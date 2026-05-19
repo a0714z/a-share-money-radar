@@ -1,0 +1,39 @@
+{
+  "name": "a-share-money-radar",
+  "version": "1.0.0",
+  "description": "A-share main-board non-ST money-entry screener powered by Biying API.",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "scan": "tsx scripts/run-scan.ts",
+    "scan:sample": "tsx scripts/run-scan.ts --sample"
+  },
+  "keywords": [
+    "a-share",
+    "quant",
+    "biyingapi",
+    "stock-screener"
+  ],
+  "author": "zhangxiaolong",
+  "license": "UNLICENSED",
+  "type": "module",
+  "dependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "dotenv": "^17.4.2",
+    "lucide-react": "^1.16.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^3.8.1",
+    "tsx": "^4.22.2",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3"
+  }
+}
