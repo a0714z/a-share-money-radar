@@ -94,6 +94,21 @@ function tradeDateFromPicks(picks: StockPick[]) {
   return updated ? updated.slice(0, 10) : new Date().toISOString().slice(0, 10);
 }
 
+function chinaDateTime(date = new Date()) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false
+  })
+    .format(date)
+    .replace(/\//g, "-");
+}
+
 function hasUsableQuote(item: { stock: StockListItem; quote?: RealQuote; rough: number }): item is RoughCandidate {
   return Boolean(item.quote) && Number.isFinite(item.rough);
 }
@@ -155,7 +170,7 @@ async function liveScan() {
 
   const report: ScanReport = {
     meta: {
-      generatedAt: new Date().toISOString(),
+      generatedAt: chinaDateTime(),
       tradeDate: tradeDateFromPicks(ranked),
       source: "Biying API",
       mode: "live",
