@@ -33,7 +33,8 @@ npm run dev
 
 1. 如果仓库 secret `BIYING_LICENSE` 存在，拉取必盈数据并生成真实报告。
 2. 如果 secret 不存在，生成样例报告，保证页面仍可构建。
-3. 构建静态前端并部署到 GitHub Pages。
+3. 提交 `public/reports/latest.json`，构建静态前端，并上传构建产物 artifact。
+4. 如果仓库是公开仓库，额外部署到 GitHub Pages；私有仓库会保留在 Actions artifact 中。
 
 ## 配置项
 
