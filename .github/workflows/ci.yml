@@ -21,7 +21,9 @@ jobs:
         run: npm ci
 
       - name: Generate sample report
-        run: npm run scan:sample
+        run: |
+          npm run scan:sample
+          npm run review:sample
 
       - name: Build
         run: npm run build

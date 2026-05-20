@@ -77,8 +77,15 @@ button {
 .panel-toolbar span,
 .detail-head p,
 .metric span,
-.detail-grid span {
+.detail-grid span,
+.muted {
   color: #657168;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .live-badge {
@@ -107,6 +114,30 @@ button {
 
 .live-sample span {
   background: #a16207;
+}
+
+.view-switch {
+  display: inline-flex;
+  height: 42px;
+  padding: 3px;
+  border: 1px solid #d8dfda;
+  border-radius: 8px;
+  background: rgba(238, 242, 239, 0.88);
+}
+
+.view-switch button {
+  min-width: 86px;
+  border: 0;
+  border-radius: 6px;
+  color: #526057;
+  background: transparent;
+  font-weight: 800;
+}
+
+.view-switch button.active {
+  color: #102018;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(20, 32, 26, 0.08);
 }
 
 .summary-grid {
@@ -162,6 +193,13 @@ button {
 .workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.58fr) minmax(360px, 0.92fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(360px, 0.58fr) minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -245,6 +283,10 @@ button {
   max-height: calc(100vh - 260px);
 }
 
+.review-table {
+  max-height: calc(100vh - 330px);
+}
+
 table {
   width: 100%;
   min-width: 860px;
@@ -323,6 +365,45 @@ tbody tr.is-selected {
   padding: 46px;
   color: #657168;
   text-align: center;
+}
+
+.review-panel {
+  margin-top: 22px;
+}
+
+.review-summary {
+  margin-top: 0;
+}
+
+.review-chart {
+  padding: 16px 12px 4px;
+}
+
+.review-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 16px 16px;
+}
+
+.review-kpis div {
+  min-height: 86px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.review-kpis span,
+.review-kpis small {
+  display: block;
+  color: #657168;
+}
+
+.review-kpis strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 20px;
 }
 
 .detail-panel {
@@ -467,7 +548,8 @@ tbody tr.is-selected {
 }
 
 @media (max-width: 1180px) {
-  .workspace {
+  .workspace,
+  .review-layout {
     grid-template-columns: 1fr;
   }
 
@@ -488,6 +570,19 @@ tbody tr.is-selected {
     flex-direction: column;
   }
 
+  .top-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-switch {
+    width: 100%;
+  }
+
+  .view-switch button {
+    flex: 1;
+  }
+
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -506,14 +601,16 @@ tbody tr.is-selected {
     flex: 1 0 auto;
   }
 
-  .detail-grid {
+  .detail-grid,
+  .review-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 520px) {
   .summary-grid,
-  .detail-grid {
+  .detail-grid,
+  .review-kpis {
     grid-template-columns: 1fr;
   }
 

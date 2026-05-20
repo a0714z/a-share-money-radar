@@ -146,3 +146,57 @@ export type ScanReport = {
   watchlist: StockPick[];
   avoided: StockPick[];
 };
+
+export type ReviewHorizon = "1d" | "3d" | "5d" | "10d";
+
+export type HorizonResult = {
+  days: number;
+  status: "complete" | "pending";
+  date?: string;
+  close?: number;
+  returnPct?: number;
+};
+
+export type ReviewRecord = {
+  signalDate: string;
+  code: string;
+  instrument: string;
+  name: string;
+  rank: number;
+  score: number;
+  signalPrice: number;
+  flowRatio5d: number;
+  valuePosition: number;
+  pullbackFromHigh: number;
+  horizons: Record<ReviewHorizon, HorizonResult>;
+  bestEntryDrawdown3d?: number;
+  maxDrawdown10d?: number;
+  maxRunup10d?: number;
+  status: "complete" | "tracking";
+};
+
+export type HorizonSummary = {
+  completed: number;
+  winRate?: number;
+  avgReturn?: number;
+  medianReturn?: number;
+};
+
+export type ReviewReport = {
+  meta: {
+    generatedAt: string;
+    source: string;
+    mode: "live" | "sample";
+    historyReports: number;
+    notes: string[];
+  };
+  summary: {
+    totalSignals: number;
+    completed10d: number;
+    tracking: number;
+    horizons: Record<ReviewHorizon, HorizonSummary>;
+    avgMaxDrawdown10d?: number;
+    avgBestEntryDrawdown3d?: number;
+  };
+  records: ReviewRecord[];
+};

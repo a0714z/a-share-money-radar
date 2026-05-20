@@ -1,0 +1,220 @@
+{
+  "meta": {
+    "generatedAt": "2026-05-20 09:02:45",
+    "source": "Biying API + archived scan reports",
+    "mode": "live",
+    "historyReports": 1,
+    "notes": [
+      "只统计核心强关注池，不把观察池计入胜率",
+      "收益按信号日收盘价到后续第 N 个交易日收盘价计算",
+      "3日最佳低吸空间和10日最大回撤用信号价到后续最低价估算"
+    ]
+  },
+  "summary": {
+    "totalSignals": 6,
+    "completed10d": 0,
+    "tracking": 6,
+    "horizons": {
+      "1d": {
+        "completed": 0
+      },
+      "3d": {
+        "completed": 0
+      },
+      "5d": {
+        "completed": 0
+      },
+      "10d": {
+        "completed": 0
+      }
+    }
+  },
+  "records": [
+    {
+      "signalDate": "2026-05-19",
+      "code": "000725",
+      "instrument": "000725.SZ",
+      "name": "京东方Ａ",
+      "rank": 1,
+      "score": 88.9,
+      "signalPrice": 4.31,
+      "flowRatio5d": 3.53,
+      "valuePosition": 55.3,
+      "pullbackFromHigh": 8.9,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-19",
+      "code": "000032",
+      "instrument": "000032.SZ",
+      "name": "深桑达Ａ",
+      "rank": 2,
+      "score": 87.1,
+      "signalPrice": 19.63,
+      "flowRatio5d": 7.73,
+      "valuePosition": 39.5,
+      "pullbackFromHigh": 18.8,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-19",
+      "code": "000156",
+      "instrument": "000156.SZ",
+      "name": "华数传媒",
+      "rank": 3,
+      "score": 86,
+      "signalPrice": 7.68,
+      "flowRatio5d": 6.93,
+      "valuePosition": 24.4,
+      "pullbackFromHigh": 23.3,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-19",
+      "code": "000027",
+      "instrument": "000027.SZ",
+      "name": "深圳能源",
+      "rank": 4,
+      "score": 85.8,
+      "signalPrice": 7.76,
+      "flowRatio5d": 5.59,
+      "valuePosition": 64.4,
+      "pullbackFromHigh": 8.5,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-19",
+      "code": "000507",
+      "instrument": "000507.SZ",
+      "name": "珠海港",
+      "rank": 5,
+      "score": 85.3,
+      "signalPrice": 5.4,
+      "flowRatio5d": 12.3,
+      "valuePosition": 37.6,
+      "pullbackFromHigh": 8.9,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-19",
+      "code": "000966",
+      "instrument": "000966.SZ",
+      "name": "长源电力",
+      "rank": 7,
+      "score": 83.2,
+      "signalPrice": 5.09,
+      "flowRatio5d": 4.59,
+      "valuePosition": 50.6,
+      "pullbackFromHigh": 14.5,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    }
+  ]
+}

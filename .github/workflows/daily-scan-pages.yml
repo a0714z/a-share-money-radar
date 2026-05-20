@@ -44,11 +44,14 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -n "$BIYING_LICENSE" ]; then
               npm run scan
+              npm run review
             else
               npm run scan:sample
+              npm run review:sample
             fi
           elif [ ! -f public/reports/latest.json ]; then
             npm run scan:sample
+            npm run review:sample
           else
             echo "Using committed latest report for push build"
           fi
@@ -58,7 +61,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/reports/latest.json
+          git add public/reports/latest.json public/reports/history public/reports/performance.json
           if git diff --cached --quiet; then
             echo "No report changes"
           else
@@ -70,6 +73,7 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         run: |
           node -e "const r=require('./public/reports/latest.json'); if (!r.picks || !r.meta) process.exit(1); console.log('report ok:', r.meta.tradeDate, r.universe.strong)"
+          node -e "const r=require('./public/reports/performance.json'); if (!r.records || !r.summary) process.exit(1); console.log('review ok:', r.summary.totalSignals)"
 
       - name: Build
         env:

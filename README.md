@@ -9,6 +9,7 @@
 - 精筛：对候选池补 120 日 K 线和 10 日资金流向。
 - 打分：资金流入 40%，价格分位与回撤 30%，趋势成本区 20%，流动性 10%，再扣除追高、过热、破位、流动性不足等风险。
 - 输出：`public/reports/latest.json`，前端读取这份报告展示核心强关注、观察和等待名单。默认核心池控制在个位数，避免候选过多。
+- 复盘：每天归档 `public/reports/history/YYYY-MM-DD.json`，并生成 `public/reports/performance.json` 追踪核心池 1/3/5/10 日表现。
 
 ## 本地运行
 
@@ -17,6 +18,7 @@ cp .env.example .env.local
 # 把 BIYING_LICENSE 改成你的必盈 API 证书
 npm install
 npm run scan
+npm run review
 npm run dev
 ```
 
@@ -24,6 +26,7 @@ npm run dev
 
 ```bash
 npm run scan:sample
+npm run review:sample
 npm run dev
 ```
 
@@ -33,7 +36,7 @@ npm run dev
 
 1. 如果仓库 secret `BIYING_LICENSE` 存在，拉取必盈数据并生成真实报告。
 2. 如果 secret 不存在，生成样例报告，保证页面仍可构建。
-3. 提交 `public/reports/latest.json`，构建静态前端，并上传构建产物 artifact。
+3. 提交 `public/reports/latest.json`、历史归档和 `public/reports/performance.json`，构建静态前端，并上传构建产物 artifact。
 4. 如果仓库是公开仓库，额外部署到 GitHub Pages；私有仓库会保留在 Actions artifact 中。
 
 ## 配置项

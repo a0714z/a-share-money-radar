@@ -6,9 +6,13 @@ import {
   CalendarClock,
   CircleDollarSign,
   Filter,
+  History,
+  ListChecks,
+  Percent,
   Radar,
   Search,
   ShieldCheck,
+  Target,
   TrendingUp
 } from "lucide-react";
 import {
@@ -24,9 +28,11 @@ import {
   YAxis
 } from "recharts";
 import { sampleReport } from "./data/sample-report";
-import type { ScanReport, Signal, StockPick } from "./lib/types";
+import { sampleReview } from "./data/sample-review";
+import type { ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, Signal, StockPick } from "./lib/types";
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
+const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
 
 function formatMoney(value?: number) {
   if (!value) return "-";
@@ -55,6 +61,13 @@ async function loadReport() {
   const response = await fetch(`${base}reports/latest.json?t=${Date.now()}`);
   if (!response.ok) throw new Error("no live report");
   return (await response.json()) as ScanReport;
+}
+
+async function loadReview() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/performance.json?t=${Date.now()}`);
+  if (!response.ok) throw new Error("no review report");
+  return (await response.json()) as ReviewReport;
 }
 
 function Metric({
@@ -256,8 +269,129 @@ function PickDetail({ pick }: { pick: StockPick }) {
   );
 }
 
+function horizonLabel(horizon: ReviewHorizon) {
+  return horizon.replace("d", "日");
+}
+
+function ReviewReturn({ value }: { value?: number }) {
+  if (!Number.isFinite(value)) return <span className="muted">追踪中</span>;
+  return <span className={value! >= 0 ? "up" : "down"}>{formatPct(value)}</span>;
+}
+
+function ReviewTable({ records }: { records: ReviewRecord[] }) {
+  return (
+    <div className="table-wrap review-table">
+      <table>
+        <thead>
+          <tr>
+            <th>信号日</th>
+            <th>代码</th>
+            <th>名称</th>
+            <th>信号价</th>
+            <th>1日</th>
+            <th>3日</th>
+            <th>5日</th>
+            <th>10日</th>
+            <th>3日低吸</th>
+            <th>10日回撤</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((record) => (
+            <tr key={`${record.signalDate}-${record.instrument}`}>
+              <td>{record.signalDate}</td>
+              <td className="code">{record.instrument}</td>
+              <td>{record.name}</td>
+              <td>{record.signalPrice.toFixed(2)}</td>
+              {reviewHorizons.map((horizon) => (
+                <td key={horizon}>
+                  <ReviewReturn value={record.horizons[horizon].returnPct} />
+                </td>
+              ))}
+              <td>
+                <ReviewReturn value={record.bestEntryDrawdown3d} />
+              </td>
+              <td>
+                <ReviewReturn value={record.maxDrawdown10d} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!records.length && <div className="empty">还没有可复盘的核心信号</div>}
+    </div>
+  );
+}
+
+function ReviewPanel({ review }: { review: ReviewReport }) {
+  const summaryBars = reviewHorizons.map((horizon) => ({
+    name: horizonLabel(horizon),
+    avg: review.summary.horizons[horizon].avgReturn ?? 0,
+    winRate: review.summary.horizons[horizon].winRate ?? 0,
+    completed: review.summary.horizons[horizon].completed
+  }));
+  const fiveDay = review.summary.horizons["5d"];
+
+  return (
+    <section className="review-panel">
+      <div className="summary-grid review-summary">
+        <Metric icon={ListChecks} label="核心信号" value={review.summary.totalSignals} tone="blue" />
+        <Metric icon={Target} label="10日完成" value={review.summary.completed10d} />
+        <Metric icon={Percent} label="5日胜率" value={fiveDay.winRate !== undefined ? `${fiveDay.winRate}%` : "追踪中"} tone="green" />
+        <Metric icon={History} label="历史报告" value={review.meta.historyReports} tone="amber" />
+      </div>
+
+      <div className="review-layout">
+        <section className="list-panel review-chart-panel">
+          <div className="panel-toolbar">
+            <div>
+              <h2>收益复盘</h2>
+              <span>{review.meta.generatedAt}</span>
+            </div>
+          </div>
+          <div className="review-chart">
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={summaryBars} margin={{ top: 18, right: 18, left: 0, bottom: 0 }}>
+                <CartesianGrid stroke="#edf1ee" vertical={false} />
+                <XAxis dataKey="name" tickLine={false} axisLine={false} />
+                <YAxis tickFormatter={(value) => `${Number(value).toFixed(1)}%`} tickLine={false} axisLine={false} width={44} />
+                <Tooltip formatter={(value) => `${Number(value ?? 0).toFixed(2)}%`} />
+                <Bar dataKey="avg" name="平均收益" fill="#159a65" radius={[5, 5, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="review-kpis">
+            {reviewHorizons.map((horizon) => {
+              const item = review.summary.horizons[horizon];
+              return (
+                <div key={horizon}>
+                  <span>{horizonLabel(horizon)}</span>
+                  <strong>{item.avgReturn !== undefined ? formatPct(item.avgReturn) : "追踪中"}</strong>
+                  <small>{item.completed} 个完成样本</small>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="list-panel">
+          <div className="panel-toolbar">
+            <div>
+              <h2>单票追踪</h2>
+              <span>只统计核心强关注池</span>
+            </div>
+          </div>
+          <ReviewTable records={review.records} />
+        </section>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [report, setReport] = useState<ScanReport>(sampleReport);
+  const [review, setReview] = useState<ReviewReport>(sampleReview);
+  const [view, setView] = useState<"radar" | "review">("radar");
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
   const [selected, setSelected] = useState<StockPick | undefined>(sampleReport.picks[0]);
@@ -275,6 +409,12 @@ export default function App() {
         setReport(sampleReport);
         setSelected(sampleReport.picks[0]);
       });
+  }, []);
+
+  useEffect(() => {
+    loadReview()
+      .then(setReview)
+      .catch(() => setReview(sampleReview));
   }, []);
 
   const rows = useMemo(() => {
@@ -310,47 +450,63 @@ export default function App() {
             <span>主板非 ST · 收盘后扫描</span>
           </div>
         </div>
-        <div className={`live-badge live-${status}`}>
-          <span />
-          {liveBadge}
+        <div className="top-actions">
+          <div className="view-switch">
+            <button className={view === "radar" ? "active" : ""} onClick={() => setView("radar")}>
+              今日选股
+            </button>
+            <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}>
+              复盘统计
+            </button>
+          </div>
+          <div className={`live-badge live-${status}`}>
+            <span />
+            {liveBadge}
+          </div>
         </div>
       </header>
 
-      <section className="summary-grid">
-        <Metric icon={CalendarClock} label="交易日" value={report.meta.tradeDate} tone="blue" />
-        <Metric icon={ShieldCheck} label="主板非 ST" value={report.universe.mainBoardNonSt.toLocaleString("zh-CN")} />
-        <Metric icon={Filter} label="已评分" value={report.universe.scored.toLocaleString("zh-CN")} tone="amber" />
-        <Metric icon={TrendingUp} label="强关注" value={report.universe.strong} tone="green" />
-      </section>
+      {view === "radar" ? (
+        <>
+          <section className="summary-grid">
+            <Metric icon={CalendarClock} label="交易日" value={report.meta.tradeDate} tone="blue" />
+            <Metric icon={ShieldCheck} label="主板非 ST" value={report.universe.mainBoardNonSt.toLocaleString("zh-CN")} />
+            <Metric icon={Filter} label="已评分" value={report.universe.scored.toLocaleString("zh-CN")} tone="amber" />
+            <Metric icon={TrendingUp} label="强关注" value={report.universe.strong} tone="green" />
+          </section>
 
-      <section className="workspace">
-        <div className="list-panel">
-          <div className="panel-toolbar">
-            <div>
-              <h2>资金进场候选</h2>
-              <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</span>
-            </div>
-            <div className="controls">
-              <label className="search-box">
-                <Search size={16} />
-                <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="代码 / 名称" />
-              </label>
-              <div className="segments">
-                <button className={signal === "all" ? "active" : ""} onClick={() => setSignal("all")}>
-                  全部
-                </button>
-                {signalOrder.map((item) => (
-                  <button key={item} className={signal === item ? "active" : ""} onClick={() => setSignal(item)}>
-                    {signalText(item)}
-                  </button>
-                ))}
+          <section className="workspace">
+            <div className="list-panel">
+              <div className="panel-toolbar">
+                <div>
+                  <h2>资金进场候选</h2>
+                  <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</span>
+                </div>
+                <div className="controls">
+                  <label className="search-box">
+                    <Search size={16} />
+                    <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="代码 / 名称" />
+                  </label>
+                  <div className="segments">
+                    <button className={signal === "all" ? "active" : ""} onClick={() => setSignal("all")}>
+                      全部
+                    </button>
+                    {signalOrder.map((item) => (
+                      <button key={item} className={signal === item ? "active" : ""} onClick={() => setSignal(item)}>
+                        {signalText(item)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+              <PickTable picks={rows} selected={selected} onSelect={setSelected} />
             </div>
-          </div>
-          <PickTable picks={rows} selected={selected} onSelect={setSelected} />
-        </div>
-        {selected && <PickDetail pick={selected} />}
-      </section>
+            {selected && <PickDetail pick={selected} />}
+          </section>
+        </>
+      ) : (
+        <ReviewPanel review={review} />
+      )}
     </main>
   );
 }
