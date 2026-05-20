@@ -133,6 +133,32 @@ function buildRecord(report: ScanReport, pick: StockPick, history: KLine[]): Rev
     result.maxDrawdown10d = round(pctChange(minLow, signalPrice), 2);
     result.maxRunup10d = round(pctChange(maxHigh, signalPrice), 2);
   }
+  if (pick.tradePlan && next10.length) {
+    const replay: NonNullable<ReviewRecord["planReplay"]> = {
+      entryTouched: next10.some((bar) => bar.l <= pick.tradePlan!.entryHigh && bar.h >= pick.tradePlan!.entryLow),
+      stopLossTouched: next10.some((bar) => bar.l <= pick.tradePlan!.stopLoss),
+      target1Touched: next10.some((bar) => bar.h >= pick.tradePlan!.target1),
+      target2Touched: next10.some((bar) => bar.h >= pick.tradePlan!.target2)
+    };
+
+    for (const bar of next10) {
+      if (bar.l <= pick.tradePlan.stopLoss) {
+        replay.firstTrigger = "stopLoss";
+      } else if (bar.l <= pick.tradePlan.entryHigh && bar.h >= pick.tradePlan.entryLow) {
+        replay.firstTrigger = "entry";
+      } else if (bar.h >= pick.tradePlan.target2) {
+        replay.firstTrigger = "target2";
+      } else if (bar.h >= pick.tradePlan.target1) {
+        replay.firstTrigger = "target1";
+      }
+      if (replay.firstTrigger) {
+        replay.firstTriggerDate = bar.t.slice(0, 10);
+        break;
+      }
+    }
+
+    result.planReplay = replay;
+  }
   if (result.horizons["10d"].status === "complete") result.status = "complete";
 
   return result;
@@ -168,6 +194,25 @@ function summarize(records: ReviewRecord[]): ReviewReport["summary"] {
   if (drawdowns.length) summary.avgMaxDrawdown10d = round(drawdowns.reduce((total, value) => total + value, 0) / drawdowns.length, 2);
   if (entryDrawdowns.length) {
     summary.avgBestEntryDrawdown3d = round(entryDrawdowns.reduce((total, value) => total + value, 0) / entryDrawdowns.length, 2);
+  }
+
+  const planRecords = records.filter((record) => record.planReplay);
+  if (planRecords.length) {
+    const entryTouches = planRecords.filter((record) => record.planReplay?.entryTouched).length;
+    const stopLossHits = planRecords.filter((record) => record.planReplay?.stopLossTouched).length;
+    const target1Hits = planRecords.filter((record) => record.planReplay?.target1Touched).length;
+    const target2Hits = planRecords.filter((record) => record.planReplay?.target2Touched).length;
+    summary.planReplay = {
+      completed: planRecords.length,
+      entryTouches,
+      stopLossHits,
+      target1Hits,
+      target2Hits,
+      entryTouchRate: round((entryTouches / planRecords.length) * 100, 1),
+      stopLossRate: round((stopLossHits / planRecords.length) * 100, 1),
+      target1HitRate: round((target1Hits / planRecords.length) * 100, 1),
+      target2HitRate: round((target2Hits / planRecords.length) * 100, 1)
+    };
   }
 
   return summary;

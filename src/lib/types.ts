@@ -254,6 +254,14 @@ export type ReviewRecord = {
   bestEntryDrawdown3d?: number;
   maxDrawdown10d?: number;
   maxRunup10d?: number;
+  planReplay?: {
+    entryTouched: boolean;
+    stopLossTouched: boolean;
+    target1Touched: boolean;
+    target2Touched: boolean;
+    firstTrigger?: "entry" | "stopLoss" | "target1" | "target2";
+    firstTriggerDate?: string;
+  };
   status: "complete" | "tracking";
 };
 
@@ -279,6 +287,17 @@ export type ReviewReport = {
     horizons: Record<ReviewHorizon, HorizonSummary>;
     avgMaxDrawdown10d?: number;
     avgBestEntryDrawdown3d?: number;
+    planReplay?: {
+      completed: number;
+      entryTouches: number;
+      stopLossHits: number;
+      target1Hits: number;
+      target2Hits: number;
+      entryTouchRate?: number;
+      stopLossRate?: number;
+      target1HitRate?: number;
+      target2HitRate?: number;
+    };
   };
   records: ReviewRecord[];
 };

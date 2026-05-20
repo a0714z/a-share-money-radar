@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   AlertTriangle,
   BadgeCheck,
   BarChart3,
@@ -68,6 +69,14 @@ function marketActionText(market?: MarketRegime) {
 
 function allPicks(report: ScanReport) {
   return [...report.picks, ...report.watchlist, ...report.avoided].sort((a, b) => a.rank - b.rank);
+}
+
+function triggerText(trigger?: NonNullable<ReviewRecord["planReplay"]>["firstTrigger"]) {
+  if (trigger === "entry") return "触达关注区";
+  if (trigger === "stopLoss") return "触发止损";
+  if (trigger === "target1") return "触达目标一";
+  if (trigger === "target2") return "触达目标二";
+  return "未触发";
 }
 
 async function loadReport() {
@@ -173,8 +182,12 @@ function PickTable({
   );
 }
 
-function PickDetail({ pick }: { pick: StockPick }) {
+function PickDetail({ pick, reviewRecords }: { pick: StockPick; reviewRecords: ReviewRecord[] }) {
   const plan = pick.tradePlan;
+  const historySignals = reviewRecords
+    .filter((record) => record.instrument === pick.instrument)
+    .sort((a, b) => b.signalDate.localeCompare(a.signalDate))
+    .slice(0, 4);
 
   return (
     <aside className="detail-panel">
@@ -311,6 +324,38 @@ function PickDetail({ pick }: { pick: StockPick }) {
         </div>
       </div>
 
+      <div className="history-card">
+        <div className="chart-title">
+          <History size={16} />
+          <span>历史信号</span>
+        </div>
+        {historySignals.length ? (
+          <div className="signal-history">
+            {historySignals.map((record) => (
+              <div key={`${record.signalDate}-${record.instrument}`} className="signal-history-row">
+                <div>
+                  <strong>{record.signalDate}</strong>
+                  <span>
+                    Rank {record.rank} · 评分 {record.score.toFixed(1)}
+                  </span>
+                </div>
+                <div className="history-values">
+                  <span>
+                    5日 <ReviewReturn value={record.horizons["5d"].returnPct} />
+                  </span>
+                  <span>
+                    浮盈 <ReviewReturn value={record.maxRunup10d} />
+                  </span>
+                  <span>{triggerText(record.planReplay?.firstTrigger)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty small-empty">暂无历史核心信号</div>
+        )}
+      </div>
+
       <div className="reason-block">
         <h3>入选依据</h3>
         <ul>
@@ -335,6 +380,53 @@ function PickDetail({ pick }: { pick: StockPick }) {
         </ul>
       </div>
     </aside>
+  );
+}
+
+function SystemStatusPanel({
+  report,
+  review,
+  status
+}: {
+  report: ScanReport;
+  review: ReviewReport;
+  status: "loading" | "live" | "sample";
+}) {
+  const reportFresh = report.meta.tradeDate === review.records[0]?.signalDate || review.meta.historyReports > 0;
+  const dataTone = status === "live" ? "tag-ok" : status === "loading" ? "tag-warn" : "tag-warn";
+
+  return (
+    <section className="status-panel">
+      <div className="status-head">
+        <div>
+          <h2>系统状态</h2>
+          <span>{report.meta.source} · 下一次 {report.meta.nextRunHint}</span>
+        </div>
+        <span className={dataTone}>{status === "live" ? "Live 数据" : status === "loading" ? "加载中" : "Sample 数据"}</span>
+      </div>
+      <div className="status-grid">
+        <div>
+          <Activity size={16} />
+          <span>扫描时间</span>
+          <strong>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</strong>
+        </div>
+        <div>
+          <ListChecks size={16} />
+          <span>复盘样本</span>
+          <strong>{review.summary.totalSignals} 个信号</strong>
+        </div>
+        <div>
+          <ShieldCheck size={16} />
+          <span>报告状态</span>
+          <strong>{reportFresh ? "已归档" : "待归档"}</strong>
+        </div>
+        <div>
+          <Target size={16} />
+          <span>交易计划命中</span>
+          <strong>{review.summary.planReplay?.target1HitRate !== undefined ? `${review.summary.planReplay.target1HitRate}%` : "追踪中"}</strong>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -431,8 +523,10 @@ function ReviewTable({ records }: { records: ReviewRecord[] }) {
             <th>3日</th>
             <th>5日</th>
             <th>10日</th>
+            <th>10日浮盈</th>
             <th>3日低吸</th>
             <th>10日回撤</th>
+            <th>计划触发</th>
           </tr>
         </thead>
         <tbody>
@@ -448,11 +542,15 @@ function ReviewTable({ records }: { records: ReviewRecord[] }) {
                 </td>
               ))}
               <td>
+                <ReviewReturn value={record.maxRunup10d} />
+              </td>
+              <td>
                 <ReviewReturn value={record.bestEntryDrawdown3d} />
               </td>
               <td>
                 <ReviewReturn value={record.maxDrawdown10d} />
               </td>
+              <td>{triggerText(record.planReplay?.firstTrigger)}</td>
             </tr>
           ))}
         </tbody>
@@ -478,6 +576,8 @@ function ReviewPanel({ review }: { review: ReviewReport }) {
         <Metric icon={Target} label="10日完成" value={review.summary.completed10d} />
         <Metric icon={Percent} label="5日胜率" value={fiveDay.winRate !== undefined ? `${fiveDay.winRate}%` : "追踪中"} tone="green" />
         <Metric icon={History} label="历史报告" value={review.meta.historyReports} tone="amber" />
+        <Metric icon={AlertTriangle} label="10日回撤" value={review.summary.avgMaxDrawdown10d !== undefined ? formatPct(review.summary.avgMaxDrawdown10d) : "追踪中"} tone="red" />
+        <Metric icon={BadgeCheck} label="目标一命中" value={review.summary.planReplay?.target1HitRate !== undefined ? `${review.summary.planReplay.target1HitRate}%` : "追踪中"} tone="green" />
       </div>
 
       <div className="review-layout">
@@ -615,6 +715,7 @@ export default function App() {
             <Metric icon={Radar} label="市场状态" value={report.market?.label ?? "未评估"} tone={marketTone(report.market)} />
           </section>
 
+          <SystemStatusPanel report={report} review={review} status={status} />
           <MarketPanel market={report.market} />
           <ConcentrationPanel concentration={report.concentration} />
 
@@ -644,7 +745,7 @@ export default function App() {
               </div>
               <PickTable picks={rows} selected={selected} onSelect={setSelected} />
             </div>
-            {selected && <PickDetail pick={selected} />}
+            {selected && <PickDetail pick={selected} reviewRecords={review.records} />}
           </section>
         </>
       ) : (

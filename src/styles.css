@@ -196,7 +196,8 @@ button {
 }
 
 .market-panel,
-.concentration-panel {
+.concentration-panel,
+.status-panel {
   margin: -8px 0 22px;
   padding: 16px;
   border: 1px solid #dce3df;
@@ -207,6 +208,65 @@ button {
 
 .concentration-panel {
   margin-top: -8px;
+}
+
+.status-panel {
+  margin-top: -8px;
+}
+
+.status-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.status-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.status-head span {
+  color: #657168;
+}
+
+.status-head > span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.status-grid div {
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.status-grid svg {
+  color: #159a65;
+}
+
+.status-grid span {
+  display: block;
+  margin-top: 8px;
+  color: #657168;
+  font-size: 13px;
+}
+
+.status-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 18px;
 }
 
 .market-head {
@@ -434,7 +494,7 @@ button {
 
 table {
   width: 100%;
-  min-width: 940px;
+  min-width: 1080px;
   border-collapse: collapse;
 }
 
@@ -706,6 +766,61 @@ tbody tr.is-selected {
   border-radius: 8px;
 }
 
+.history-card {
+  margin-top: 14px;
+  padding: 14px 8px 8px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.signal-history {
+  display: grid;
+  gap: 8px;
+  padding: 0 6px 6px;
+}
+
+.signal-history-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.signal-history-row strong,
+.signal-history-row span {
+  display: block;
+}
+
+.signal-history-row span {
+  color: #657168;
+  font-size: 12px;
+}
+
+.history-values {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.history-values > span {
+  min-width: 78px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #31443a;
+  background: #edf2ef;
+  text-align: center;
+  font-weight: 800;
+}
+
+.small-empty {
+  padding: 18px;
+}
+
 .chart-title {
   display: flex;
   align-items: center;
@@ -822,7 +937,8 @@ tbody tr.is-selected {
   }
 
   .market-index-grid,
-  .sector-bars {
+  .sector-bars,
+  .status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -853,8 +969,14 @@ tbody tr.is-selected {
   .trade-plan-grid,
   .review-kpis,
   .market-index-grid,
-  .sector-bars {
+  .sector-bars,
+  .status-grid,
+  .signal-history-row {
     grid-template-columns: 1fr;
+  }
+
+  .history-values {
+    justify-content: flex-start;
   }
 
   .brand h1 {
