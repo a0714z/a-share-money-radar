@@ -391,6 +391,16 @@ function selectCoreBySector(strong: StockPick[], coreLimit: number, maxPerSector
   return { picks, sectorDemoted, capacityDemoted };
 }
 
+function isSurgePullbackPick(pick: StockPick) {
+  return pick.reasons.some((reason) => reason.includes("倍量启动") || reason.includes("回调缩量") || reason.includes("回踩"));
+}
+
+function buildWatchlist(items: StockPick[], limit: number) {
+  const setup = items.filter(isSurgePullbackPick).sort((a, b) => b.score - a.score);
+  const regular = items.filter((item) => !isSurgePullbackPick(item)).sort((a, b) => b.score - a.score);
+  return [...setup, ...regular].slice(0, limit);
+}
+
 function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: number, maxPerSector: number) {
   const strong = ranked.filter((item) => item.signal === "strong");
   const watch = ranked.filter((item) => item.signal === "watch");
@@ -402,7 +412,7 @@ function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: nu
     concentration = buildConcentrationReport(strong, [], [], maxPerSector);
     return {
       picks: [],
-      watchlist: [...demoted, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
+      watchlist: buildWatchlist([...demoted, ...watch], Math.max(20, topN)),
       avoided: wait.slice(0, 25),
       concentration
     };
@@ -415,7 +425,7 @@ function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: nu
 
   return {
     picks,
-    watchlist: [...sectorDemoted, ...capacityDemoted, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
+    watchlist: buildWatchlist([...sectorDemoted, ...capacityDemoted, ...watch], Math.max(20, topN)),
     avoided: wait.slice(0, 25),
     concentration
   };
