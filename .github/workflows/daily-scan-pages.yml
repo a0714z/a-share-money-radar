@@ -100,16 +100,13 @@ jobs:
           path: dist
 
       - name: Configure Pages
-        if: ${{ github.event.repository.private == false }}
         uses: actions/configure-pages@v5
 
       - name: Upload artifact
-        if: ${{ github.event.repository.private == false }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
       - name: Deploy
-        if: ${{ github.event.repository.private == false }}
         id: deployment
         uses: actions/deploy-pages@v4
