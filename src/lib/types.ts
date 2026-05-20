@@ -2,6 +2,8 @@ export type Exchange = "sh" | "sz";
 
 export type Signal = "strong" | "watch" | "wait";
 
+export type MarketState = "strong" | "neutral" | "weak";
+
 export type StockListItem = {
   dm: string;
   mc: string;
@@ -142,9 +144,37 @@ export type ScanReport = {
     strong: number;
     watch: number;
   };
+  market?: MarketRegime;
   picks: StockPick[];
   watchlist: StockPick[];
   avoided: StockPick[];
+};
+
+export type MarketIndexSignal = {
+  code: string;
+  name: string;
+  tradeDate: string;
+  close: number;
+  ma20: number;
+  ma60: number;
+  return5d: number;
+  return20d: number;
+  aboveMa20: boolean;
+  aboveMa60: boolean;
+  ma20Slope: number;
+  score: number;
+  reasons: string[];
+};
+
+export type MarketRegime = {
+  state: MarketState;
+  label: string;
+  score: number;
+  action: "allow_core" | "cap_core" | "observe_only";
+  tradeDate: string;
+  appliedToCore: boolean;
+  indices: MarketIndexSignal[];
+  reasons: string[];
 };
 
 export type ReviewHorizon = "1d" | "3d" | "5d" | "10d";

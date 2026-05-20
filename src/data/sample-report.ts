@@ -76,6 +76,47 @@ export const sampleReport: ScanReport = {
     strong: 2,
     watch: 4
   },
+  market: {
+    state: "strong",
+    label: "强势",
+    score: 82.5,
+    action: "allow_core",
+    tradeDate: "2026-05-19",
+    appliedToCore: false,
+    indices: [
+      {
+        code: "000001.SH",
+        name: "上证指数",
+        tradeDate: "2026-05-19",
+        close: 4169.54,
+        ma20: 4052.31,
+        ma60: 3928.64,
+        return5d: 2.18,
+        return20d: 4.65,
+        aboveMa20: true,
+        aboveMa60: true,
+        ma20Slope: 1.26,
+        score: 86,
+        reasons: ["站上20日线", "站上60日线", "20日线抬升", "5日收益为正"]
+      },
+      {
+        code: "399001.SZ",
+        name: "深证成指",
+        tradeDate: "2026-05-19",
+        close: 15569.91,
+        ma20: 15088.2,
+        ma60: 14572.46,
+        return5d: 2.04,
+        return20d: 5.12,
+        aboveMa20: true,
+        aboveMa60: true,
+        ma20Slope: 1.38,
+        score: 84,
+        reasons: ["站上20日线", "站上60日线", "20日线抬升", "5日收益为正"]
+      }
+    ],
+    reasons: ["指数综合分 82.5", "2 个指数参与评估", "0 个指数低于20日线", "0 个指数低于60日线"]
+  },
   picks: [
     pick({ rank: 1 }),
     pick({

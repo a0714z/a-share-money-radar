@@ -29,7 +29,7 @@ import {
 } from "recharts";
 import { sampleReport } from "./data/sample-report";
 import { sampleReview } from "./data/sample-review";
-import type { ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, Signal, StockPick } from "./lib/types";
+import type { MarketRegime, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, Signal, StockPick } from "./lib/types";
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
@@ -50,6 +50,20 @@ function signalText(signal: Signal) {
   if (signal === "strong") return "强关注";
   if (signal === "watch") return "观察";
   return "等待";
+}
+
+function marketTone(market?: MarketRegime): "neutral" | "green" | "amber" | "blue" | "red" {
+  if (!market) return "neutral";
+  if (market.state === "strong") return "green";
+  if (market.state === "weak") return "red";
+  return "amber";
+}
+
+function marketActionText(market?: MarketRegime) {
+  if (!market) return "未启用市场过滤";
+  if (market.action === "allow_core") return "允许核心池";
+  if (market.action === "observe_only") return "只观察";
+  return "收紧核心池";
 }
 
 function allPicks(report: ScanReport) {
@@ -79,7 +93,7 @@ function Metric({
   icon: typeof Radar;
   label: string;
   value: string | number;
-  tone?: "neutral" | "green" | "amber" | "blue";
+  tone?: "neutral" | "green" | "amber" | "blue" | "red";
 }) {
   return (
     <section className={`metric metric-${tone}`}>
@@ -266,6 +280,41 @@ function PickDetail({ pick }: { pick: StockPick }) {
         </ul>
       </div>
     </aside>
+  );
+}
+
+function MarketPanel({ market }: { market?: MarketRegime }) {
+  if (!market) return null;
+
+  return (
+    <section className={`market-panel market-${market.state}`}>
+      <div className="market-head">
+        <div>
+          <h2>市场环境</h2>
+          <span>{market.tradeDate} · {marketActionText(market)}</span>
+        </div>
+        <div className="market-score">
+          <strong>{market.label}</strong>
+          <span>{market.score.toFixed(1)}</span>
+        </div>
+      </div>
+      <div className="market-index-grid">
+        {market.indices.map((index) => (
+          <div key={index.code} className="market-index">
+            <div>
+              <strong>{index.name}</strong>
+              <span>{index.code}</span>
+            </div>
+            <p>{index.close.toFixed(2)}</p>
+            <div className="market-tags">
+              <span className={index.aboveMa20 ? "tag-ok" : "tag-warn"}>20日</span>
+              <span className={index.aboveMa60 ? "tag-ok" : "tag-warn"}>60日</span>
+              <span className={index.return5d >= 0 ? "tag-ok" : "tag-warn"}>{formatPct(index.return5d)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -473,7 +522,10 @@ export default function App() {
             <Metric icon={ShieldCheck} label="主板非 ST" value={report.universe.mainBoardNonSt.toLocaleString("zh-CN")} />
             <Metric icon={Filter} label="已评分" value={report.universe.scored.toLocaleString("zh-CN")} tone="amber" />
             <Metric icon={TrendingUp} label="强关注" value={report.universe.strong} tone="green" />
+            <Metric icon={Radar} label="市场状态" value={report.market?.label ?? "未评估"} tone={marketTone(report.market)} />
           </section>
+
+          <MarketPanel market={report.market} />
 
           <section className="workspace">
             <div className="list-panel">

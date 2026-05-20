@@ -142,7 +142,7 @@ button {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
   margin: 22px 0;
 }
@@ -188,6 +188,103 @@ button {
 .metric-blue .metric-icon {
   color: #f7fbff;
   background: #2563eb;
+}
+
+.metric-red .metric-icon {
+  color: #fff8f7;
+  background: #c2413f;
+}
+
+.market-panel {
+  margin: -8px 0 22px;
+  padding: 16px;
+  border: 1px solid #dce3df;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 16px 32px rgba(20, 32, 26, 0.06);
+}
+
+.market-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.market-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.market-head span,
+.market-index span {
+  color: #657168;
+}
+
+.market-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.market-score strong {
+  font-size: 22px;
+}
+
+.market-score span {
+  color: #31443a;
+  font-weight: 800;
+}
+
+.market-index-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.market-index {
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.market-index div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.market-index p {
+  margin: 10px 0;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.market-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.market-tags span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tag-ok {
+  color: #075535;
+  background: #dff6e9;
+}
+
+.tag-warn {
+  color: #8b2d2c;
+  background: #f8dedc;
 }
 
 .workspace {
@@ -587,6 +684,14 @@ tbody tr.is-selected {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .market-head {
+    flex-direction: column;
+  }
+
+  .market-index-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .controls,
   .search-box {
     width: 100%;
@@ -610,7 +715,8 @@ tbody tr.is-selected {
 @media (max-width: 520px) {
   .summary-grid,
   .detail-grid,
-  .review-kpis {
+  .review-kpis,
+  .market-index-grid {
     grid-template-columns: 1fr;
   }
 

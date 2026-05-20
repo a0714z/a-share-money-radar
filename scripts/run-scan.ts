@@ -4,8 +4,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
 import { sampleReport } from "../src/data/sample-report";
+import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { scoreCandidate } from "../src/lib/scoring";
-import type { RealQuote, ScanReport, StockListItem, StockPick } from "../src/lib/types";
+import type { KLine, MarketRegime, RealQuote, ScanReport, StockListItem, StockPick } from "../src/lib/types";
 import { isMainBoardNonSt, toInstrumentCode, inferExchange, plainCode } from "../src/lib/universe";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -114,8 +115,72 @@ function chinaDateTime(date = new Date()) {
     .replace(/\//g, "-");
 }
 
+function chinaDateCompact(daysOffset = 0) {
+  const date = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  })
+    .format(date)
+    .replace(/\//g, "");
+}
+
 function hasUsableQuote(item: { stock: StockListItem; quote?: RealQuote; rough: number }): item is RoughCandidate {
   return Boolean(item.quote) && Number.isFinite(item.rough);
+}
+
+async function loadMarketRegime(client: BiyingClient) {
+  const histories: Record<string, KLine[]> = {};
+  const start = chinaDateCompact(-520);
+  const end = chinaDateCompact(0);
+
+  await Promise.all(
+    MARKET_INDEXES.map(async (index) => {
+      try {
+        histories[index.code] = await client.indexHistory(index.code, start, end);
+      } catch (error) {
+        console.warn(`[scan] market index ${index.code} skipped: ${(error as Error).message}`);
+      }
+    })
+  );
+
+  return evaluateMarketRegime(histories);
+}
+
+function downgradeToWatch(pick: StockPick, risk: string): StockPick {
+  return {
+    ...pick,
+    signal: "watch",
+    rating: "观察",
+    risks: pick.risks.includes(risk) ? pick.risks : [...pick.risks, risk]
+  };
+}
+
+function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: number) {
+  const strong = ranked.filter((item) => item.signal === "strong");
+  const watch = ranked.filter((item) => item.signal === "watch");
+  const wait = ranked.filter((item) => item.signal === "wait");
+
+  if (market.action === "observe_only") {
+    const demoted = strong.map((pick) => downgradeToWatch(pick, "市场弱势，暂停强关注"));
+    return {
+      picks: [],
+      watchlist: [...demoted, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
+      avoided: wait.slice(0, 25)
+    };
+  }
+
+  const coreLimit = market.action === "cap_core" ? Math.min(topN, 5) : topN;
+  const picks = strong.slice(0, coreLimit);
+  const overflow = strong.slice(coreLimit).map((pick) => downgradeToWatch(pick, "市场震荡，核心池上限收紧"));
+
+  return {
+    picks,
+    watchlist: [...overflow, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
+    avoided: wait.slice(0, 25)
+  };
 }
 
 async function liveScan() {
@@ -124,6 +189,7 @@ async function liveScan() {
 
   const config = configFromEnv();
   const client = new BiyingClient(license);
+  const market = await loadMarketRegime(client);
 
   console.log("[scan] fetching stock list");
   const listed = await client.stockList();
@@ -181,9 +247,7 @@ async function liveScan() {
     throw new Error("No candidates could be scored; keeping the previous report.");
   }
 
-  const picks = ranked.filter((item) => item.signal === "strong").slice(0, config.topN);
-  const watchlist = ranked.filter((item) => item.signal === "watch").slice(0, Math.max(20, config.topN));
-  const avoided = ranked.filter((item) => item.signal === "wait").slice(0, 25);
+  const { picks, watchlist, avoided } = selectPicksByMarket(ranked, market, config.topN);
 
   const report: ScanReport = {
     meta: {
@@ -196,7 +260,8 @@ async function liveScan() {
       notes: [
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
-        "评分侧重资金流入、价格分位、均线成本区和流动性"
+        "评分侧重资金流入、价格分位、均线成本区和流动性",
+        `大盘环境：${market.label}，${market.reasons.join("；")}`
       ]
     },
     universe: {
@@ -208,6 +273,7 @@ async function liveScan() {
       strong: picks.length,
       watch: watchlist.length
     },
+    market,
     picks,
     watchlist,
     avoided
