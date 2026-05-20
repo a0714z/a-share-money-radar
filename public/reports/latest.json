@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 16:35:42",
+    "generatedAt": "2026-05-20 17:11:08",
     "tradeDate": "2026-05-20",
     "source": "Biying API",
     "mode": "live",
@@ -19,7 +19,7 @@
     "mainBoardNonSt": 3004,
     "quoted": 3004,
     "candidates": 180,
-    "scored": 180,
+    "scored": 179,
     "strong": 3,
     "watch": 15
   },

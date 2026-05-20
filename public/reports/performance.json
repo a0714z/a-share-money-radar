@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 16:35:48",
+    "generatedAt": "2026-05-20 17:11:10",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 2,
@@ -43,6 +43,27 @@
       "stopLossRate": 0,
       "target1HitRate": 0,
       "target2HitRate": 0
+    },
+    "health": {
+      "status": "tighten",
+      "label": "收缩",
+      "score": 29.4,
+      "sampleSize": 5,
+      "sampleWindow": 20,
+      "action": "pause",
+      "headline": "5日完成样本不足，平均收益追踪中，平均回撤 -2.56%，建议收缩仓位并等待复盘改善。",
+      "metrics": {
+        "avgMaxDrawdown10d": -2.56,
+        "target1HitRate": 0,
+        "stopLossRate": 0,
+        "completed5d": 0,
+        "completedPlan": 5
+      },
+      "notes": [
+        "健康度基于最近核心强关注信号，不包含观察池。",
+        "样本不足时自动降低健康分，避免过度相信短期结果。",
+        "目标和止损命中率按交易计划后续10个交易日估算。"
+      ]
     }
   },
   "records": [
