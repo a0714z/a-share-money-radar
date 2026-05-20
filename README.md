@@ -13,6 +13,7 @@
 - 交易计划：为每只候选生成关注区间、追高线、失效位、止损参考、目标位和仓位建议。
 - 输出：`public/reports/latest.json`，前端读取这份报告展示核心强关注、观察和等待名单。默认核心池控制在个位数，避免候选过多。
 - 复盘：每天归档 `public/reports/history/YYYY-MM-DD.json`，并生成 `public/reports/performance.json` 追踪核心池 1/3/5/10 日表现。
+- 邮件通知：收盘扫描完成后可把核心池、交易计划和复盘摘要发送到 `zxl4418@163.com`。
 
 ## 本地运行
 
@@ -40,7 +41,27 @@ npm run dev
 1. 如果仓库 secret `BIYING_LICENSE` 存在，拉取必盈数据并生成真实报告。
 2. 如果 secret 不存在，生成样例报告，保证页面仍可构建。
 3. 提交 `public/reports/latest.json`、历史归档和 `public/reports/performance.json`，构建静态前端，并上传构建产物 artifact。
-4. 如果仓库是公开仓库，额外部署到 GitHub Pages；私有仓库会保留在 Actions artifact 中。
+4. 如果配置了 SMTP secrets，发送邮件提醒到 `zxl4418@163.com`；没有配置时自动跳过，不影响扫描。
+5. 如果仓库是公开仓库，额外部署到 GitHub Pages；私有仓库会保留在 Actions artifact 中。
+
+## 邮件通知
+
+通知脚本默认收件人为 `zxl4418@163.com`，本地可先预览邮件内容：
+
+```bash
+npm run notify:dry
+```
+
+要让 GitHub Actions 真正发邮件，需要在仓库 `Settings -> Secrets and variables -> Actions` 增加这些 secrets：
+
+| Secret | 示例 | 说明 |
+| --- | --- | --- |
+| `SMTP_HOST` | `smtp.163.com` | 发件邮箱 SMTP 服务器 |
+| `SMTP_PORT` | `465` | SMTP 端口 |
+| `SMTP_SECURE` | `true` | 465 端口通常为 `true` |
+| `SMTP_USER` | `your_sender@163.com` | 发件邮箱账号 |
+| `SMTP_PASS` | `授权码` | 163 邮箱需开启 SMTP 并使用授权码，不是登录密码 |
+| `SMTP_FROM` | `A股资金雷达 <your_sender@163.com>` | 邮件发件人显示 |
 
 ## 配置项
 
@@ -53,6 +74,13 @@ npm run dev
 | `SCAN_FLOW_CANDIDATE_LIMIT` | `180` | 进入精筛的候选数量 |
 | `SCAN_MIN_AMOUNT` | `30000000` | 最低成交额 |
 | `SCAN_MAX_PER_SECTOR` | `2` | 同一主题最多进入核心池数量 |
+| `NOTIFY_EMAIL_TO` | `zxl4418@163.com` | 邮件收件人 |
+| `SMTP_HOST` | - | 发件邮箱 SMTP 服务器 |
+| `SMTP_PORT` | `465` | SMTP 端口 |
+| `SMTP_SECURE` | `true` | 是否使用 TLS |
+| `SMTP_USER` | - | 发件邮箱账号 |
+| `SMTP_PASS` | - | 发件邮箱授权码或 SMTP 密码 |
+| `SMTP_FROM` | `SMTP_USER` | 发件人显示 |
 
 ## 风险说明
 

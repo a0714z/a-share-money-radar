@@ -11,7 +11,9 @@
     "scan": "tsx scripts/run-scan.ts",
     "scan:sample": "tsx scripts/run-scan.ts --sample",
     "review": "tsx scripts/run-review.ts",
-    "review:sample": "tsx scripts/run-review.ts --sample"
+    "review:sample": "tsx scripts/run-review.ts --sample",
+    "notify": "tsx scripts/send-email.ts",
+    "notify:dry": "tsx scripts/send-email.ts --dry-run"
   },
   "keywords": [
     "a-share",
@@ -26,6 +28,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.16.0",
+    "nodemailer": "^8.0.7",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
@@ -35,6 +38,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.9.0",
+    "@types/nodemailer": "^8.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3"
   }
