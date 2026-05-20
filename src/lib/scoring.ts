@@ -171,9 +171,7 @@ function ratingFromSetup(args: {
   const isEntryZone = pullbackEntryZone || (classicEntryZone && args.surgePullbackScore >= 58);
 
   if (isEntryZone) return { signal: "strong" as const, rating: "强关注" };
-  if (args.hasSurgePullbackSetup && args.surgePullbackScore >= 72 && args.flowRatio5d > -0.025 && (args.flowToday > 0 || args.flowAcceleration > 0)) {
-    return { signal: "watch" as const, rating: "观察" };
-  }
+  if (args.hasSurgePullbackSetup && args.surgePullbackScore >= 72) return { signal: "watch" as const, rating: "观察" };
   if (args.hasSurgePullbackSetup && args.surgePullbackScore >= 68 && args.score >= 68) return { signal: "watch" as const, rating: "观察" };
   if (args.score >= 72) return { signal: "watch" as const, rating: "观察" };
   return { signal: "wait" as const, rating: "等待" };
