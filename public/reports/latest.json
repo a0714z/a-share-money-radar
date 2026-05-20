@@ -616,6 +616,23 @@
         "groupSize": 1,
         "maxPerSector": 2,
         "demoted": false
+      },
+      "tradePlan": {
+        "entryLow": 4.1,
+        "entryHigh": 4.3,
+        "chaseAbove": 4.37,
+        "invalidBelow": 4,
+        "stopLoss": 3.97,
+        "target1": 4.81,
+        "target2": 5.08,
+        "positionPct": 15,
+        "positionLabel": "标准",
+        "riskReward": 1.55,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 4.37 后按追高处理",
+          "跌破 4 说明资金进场逻辑失效"
+        ]
       }
     },
     {
@@ -1209,6 +1226,24 @@
         "groupSize": 1,
         "maxPerSector": 2,
         "demoted": false
+      },
+      "tradePlan": {
+        "entryLow": 18.45,
+        "entryHigh": 18.9,
+        "chaseAbove": 19.66,
+        "invalidBelow": 17.24,
+        "stopLoss": 17.1,
+        "target1": 23.3,
+        "target2": 25.32,
+        "positionPct": 10,
+        "positionLabel": "半仓",
+        "riskReward": 2.44,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 19.66 后按追高处理",
+          "跌破 17.24 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档"
+        ]
       }
     },
     {
@@ -1802,6 +1837,23 @@
         "groupSize": 1,
         "maxPerSector": 2,
         "demoted": false
+      },
+      "tradePlan": {
+        "entryLow": 7.37,
+        "entryHigh": 7.71,
+        "chaseAbove": 7.85,
+        "invalidBelow": 7.17,
+        "stopLoss": 7.11,
+        "target1": 8.5,
+        "target2": 8.96,
+        "positionPct": 15,
+        "positionLabel": "标准",
+        "riskReward": 1.33,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 7.85 后按追高处理",
+          "跌破 7.17 说明资金进场逻辑失效"
+        ]
       }
     },
     {
@@ -2395,6 +2447,25 @@
         "groupSize": 3,
         "maxPerSector": 2,
         "demoted": false
+      },
+      "tradePlan": {
+        "entryLow": 7.29,
+        "entryHigh": 7.3,
+        "chaseAbove": 7.96,
+        "invalidBelow": 6.67,
+        "stopLoss": 6.62,
+        "target1": 9.42,
+        "target2": 10.33,
+        "positionPct": 10,
+        "positionLabel": "半仓",
+        "riskReward": 3.11,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 7.96 后按追高处理",
+          "跌破 6.67 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
       }
     },
     {
@@ -2988,6 +3059,24 @@
         "groupSize": 3,
         "maxPerSector": 2,
         "demoted": false
+      },
+      "tradePlan": {
+        "entryLow": 5.2,
+        "entryHigh": 5.4,
+        "chaseAbove": 5.49,
+        "invalidBelow": 5.12,
+        "stopLoss": 5.08,
+        "target1": 5.87,
+        "target2": 6.12,
+        "positionPct": 10,
+        "positionLabel": "半仓",
+        "riskReward": 1.47,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.49 后按追高处理",
+          "跌破 5.12 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档"
+        ]
       }
     }
   ],
@@ -3576,7 +3665,24 @@
         "增持回购",
         "中药"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 22.9,
+        "entryHigh": 23.6,
+        "chaseAbove": 24.25,
+        "invalidBelow": 21.84,
+        "stopLoss": 21.66,
+        "target1": 25.72,
+        "target2": 27.04,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.1,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 24.25 后按追高处理",
+          "跌破 21.84 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 7,
@@ -4171,6 +4277,23 @@
         "groupSize": 3,
         "maxPerSector": 2,
         "demoted": true
+      },
+      "tradePlan": {
+        "entryLow": 4.78,
+        "entryHigh": 4.83,
+        "chaseAbove": 5.18,
+        "invalidBelow": 4.24,
+        "stopLoss": 4.21,
+        "target1": 6.37,
+        "target2": 7.08,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 2.46,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.18 后按追高处理",
+          "跌破 4.24 说明资金进场逻辑失效"
+        ]
       }
     },
     {
@@ -4757,7 +4880,25 @@
         "工业4.0",
         "新能源车"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 17.03,
+        "entryHigh": 17.4,
+        "chaseAbove": 18.5,
+        "invalidBelow": 15.4,
+        "stopLoss": 15.28,
+        "target1": 22.24,
+        "target2": 24.52,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 2.27,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 18.5 后按追高处理",
+          "跌破 15.4 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 9,
@@ -5343,7 +5484,24 @@
         "高派息",
         "家用电器"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 23.12,
+        "entryHigh": 24.2,
+        "chaseAbove": 24.65,
+        "invalidBelow": 22.08,
+        "stopLoss": 21.9,
+        "target1": 28.14,
+        "target2": 30.18,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.72,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 24.65 后按追高处理",
+          "跌破 22.08 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 10,
@@ -5929,7 +6087,24 @@
         "宽带提速",
         "含H股"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 36.56,
+        "entryHigh": 38.1,
+        "chaseAbove": 39.16,
+        "invalidBelow": 34.76,
+        "stopLoss": 34.48,
+        "target1": 42.24,
+        "target2": 44.78,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.14,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 39.16 后按追高处理",
+          "跌破 34.76 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 11,
@@ -6515,7 +6690,25 @@
         "航天军工",
         "储能"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 45.03,
+        "entryHigh": 47.14,
+        "chaseAbove": 47.99,
+        "invalidBelow": 41.88,
+        "stopLoss": 41.54,
+        "target1": 54.69,
+        "target2": 58.98,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.35,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 47.99 后按追高处理",
+          "跌破 41.88 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档"
+        ]
+      }
     },
     {
       "rank": 12,
@@ -7100,7 +7293,24 @@
         "中石化系",
         "幽门螺杆概念"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 15.78,
+        "entryHigh": 16.26,
+        "chaseAbove": 16.71,
+        "invalidBelow": 14.72,
+        "stopLoss": 14.6,
+        "target1": 18.2,
+        "target2": 19.37,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 1.17,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 16.71 后按追高处理",
+          "跌破 14.72 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 13,
@@ -7686,7 +7896,24 @@
         "旅游酒店",
         "数字经济"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 5.62,
+        "entryHigh": 5.88,
+        "chaseAbove": 5.98,
+        "invalidBelow": 4.35,
+        "stopLoss": 4.32,
+        "target1": 8,
+        "target2": 9.21,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 1.36,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.98 后按追高处理",
+          "跌破 4.35 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 14,
@@ -8268,7 +8495,25 @@
         "旅游酒店",
         "影视传媒"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 5.01,
+        "entryHigh": 5.24,
+        "chaseAbove": 5.4,
+        "invalidBelow": 3.89,
+        "stopLoss": 3.86,
+        "target1": 7.12,
+        "target2": 8.19,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.36,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.4 后按追高处理",
+          "跌破 3.89 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 15,
@@ -8852,7 +9097,25 @@
         "啤酒",
         "横琴新区"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 4.07,
+        "entryHigh": 4.26,
+        "chaseAbove": 4.47,
+        "invalidBelow": 3.9,
+        "stopLoss": 3.87,
+        "target1": 4.95,
+        "target2": 5.3,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.79,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 4.47 后按追高处理",
+          "跌破 3.9 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 16,
@@ -9436,7 +9699,24 @@
         "光刻胶",
         "柔性电子"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 9.21,
+        "entryHigh": 9.64,
+        "chaseAbove": 9.95,
+        "invalidBelow": 8.75,
+        "stopLoss": 8.68,
+        "target1": 10.86,
+        "target2": 11.57,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 1.27,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 9.95 后按追高处理",
+          "跌破 8.75 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 17,
@@ -10022,7 +10302,25 @@
         "风能",
         "海上风电"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 3.22,
+        "entryHigh": 3.37,
+        "chaseAbove": 3.49,
+        "invalidBelow": 3.14,
+        "stopLoss": 3.11,
+        "target1": 3.81,
+        "target2": 4.04,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.72,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 3.49 后按追高处理",
+          "跌破 3.14 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档"
+        ]
+      }
     },
     {
       "rank": 18,
@@ -10608,7 +10906,25 @@
         "通用航空",
         "无人机"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 37.81,
+        "entryHigh": 38.96,
+        "chaseAbove": 40.04,
+        "invalidBelow": 36.48,
+        "stopLoss": 36.19,
+        "target1": 41.85,
+        "target2": 43.7,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.04,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 40.04 后按追高处理",
+          "跌破 36.48 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 19,
@@ -11194,7 +11510,24 @@
         "5G",
         "在线教育"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 4.7,
+        "entryHigh": 4.92,
+        "chaseAbove": 5.1,
+        "invalidBelow": 4.54,
+        "stopLoss": 4.5,
+        "target1": 5.67,
+        "target2": 6.05,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 1.78,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.1 后按追高处理",
+          "跌破 4.54 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 20,
@@ -11780,7 +12113,25 @@
         "充电桩",
         "三板精选"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 13.27,
+        "entryHigh": 13.81,
+        "chaseAbove": 14.05,
+        "invalidBelow": 12.93,
+        "stopLoss": 12.83,
+        "target1": 16,
+        "target2": 17.03,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 2.24,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 14.05 后按追高处理",
+          "跌破 12.93 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 21,
@@ -12366,7 +12717,24 @@
         "无人驾驶",
         "粤港澳"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 7.11,
+        "entryHigh": 7.36,
+        "chaseAbove": 7.54,
+        "invalidBelow": 6.58,
+        "stopLoss": 6.53,
+        "target1": 9.06,
+        "target2": 9.88,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 2.04,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 7.54 后按追高处理",
+          "跌破 6.58 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 22,
@@ -12953,7 +13321,26 @@
         "新能源车",
         "机械"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 12.32,
+        "entryHigh": 12.9,
+        "chaseAbove": 13.13,
+        "invalidBelow": 10.56,
+        "stopLoss": 10.48,
+        "target1": 16.1,
+        "target2": 17.93,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 1.32,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 13.13 后按追高处理",
+          "跌破 10.56 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 23,
@@ -13541,7 +13928,26 @@
         "风能",
         "光伏概念"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 4.85,
+        "entryHigh": 5.03,
+        "chaseAbove": 5.13,
+        "invalidBelow": 4.63,
+        "stopLoss": 4.59,
+        "target1": 5.98,
+        "target2": 6.44,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 2.2,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.13 后按追高处理",
+          "跌破 4.63 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 24,
@@ -14127,7 +14533,24 @@
         "半导体",
         "工业互联网"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 8.19,
+        "entryHigh": 8.44,
+        "chaseAbove": 8.67,
+        "invalidBelow": 7.64,
+        "stopLoss": 7.58,
+        "target1": 9.44,
+        "target2": 10.05,
+        "positionPct": 8,
+        "positionLabel": "轻仓",
+        "riskReward": 1.17,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 8.67 后按追高处理",
+          "跌破 7.64 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 25,
@@ -14714,7 +15137,26 @@
         "天然气",
         "券商相关"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 8.46,
+        "entryHigh": 8.53,
+        "chaseAbove": 8.94,
+        "invalidBelow": 7.96,
+        "stopLoss": 7.9,
+        "target1": 10.6,
+        "target2": 11.48,
+        "positionPct": 5,
+        "positionLabel": "观察",
+        "riskReward": 3.25,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 8.94 后按追高处理",
+          "跌破 7.96 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     }
   ],
   "avoided": [
@@ -15297,7 +15739,25 @@
         "社保重仓",
         "新疆振兴"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 7.42,
+        "entryHigh": 7.65,
+        "chaseAbove": 7.86,
+        "invalidBelow": 7.13,
+        "stopLoss": 7.07,
+        "target1": 8.27,
+        "target2": 8.66,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.07,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 7.86 后按追高处理",
+          "跌破 7.13 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 34,
@@ -15884,7 +16344,25 @@
         "风能",
         "超超临界发电"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 5.39,
+        "entryHigh": 5.58,
+        "chaseAbove": 5.87,
+        "invalidBelow": 4.68,
+        "stopLoss": 4.64,
+        "target1": 7.31,
+        "target2": 8.18,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.84,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 5.87 后按追高处理",
+          "跌破 4.68 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 35,
@@ -16468,7 +16946,24 @@
         "机器人概念",
         "PM2.5"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 19.3,
+        "entryHigh": 20.15,
+        "chaseAbove": 20.51,
+        "invalidBelow": 18.66,
+        "stopLoss": 18.51,
+        "target1": 21.94,
+        "target2": 23.06,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.09,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 20.51 后按追高处理",
+          "跌破 18.66 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 36,
@@ -17056,7 +17551,25 @@
         "智慧城市",
         "储能"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 61.14,
+        "entryHigh": 63.01,
+        "chaseAbove": 64.75,
+        "invalidBelow": 55.85,
+        "stopLoss": 55.4,
+        "target1": 72.21,
+        "target2": 77.7,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.21,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 64.75 后按追高处理",
+          "跌破 55.85 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 37,
@@ -17644,7 +18157,24 @@
         "锂矿",
         "太阳能（光伏）"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 15.89,
+        "entryHigh": 16.37,
+        "chaseAbove": 16.83,
+        "invalidBelow": 15.46,
+        "stopLoss": 15.34,
+        "target1": 17.4,
+        "target2": 18.08,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 0.99,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 16.83 后按追高处理",
+          "跌破 15.46 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 38,
@@ -18229,7 +18759,24 @@
         "医疗美容",
         "生物医药"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 11.22,
+        "entryHigh": 11.45,
+        "chaseAbove": 11.97,
+        "invalidBelow": 10.41,
+        "stopLoss": 10.33,
+        "target1": 14.28,
+        "target2": 15.57,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 2.51,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 11.97 后按追高处理",
+          "跌破 10.41 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 39,
@@ -18813,7 +19360,25 @@
         "微盘股",
         "金属铅"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 4.58,
+        "entryHigh": 4.72,
+        "chaseAbove": 4.85,
+        "invalidBelow": 4.34,
+        "stopLoss": 4.31,
+        "target1": 5.17,
+        "target2": 5.46,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.12,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 4.85 后按追高处理",
+          "跌破 4.34 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 40,
@@ -19399,7 +19964,24 @@
         "工业互联网",
         "腾讯概念"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 5.9,
+        "entryHigh": 6.08,
+        "chaseAbove": 6.25,
+        "invalidBelow": 5.78,
+        "stopLoss": 5.73,
+        "target1": 6.41,
+        "target2": 6.63,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 0.94,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 6.25 后按追高处理",
+          "跌破 5.78 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 41,
@@ -19987,7 +20569,25 @@
         "储能",
         "区块链"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 5.9,
+        "entryHigh": 6.17,
+        "chaseAbove": 6.28,
+        "invalidBelow": 4.96,
+        "stopLoss": 4.92,
+        "target1": 7.84,
+        "target2": 8.79,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.33,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 6.28 后按追高处理",
+          "跌破 4.96 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 42,
@@ -20575,7 +21175,25 @@
         "换电概念",
         "高压快充"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 25.79,
+        "entryHigh": 27,
+        "chaseAbove": 27.54,
+        "invalidBelow": 24.93,
+        "stopLoss": 24.73,
+        "target1": 31.34,
+        "target2": 33.5,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.92,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 27.54 后按追高处理",
+          "跌破 24.93 说明资金进场逻辑失效",
+          "当日涨幅偏大，仓位自动降一档"
+        ]
+      }
     },
     {
       "rank": 43,
@@ -21160,7 +21778,24 @@
         "农机",
         "QFII持股"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 12.41,
+        "entryHigh": 12.78,
+        "chaseAbove": 13.69,
+        "invalidBelow": 11.39,
+        "stopLoss": 11.3,
+        "target1": 15.96,
+        "target2": 17.48,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 2.15,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 13.69 后按追高处理",
+          "跌破 11.39 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 44,
@@ -21748,7 +22383,24 @@
         "航天军工",
         "锂电池"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 17.85,
+        "entryHigh": 18.69,
+        "chaseAbove": 19.03,
+        "invalidBelow": 17.19,
+        "stopLoss": 17.05,
+        "target1": 21.09,
+        "target2": 22.41,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.47,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 19.03 后按追高处理",
+          "跌破 17.19 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 45,
@@ -22333,7 +22985,25 @@
         "新材料",
         "核电"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 53.56,
+        "entryHigh": 56.06,
+        "chaseAbove": 57.6,
+        "invalidBelow": 42.3,
+        "stopLoss": 41.96,
+        "target1": 75.13,
+        "target2": 85.96,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.35,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 57.6 后按追高处理",
+          "跌破 42.3 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 46,
@@ -22920,7 +23590,25 @@
         "ST板块",
         "腾讯概念"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 7.47,
+        "entryHigh": 7.54,
+        "chaseAbove": 7.75,
+        "invalidBelow": 7.36,
+        "stopLoss": 7.3,
+        "target1": 7.83,
+        "target2": 8.04,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.2,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 7.75 后按追高处理",
+          "跌破 7.36 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 47,
@@ -23506,7 +24194,25 @@
         "空气治理",
         "三板精选"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 16.97,
+        "entryHigh": 17.77,
+        "chaseAbove": 18.09,
+        "invalidBelow": 14.16,
+        "stopLoss": 14.05,
+        "target1": 22.73,
+        "target2": 25.56,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.33,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 18.09 后按追高处理",
+          "跌破 14.16 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 48,
@@ -24094,7 +24800,25 @@
         "一带一路",
         "人工智能"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 2.71,
+        "entryHigh": 2.84,
+        "chaseAbove": 2.96,
+        "invalidBelow": 2.58,
+        "stopLoss": 2.56,
+        "target1": 3.32,
+        "target2": 3.57,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.74,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 2.96 后按追高处理",
+          "跌破 2.58 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 49,
@@ -24678,7 +25402,24 @@
         "并购重组",
         "福建国资"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 10.68,
+        "entryHigh": 11.01,
+        "chaseAbove": 11.32,
+        "invalidBelow": 10.45,
+        "stopLoss": 10.37,
+        "target1": 11.62,
+        "target2": 12.04,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 0.95,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 11.32 后按追高处理",
+          "跌破 10.45 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 50,
@@ -25266,7 +26007,25 @@
         "大数据",
         "一带一路"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 14.52,
+        "entryHigh": 14.93,
+        "chaseAbove": 15.34,
+        "invalidBelow": 13.74,
+        "stopLoss": 13.63,
+        "target1": 16.37,
+        "target2": 17.27,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.12,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 15.34 后按追高处理",
+          "跌破 13.74 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 51,
@@ -25854,7 +26613,24 @@
         "在线教育",
         "工业4.0"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 4.21,
+        "entryHigh": 4.35,
+        "chaseAbove": 4.43,
+        "invalidBelow": 4.12,
+        "stopLoss": 4.09,
+        "target1": 4.61,
+        "target2": 4.78,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 0.97,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 4.43 后按追高处理",
+          "跌破 4.12 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 52,
@@ -26440,7 +27216,24 @@
         "中字头",
         "中特估"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 50.68,
+        "entryHigh": 52.23,
+        "chaseAbove": 53.67,
+        "invalidBelow": 48.8,
+        "stopLoss": 48.41,
+        "target1": 56.25,
+        "target2": 58.81,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.05,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 53.67 后按追高处理",
+          "跌破 48.8 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 53,
@@ -27026,7 +27819,25 @@
         "超超临界发电",
         "长期破净"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 2.72,
+        "entryHigh": 2.85,
+        "chaseAbove": 2.93,
+        "invalidBelow": 2.51,
+        "stopLoss": 2.49,
+        "target1": 3.3,
+        "target2": 3.56,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.26,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 2.93 后按追高处理",
+          "跌破 2.51 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 54,
@@ -27614,7 +28425,24 @@
         "新零售",
         "旅游酒店"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 21.2,
+        "entryHigh": 22.19,
+        "chaseAbove": 23.1,
+        "invalidBelow": 19.67,
+        "stopLoss": 19.51,
+        "target1": 26.83,
+        "target2": 29.22,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.73,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 23.1 后按追高处理",
+          "跌破 19.67 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 55,
@@ -28201,7 +29029,24 @@
         "新能源车",
         "芯片概念"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 3.92,
+        "entryHigh": 4.04,
+        "chaseAbove": 4.15,
+        "invalidBelow": 3.8,
+        "stopLoss": 3.77,
+        "target1": 4.31,
+        "target2": 4.49,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.01,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 4.15 后按追高处理",
+          "跌破 3.8 说明资金进场逻辑失效"
+        ]
+      }
     },
     {
       "rank": 56,
@@ -28788,7 +29633,25 @@
         "原料药",
         "辅助生殖"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 31.43,
+        "entryHigh": 32.9,
+        "chaseAbove": 33.62,
+        "invalidBelow": 26.41,
+        "stopLoss": 26.2,
+        "target1": 41.81,
+        "target2": 46.91,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 1.33,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 33.62 后按追高处理",
+          "跌破 26.41 说明资金进场逻辑失效",
+          "阶段分位偏高，等待回踩更有性价比"
+        ]
+      }
     },
     {
       "rank": 57,
@@ -29376,7 +30239,24 @@
         "一带一路",
         "人工智能"
       ],
-      "sectorSource": "biying"
+      "sectorSource": "biying",
+      "tradePlan": {
+        "entryLow": 6.15,
+        "entryHigh": 6.27,
+        "chaseAbove": 6.45,
+        "invalidBelow": 6.06,
+        "stopLoss": 6.01,
+        "target1": 6.51,
+        "target2": 6.69,
+        "positionPct": 0,
+        "positionLabel": "观察",
+        "riskReward": 0.91,
+        "notes": [
+          "优先等回踩关注区间，不追高开仓",
+          "突破 6.45 后按追高处理",
+          "跌破 6.06 说明资金进场逻辑失效"
+        ]
+      }
     }
   ],
   "market": {

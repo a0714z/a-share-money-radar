@@ -98,6 +98,20 @@ export type ScoreBreakdown = {
   penalty: number;
 };
 
+export type TradePlan = {
+  entryLow: number;
+  entryHigh: number;
+  chaseAbove: number;
+  invalidBelow: number;
+  stopLoss: number;
+  target1: number;
+  target2: number;
+  positionPct: number;
+  positionLabel: "标准" | "半仓" | "轻仓" | "观察";
+  riskReward: number;
+  notes: string[];
+};
+
 export type StockPick = {
   rank: number;
   code: string;
@@ -130,6 +144,7 @@ export type StockPick = {
   sector?: string;
   themes?: string[];
   sectorSource?: "biying" | "fallback";
+  tradePlan?: TradePlan;
   concentration?: {
     sector: string;
     groupRank: number;

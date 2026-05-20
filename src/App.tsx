@@ -174,6 +174,8 @@ function PickTable({
 }
 
 function PickDetail({ pick }: { pick: StockPick }) {
+  const plan = pick.tradePlan;
+
   return (
     <aside className="detail-panel">
       <div className="detail-head">
@@ -197,6 +199,50 @@ function PickDetail({ pick }: { pick: StockPick }) {
           <span key={theme}>{theme}</span>
         ))}
       </div>
+
+      {plan && (
+        <div className="trade-plan">
+          <div className="trade-plan-head">
+            <h3>交易计划</h3>
+            <span>
+              {plan.positionLabel} · {plan.positionPct}%
+            </span>
+          </div>
+          <div className="trade-plan-grid">
+            <div>
+              <span>关注区间</span>
+              <strong>
+                {plan.entryLow.toFixed(2)} - {plan.entryHigh.toFixed(2)}
+              </strong>
+            </div>
+            <div>
+              <span>追高线</span>
+              <strong>{plan.chaseAbove.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span>失效位</span>
+              <strong className="down">{plan.invalidBelow.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span>止损参考</span>
+              <strong className="down">{plan.stopLoss.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span>目标一</span>
+              <strong className="up">{plan.target1.toFixed(2)}</strong>
+            </div>
+            <div>
+              <span>目标二</span>
+              <strong className="up">{plan.target2.toFixed(2)}</strong>
+            </div>
+          </div>
+          <ul>
+            {plan.notes.map((note) => (
+              <li key={note}>{note}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="chart-block">
         <div className="chart-title">

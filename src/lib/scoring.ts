@@ -113,6 +113,79 @@ function buildRisks(args: {
   return risks;
 }
 
+export function buildTradePlan(args: {
+  signal: "strong" | "watch" | "wait";
+  close: number;
+  pctChange: number;
+  valuePosition: number;
+  flowRatio5d: number;
+  ma20?: number;
+  ma60?: number;
+  sample: KLine[];
+}) {
+  const last20 = args.sample.slice(-20);
+  const recentLow = last20.length ? Math.min(...last20.map((bar) => bar.l)) : args.close * 0.95;
+  const recentHigh = last20.length ? Math.max(...last20.map((bar) => bar.h)) : args.close * 1.08;
+  const ma20 = args.ma20 ?? args.close;
+  const ma60 = args.ma60 ?? ma20;
+  let entryLow = Math.max(recentLow * 1.015, Math.min(ma20, args.close) * 0.982, args.close * 0.94);
+  let entryHigh = Math.min(args.close * 1.012, ma20 * 1.028);
+
+  if (entryLow > entryHigh) {
+    entryLow = args.close * 0.965;
+    entryHigh = args.close * 1.01;
+  }
+
+  const invalidBase = Math.min(recentLow, ma20 * 0.975, ma60 * 0.99);
+  const invalidBelow = Math.min(invalidBase, entryLow * 0.985);
+  const stopLoss = invalidBelow * 0.992;
+  const chaseAbove = Math.max(entryHigh * 1.018, Math.min(args.close * 1.04, recentHigh * 0.985));
+  const unitRisk = Math.max(args.close - stopLoss, args.close * 0.035);
+  const target1 = args.close + unitRisk * 1.45;
+  const target2 = args.close + unitRisk * 2.25;
+  const riskReward = (target1 - entryHigh) / Math.max(entryHigh - stopLoss, args.close * 0.01);
+
+  let positionPct = 8;
+  let positionLabel: "标准" | "半仓" | "轻仓" | "观察" = "观察";
+  if (args.signal === "strong") {
+    positionPct = 15;
+    positionLabel = "标准";
+  } else if (args.signal === "watch") {
+    positionPct = 8;
+    positionLabel = "轻仓";
+  }
+  if (args.pctChange > 3.5 || args.valuePosition > 62 || args.flowRatio5d < 0.025 || riskReward < 1.15) {
+    positionPct = Math.min(positionPct, args.signal === "strong" ? 10 : 5);
+    positionLabel = args.signal === "strong" ? "半仓" : "观察";
+  }
+  if (args.signal === "wait") {
+    positionPct = 0;
+    positionLabel = "观察";
+  }
+
+  const notes = [
+    "优先等回踩关注区间，不追高开仓",
+    `突破 ${round(chaseAbove, 2)} 后按追高处理`,
+    `跌破 ${round(invalidBelow, 2)} 说明资金进场逻辑失效`
+  ];
+  if (args.pctChange > 3.5) notes.push("当日涨幅偏大，仓位自动降一档");
+  if (args.valuePosition > 62) notes.push("阶段分位偏高，等待回踩更有性价比");
+
+  return {
+    entryLow: round(entryLow, 2),
+    entryHigh: round(entryHigh, 2),
+    chaseAbove: round(chaseAbove, 2),
+    invalidBelow: round(invalidBelow, 2),
+    stopLoss: round(stopLoss, 2),
+    target1: round(target1, 2),
+    target2: round(target2, 2),
+    positionPct: round(positionPct, 0),
+    positionLabel,
+    riskReward: round(riskReward, 2),
+    notes
+  };
+}
+
 export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): StockPick | null {
   const cleanHistory = byDateAsc(history).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && bar.sf !== 1);
   if (cleanHistory.length < 40) return null;
@@ -230,6 +303,16 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     turnover,
     volumeRatio
   });
+  const tradePlan = buildTradePlan({
+    signal: rating.signal,
+    close,
+    pctChange: pct,
+    valuePosition: position * 100,
+    flowRatio5d,
+    ma20,
+    ma60,
+    sample
+  });
 
   const exchange = inferExchange(stock.dm, stock.jys);
   const historyWithMa = sample.slice(-80).map((bar, index, bars) => {
@@ -274,6 +357,7 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     flow5d: round(flow5d, 0),
     flowRatio5d: round(flowRatio5d * 100, 2),
     dddxAvg: round(dddxAvg, 2),
+    tradePlan,
     reasons: reasons.length ? reasons : ["资金和价格条件接近观察区"],
     risks,
     history: historyWithMa,
