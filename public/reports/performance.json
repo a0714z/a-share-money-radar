@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 11:05:15",
+    "generatedAt": "2026-05-20 16:20:57",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 2,
@@ -11,12 +11,15 @@
     ]
   },
   "summary": {
-    "totalSignals": 12,
+    "totalSignals": 8,
     "completed10d": 0,
-    "tracking": 12,
+    "tracking": 8,
     "horizons": {
       "1d": {
-        "completed": 0
+        "completed": 5,
+        "winRate": 20,
+        "avgReturn": -1.9,
+        "medianReturn": -2.59
       },
       "3d": {
         "completed": 0
@@ -27,82 +30,33 @@
       "10d": {
         "completed": 0
       }
+    },
+    "avgMaxDrawdown10d": -2.56,
+    "avgBestEntryDrawdown3d": -2.56,
+    "planReplay": {
+      "completed": 5,
+      "entryTouches": 3,
+      "stopLossHits": 0,
+      "target1Hits": 0,
+      "target2Hits": 0,
+      "entryTouchRate": 60,
+      "stopLossRate": 0,
+      "target1HitRate": 0,
+      "target2HitRate": 0
     }
   },
   "records": [
     {
       "signalDate": "2026-05-20",
-      "code": "000883",
-      "instrument": "000883.SZ",
-      "name": "湖北能源",
-      "rank": 1,
-      "score": 89.8,
-      "signalPrice": 4.93,
-      "flowRatio5d": 6,
-      "valuePosition": 49.4,
-      "pullbackFromHigh": 8.2,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "000997",
-      "instrument": "000997.SZ",
-      "name": "新 大 陆",
-      "rank": 11,
-      "score": 86.4,
-      "signalPrice": 23.14,
-      "flowRatio5d": 6.21,
-      "valuePosition": 30.2,
-      "pullbackFromHigh": 26.8,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
       "code": "000032",
       "instrument": "000032.SZ",
       "name": "深桑达Ａ",
-      "rank": 12,
-      "score": 86.3,
-      "signalPrice": 19.98,
-      "flowRatio5d": 7.73,
-      "valuePosition": 44.1,
-      "pullbackFromHigh": 17.4,
+      "rank": 5,
+      "score": 86.4,
+      "signalPrice": 20,
+      "flowRatio5d": 4.72,
+      "valuePosition": 44.4,
+      "pullbackFromHigh": 17.3,
       "horizons": {
         "1d": {
           "days": 1,
@@ -128,10 +82,10 @@
       "code": "000571",
       "instrument": "000571.SZ",
       "name": "新大洲A",
-      "rank": 19,
+      "rank": 6,
       "score": 83.5,
       "signalPrice": 5.89,
-      "flowRatio5d": 15.9,
+      "flowRatio5d": 9.33,
       "valuePosition": 34.4,
       "pullbackFromHigh": 25.9,
       "horizons": {
@@ -156,77 +110,15 @@
     },
     {
       "signalDate": "2026-05-20",
-      "code": "000725",
-      "instrument": "000725.SZ",
-      "name": "京东方Ａ",
-      "rank": 3,
-      "score": 89.5,
-      "signalPrice": 4.25,
-      "flowRatio5d": 3.53,
-      "valuePosition": 48.9,
-      "pullbackFromHigh": 10.1,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "000966",
-      "instrument": "000966.SZ",
-      "name": "长源电力",
-      "rank": 4,
-      "score": 89.1,
-      "signalPrice": 4.78,
-      "flowRatio5d": 4.59,
-      "valuePosition": 32.8,
-      "pullbackFromHigh": 19.7,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "000559",
-      "instrument": "000559.SZ",
-      "name": "万向钱潮",
-      "rank": 6,
-      "score": 89,
-      "signalPrice": 17.43,
-      "flowRatio5d": 4.68,
-      "valuePosition": 61.3,
-      "pullbackFromHigh": 19.3,
+      "code": "000729",
+      "instrument": "000729.SZ",
+      "name": "燕京啤酒",
+      "rank": 7,
+      "score": 83.1,
+      "signalPrice": 12.7,
+      "flowRatio5d": 3.59,
+      "valuePosition": 45.3,
+      "pullbackFromHigh": 12.8,
       "horizons": {
         "1d": {
           "days": 1,
@@ -261,7 +153,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-20",
+          "close": 4.26,
+          "returnPct": -1.16
         },
         "3d": {
           "days": 3,
@@ -276,7 +171,18 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": -1.62,
+      "maxDrawdown10d": -1.62,
+      "maxRunup10d": 0,
+      "planReplay": {
+        "entryTouched": true,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false,
+        "firstTrigger": "entry",
+        "firstTriggerDate": "2026-05-20"
+      }
     },
     {
       "signalDate": "2026-05-19",
@@ -292,7 +198,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-20",
+          "close": 20,
+          "returnPct": 1.88
         },
         "3d": {
           "days": 3,
@@ -307,7 +216,16 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": 0.61,
+      "maxDrawdown10d": 0.61,
+      "maxRunup10d": 8.76,
+      "planReplay": {
+        "entryTouched": false,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false
+      }
     },
     {
       "signalDate": "2026-05-19",
@@ -323,7 +241,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-20",
+          "close": 7.46,
+          "returnPct": -2.86
         },
         "3d": {
           "days": 3,
@@ -338,7 +259,18 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": -2.99,
+      "maxDrawdown10d": -2.99,
+      "maxRunup10d": -0.26,
+      "planReplay": {
+        "entryTouched": true,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false,
+        "firstTrigger": "entry",
+        "firstTriggerDate": "2026-05-20"
+      }
     },
     {
       "signalDate": "2026-05-19",
@@ -354,7 +286,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-20",
+          "close": 7.39,
+          "returnPct": -4.77
         },
         "3d": {
           "days": 3,
@@ -369,7 +304,16 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": -5.28,
+      "maxDrawdown10d": -5.28,
+      "maxRunup10d": -0.26,
+      "planReplay": {
+        "entryTouched": false,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false
+      }
     },
     {
       "signalDate": "2026-05-19",
@@ -385,7 +329,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-20",
+          "close": 5.26,
+          "returnPct": -2.59
         },
         "3d": {
           "days": 3,
@@ -400,7 +347,18 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": -3.52,
+      "maxDrawdown10d": -3.52,
+      "maxRunup10d": -0.74,
+      "planReplay": {
+        "entryTouched": true,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false,
+        "firstTrigger": "entry",
+        "firstTriggerDate": "2026-05-20"
+      }
     }
   ]
 }
