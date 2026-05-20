@@ -55,6 +55,73 @@ function countPositive(values: number[]) {
   return values.filter((value) => value > 0).length;
 }
 
+type SurgePullbackSetup = {
+  score: number;
+  daysSince: number;
+  surgePct: number;
+  surgeAmountRatio: number;
+  pullbackFromSurgeHigh: number;
+  pullbackAmountRatio: number;
+  heldCostArea: boolean;
+};
+
+function findSurgePullbackSetup(bars: KLine[], close: number, ma20?: number, ma60?: number): SurgePullbackSetup | undefined {
+  if (bars.length < 35) return undefined;
+
+  const latestIndex = bars.length - 1;
+  const start = Math.max(20, bars.length - 16);
+  let best: SurgePullbackSetup | undefined;
+
+  for (let index = start; index < latestIndex; index += 1) {
+    const bar = bars[index];
+    const previous = bars[index - 1];
+    if (!bar || !previous) continue;
+
+    const surgePct = pctChange(bar.c, previous.c);
+    const avgAmountBeforeSurge = average(bars.slice(Math.max(0, index - 20), index).map((item) => item.a));
+    const surgeAmountRatio = safeDivide(bar.a, avgAmountBeforeSurge, 0);
+    const surgeCloseLocation = closeLocation(bar.c, bar.h, bar.l);
+    const daysSince = latestIndex - index;
+
+    if (surgePct < 7 || surgeAmountRatio < 2 || surgeCloseLocation < 0.55 || daysSince < 1 || daysSince > 12) continue;
+
+    const pullbackFromSurgeHigh = clamp(((bar.h - close) / bar.h) * 100, 0, 100);
+    if (pullbackFromSurgeHigh < 5 || pullbackFromSurgeHigh > 22) continue;
+
+    const pullbackBars = bars.slice(index + 1);
+    const pullbackAmountBase = average(pullbackBars.slice(-3).map((item) => item.a)) || average(pullbackBars.map((item) => item.a));
+    const pullbackAmountRatio = safeDivide(pullbackAmountBase, bar.a, 1);
+    const heldCostArea = close >= bar.o * 0.96 && (!ma20 || close >= ma20 * 0.96) && (!ma60 || close >= ma60 * 0.99);
+    const notOverExtended = close <= bar.c * 1.03;
+
+    const pullbackScore =
+      pullbackFromSurgeHigh >= 8 && pullbackFromSurgeHigh <= 16
+        ? 24
+        : pullbackFromSurgeHigh >= 5 && pullbackFromSurgeHigh <= 20
+          ? 14
+          : 4;
+    const amountScore = surgeAmountRatio >= 2.6 ? 16 : surgeAmountRatio >= 2.2 ? 12 : 8;
+    const shrinkScore = pullbackAmountRatio <= 0.55 ? 18 : pullbackAmountRatio <= 0.75 ? 12 : pullbackAmountRatio <= 0.95 ? 3 : -10;
+    const dayScore = daysSince >= 2 && daysSince <= 8 ? 8 : 4;
+    const costScore = heldCostArea ? 12 : -14;
+    const extensionScore = notOverExtended ? 8 : -8;
+    const score = clamp(38 + Math.min(14, (surgePct - 7) * 1.8) + amountScore + pullbackScore + shrinkScore + dayScore + costScore + extensionScore);
+    const setup = {
+      score,
+      daysSince,
+      surgePct: round(surgePct, 1),
+      surgeAmountRatio: round(surgeAmountRatio, 2),
+      pullbackFromSurgeHigh: round(pullbackFromSurgeHigh, 1),
+      pullbackAmountRatio: round(pullbackAmountRatio, 2),
+      heldCostArea
+    };
+
+    if (!best || setup.score > best.score) best = setup;
+  }
+
+  return best;
+}
+
 function ratingFromSetup(args: {
   score: number;
   risks: string[];
@@ -69,8 +136,10 @@ function ratingFromSetup(args: {
   priceVolumeScore: number;
   closeLocation: number;
   amountRatio20: number;
+  surgePullbackScore: number;
+  hasSurgePullbackSetup: boolean;
 }) {
-  const isEntryZone =
+  const classicEntryZone =
     args.score >= 83 &&
     args.risks.length <= 2 &&
     args.flowRatio5d >= 0.02 &&
@@ -85,6 +154,21 @@ function ratingFromSetup(args: {
     args.priceVolumeScore >= 58 &&
     args.closeLocation >= 0.34 &&
     !(args.amountRatio20 > 2.6 && args.pctChange < 0);
+
+  const pullbackEntryZone =
+    args.score >= 80 &&
+    args.risks.length <= 3 &&
+    args.hasSurgePullbackSetup &&
+    args.surgePullbackScore >= 72 &&
+    args.pullback >= 5 &&
+    args.pullback <= 32 &&
+    args.pctChange < 4.8 &&
+    args.flowRatio5d > -0.008 &&
+    args.priceVolumeScore >= 48 &&
+    args.closeLocation >= 0.28 &&
+    !(args.amountRatio20 > 2.4 && args.pctChange < -1.5);
+
+  const isEntryZone = pullbackEntryZone || (classicEntryZone && args.surgePullbackScore >= 58);
 
   if (isEntryZone) return { signal: "strong" as const, rating: "强关注" };
   if (args.score >= 72) return { signal: "watch" as const, rating: "观察" };
@@ -105,8 +189,16 @@ function buildReasons(args: {
   amountRatio20: number;
   priceVolumeScore: number;
   closeLocation: number;
+  surgePullback?: SurgePullbackSetup;
 }) {
   const reasons: string[] = [];
+  if (args.surgePullback && args.surgePullback.score >= 72) {
+    reasons.push(
+      `前期大涨${args.surgePullback.surgePct}%且${args.surgePullback.surgeAmountRatio}倍量启动，回调${args.surgePullback.pullbackFromSurgeHigh}%`
+    );
+  }
+  if (args.surgePullback && args.surgePullback.pullbackAmountRatio <= 0.75) reasons.push("启动后回调缩量，抛压相对收敛");
+  if (args.surgePullback && args.surgePullback.heldCostArea) reasons.push("回踩仍守住启动成本区");
   if (args.flowRatio5d > 0.035) reasons.push("5日大单净流入占比抬升");
   if (args.flowToday > 0) reasons.push("今日主买大单继续为正");
   if (args.flowPositiveDays5 >= 4) reasons.push("近5日资金连续性较好");
@@ -136,6 +228,7 @@ function buildRisks(args: {
   amountRatio20: number;
   priceVolumeScore: number;
   closeLocation: number;
+  surgePullback?: SurgePullbackSetup;
   historyLength: number;
 }) {
   const risks: string[] = [];
@@ -147,6 +240,8 @@ function buildRisks(args: {
   if (args.pctChange > 2.5 && args.amountRatio20 < 0.75) risks.push("缩量上涨，持续性待确认");
   if (args.priceVolumeScore < 42) risks.push("量价配合偏弱");
   if (args.closeLocation < 0.32 && args.amountRatio20 > 1.25) risks.push("放量但收盘位置偏低");
+  if (args.surgePullback && args.surgePullback.pullbackAmountRatio > 0.95) risks.push("启动后回调未明显缩量");
+  if (args.surgePullback && !args.surgePullback.heldCostArea) risks.push("回调已跌破启动成本区");
   if (args.flowRatio5d < 0) risks.push("近5日大单净流入仍为负");
   if (args.flowPositiveDays5 <= 1) risks.push("资金流入连续性不足");
   if (args.flowAcceleration < -0.012) risks.push("近3日资金流入转弱");
@@ -264,6 +359,8 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const ma60 = last(ma60s);
   const distanceToMa20 = ma20 ? pctChange(close, ma20) : 0;
   const distanceToMa60 = ma60 ? pctChange(close, ma60) : 0;
+  const surgePullback = findSurgePullbackSetup(cleanHistory, close, ma20, ma60);
+  const surgePullbackScore = surgePullback ? surgePullback.score : 38;
   const latestHigh = Number(quote.h ?? latestBar.h ?? close);
   const latestLow = Number(quote.l ?? latestBar.l ?? close);
   const dayCloseLocation = closeLocation(close, latestHigh, latestLow);
@@ -381,6 +478,7 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     amountRatio20,
     priceVolumeScore,
     closeLocation: dayCloseLocation,
+    surgePullback,
     historyLength: cleanHistory.length
   });
 
@@ -392,7 +490,15 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     (distanceToMa60 < -12 ? 10 : 0) +
     volumePricePenalty;
 
-  const score = clamp(moneyScore * 0.34 + priceVolumeScore * 0.22 + valueScore * 0.22 + trendScore * 0.14 + liquidityScore * 0.08 - hardPenalty);
+  const score = clamp(
+    moneyScore * 0.28 +
+      priceVolumeScore * 0.18 +
+      surgePullbackScore * 0.22 +
+      valueScore * 0.16 +
+      trendScore * 0.1 +
+      liquidityScore * 0.06 -
+      hardPenalty
+  );
   const rating = ratingFromSetup({
     score,
     risks,
@@ -406,7 +512,9 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     flowAcceleration,
     priceVolumeScore,
     closeLocation: dayCloseLocation,
-    amountRatio20
+    amountRatio20,
+    surgePullbackScore,
+    hasSurgePullbackSetup: Boolean(surgePullback)
   });
   const reasons = buildReasons({
     flowRatio5d,
@@ -421,7 +529,8 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     volumeRatio,
     amountRatio20,
     priceVolumeScore,
-    closeLocation: dayCloseLocation
+    closeLocation: dayCloseLocation,
+    surgePullback
   });
   const tradePlan = buildTradePlan({
     signal: rating.signal,

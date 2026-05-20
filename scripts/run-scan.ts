@@ -55,7 +55,7 @@ function configFromEnv(): ScanConfig {
     topN: intEnv("SCAN_TOP_N", 8),
     historyDays: intEnv("SCAN_HISTORY_DAYS", 120),
     flowDays: intEnv("SCAN_FLOW_DAYS", 10),
-    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 180),
+    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 220),
     minAmount: intEnv("SCAN_MIN_AMOUNT", 30_000_000),
     maxPerSector: intEnv("SCAN_MAX_PER_SECTOR", 2)
   };
@@ -104,12 +104,13 @@ function roughSetupScore(stock: StockListItem, quote: RealQuote, minAmount: numb
   const mediumTermValue = zdf60 < 35 && zdf60 > -35 ? 18 - Math.abs(zdf60) * 0.2 : -10;
   const liquidity = Math.min(24, Math.log10(Math.max(amount, 1)) * 3);
   const turnoverScore = turnover >= 0.6 && turnover <= 7 ? 18 : turnover > 10 ? -12 : 6;
-  const volumeScore = volumeRatio >= 0.8 && volumeRatio <= 2.3 ? 14 : volumeRatio > 3.5 ? -10 : volumeRatio < 0.55 ? -5 : 4;
+  const volumeScore = volumeRatio >= 0.8 && volumeRatio <= 2.3 ? 14 : volumeRatio > 3.5 ? -10 : volumeRatio < 0.45 ? -5 : 4;
   const closeStrength = closeLocation >= 0.58 ? 10 : closeLocation >= 0.38 ? 4 : -8;
   const badVolumePrice = (pct < -2.5 && volumeRatio > 1.4 ? -16 : 0) + (pct > 5.2 && volumeRatio > 2.8 ? -10 : 0);
   const healthyVolumePrice = pct > -1.5 && pct < 4.8 && volumeRatio >= 0.75 && volumeRatio <= 2.4 ? 8 : 0;
+  const pullbackProxy = pct > -4.5 && pct < 3.5 && volumeRatio >= 0.45 && volumeRatio <= 1.45 ? 8 : 0;
   const capScore = marketCap >= 2_000_000_000 ? 6 : -8;
-  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + badVolumePrice + capScore;
+  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + pullbackProxy + badVolumePrice + capScore;
 }
 
 function attachRanks(items: StockPick[]) {
@@ -497,7 +498,7 @@ async function liveScan() {
       notes: [
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
-        "评分侧重资金连续性、流入加速度、放量质量、收盘强弱和成本区位置",
+        "评分侧重前期大涨倍量启动后的缩量回踩、资金连续性、放量质量和成本区位置",
         `大盘环境：${market.label}，${market.reasons.join("；")}`,
         `行业集中度：同一主题核心池最多 ${config.maxPerSector} 只，${concentration.applied ? `已降级 ${concentration.demoted} 只` : "未触发降级"}`
       ]
