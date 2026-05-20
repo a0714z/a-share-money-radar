@@ -6,7 +6,8 @@ import { BiyingClient } from "./biying-client";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { scoreCandidate } from "../src/lib/scoring";
-import type { KLine, MarketRegime, RealQuote, ScanReport, StockListItem, StockPick } from "../src/lib/types";
+import { attachSector, buildConcentrationReport, downgradeForConcentration } from "../src/lib/sector";
+import type { KLine, MarketRegime, RealQuote, ScanReport, SectorConcentrationReport, StockListItem, StockPick } from "../src/lib/types";
 import { isMainBoardNonSt, toInstrumentCode, inferExchange, plainCode } from "../src/lib/universe";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +24,7 @@ type ScanConfig = {
   flowDays: number;
   flowCandidateLimit: number;
   minAmount: number;
+  maxPerSector: number;
 };
 
 type RoughCandidate = {
@@ -42,7 +44,8 @@ function configFromEnv(): ScanConfig {
     historyDays: intEnv("SCAN_HISTORY_DAYS", 120),
     flowDays: intEnv("SCAN_FLOW_DAYS", 10),
     flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 180),
-    minAmount: intEnv("SCAN_MIN_AMOUNT", 30_000_000)
+    minAmount: intEnv("SCAN_MIN_AMOUNT", 30_000_000),
+    maxPerSector: intEnv("SCAN_MAX_PER_SECTOR", 2)
   };
 }
 
@@ -158,28 +161,97 @@ function downgradeToWatch(pick: StockPick, risk: string): StockPick {
   };
 }
 
-function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: number) {
+async function enrichSectors(client: BiyingClient, ranked: StockPick[]) {
+  const targets = ranked.filter((pick) => pick.signal === "strong" || pick.score >= 72).slice(0, 100);
+  const enriched = new Map<string, StockPick>();
+
+  await mapLimit(targets, 24, async (pick) => {
+    try {
+      const profile = await client.companyProfile(pick.code);
+      enriched.set(pick.instrument, attachSector(pick, profile));
+    } catch (error) {
+      console.warn(`[scan] profile ${pick.instrument} skipped: ${(error as Error).message}`);
+      enriched.set(pick.instrument, attachSector(pick));
+    }
+  });
+
+  return ranked.map((pick) => enriched.get(pick.instrument) ?? attachSector(pick));
+}
+
+function annotateStrongConcentration(strong: StockPick[], maxPerSector: number) {
+  const groups = new Map<string, StockPick[]>();
+  for (const pick of strong) {
+    const sector = pick.sector ?? "其他";
+    groups.set(sector, [...(groups.get(sector) ?? []), pick]);
+  }
+
+  return strong.map((pick) => {
+    const sector = pick.sector ?? "其他";
+    const group = groups.get(sector) ?? [];
+    const groupRank = group.findIndex((item) => item.instrument === pick.instrument) + 1;
+    return {
+      ...pick,
+      concentration: {
+        sector,
+        groupRank,
+        groupSize: group.length,
+        maxPerSector,
+        demoted: false
+      }
+    };
+  });
+}
+
+function selectCoreBySector(strong: StockPick[], coreLimit: number, maxPerSector: number, capReason: string) {
+  const picks: StockPick[] = [];
+  const sectorDemoted: StockPick[] = [];
+  const capacityDemoted: StockPick[] = [];
+  const counts = new Map<string, number>();
+
+  for (const pick of annotateStrongConcentration(strong, maxPerSector)) {
+    const sector = pick.sector ?? "其他";
+    const current = counts.get(sector) ?? 0;
+
+    if (picks.length >= coreLimit) {
+      capacityDemoted.push(downgradeToWatch(pick, capReason));
+    } else if (current >= maxPerSector) {
+      sectorDemoted.push(downgradeForConcentration(pick, maxPerSector));
+    } else {
+      picks.push(pick);
+      counts.set(sector, current + 1);
+    }
+  }
+
+  return { picks, sectorDemoted, capacityDemoted };
+}
+
+function selectPicksByMarket(ranked: StockPick[], market: MarketRegime, topN: number, maxPerSector: number) {
   const strong = ranked.filter((item) => item.signal === "strong");
   const watch = ranked.filter((item) => item.signal === "watch");
   const wait = ranked.filter((item) => item.signal === "wait");
+  let concentration: SectorConcentrationReport = buildConcentrationReport(strong, [], [], maxPerSector);
 
   if (market.action === "observe_only") {
     const demoted = strong.map((pick) => downgradeToWatch(pick, "市场弱势，暂停强关注"));
+    concentration = buildConcentrationReport(strong, [], [], maxPerSector);
     return {
       picks: [],
       watchlist: [...demoted, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
-      avoided: wait.slice(0, 25)
+      avoided: wait.slice(0, 25),
+      concentration
     };
   }
 
   const coreLimit = market.action === "cap_core" ? Math.min(topN, 5) : topN;
-  const picks = strong.slice(0, coreLimit);
-  const overflow = strong.slice(coreLimit).map((pick) => downgradeToWatch(pick, "市场震荡，核心池上限收紧"));
+  const capReason = market.action === "cap_core" ? "市场震荡，核心池上限收紧" : "核心池名额已满";
+  const { picks, sectorDemoted, capacityDemoted } = selectCoreBySector(strong, coreLimit, maxPerSector, capReason);
+  concentration = buildConcentrationReport(strong, picks, sectorDemoted, maxPerSector);
 
   return {
     picks,
-    watchlist: [...overflow, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
-    avoided: wait.slice(0, 25)
+    watchlist: [...sectorDemoted, ...capacityDemoted, ...watch].sort((a, b) => b.score - a.score).slice(0, Math.max(20, topN)),
+    avoided: wait.slice(0, 25),
+    concentration
   };
 }
 
@@ -241,13 +313,13 @@ async function liveScan() {
   const sorted = scored
     .filter((item): item is StockPick => Boolean(item))
     .sort((a, b) => b.score - a.score);
-  const ranked = attachRanks(sorted);
+  const ranked = attachRanks(await enrichSectors(client, sorted));
 
   if (!ranked.length) {
     throw new Error("No candidates could be scored; keeping the previous report.");
   }
 
-  const { picks, watchlist, avoided } = selectPicksByMarket(ranked, market, config.topN);
+  const { picks, watchlist, avoided, concentration } = selectPicksByMarket(ranked, market, config.topN, config.maxPerSector);
 
   const report: ScanReport = {
     meta: {
@@ -261,7 +333,8 @@ async function liveScan() {
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
         "评分侧重资金流入、价格分位、均线成本区和流动性",
-        `大盘环境：${market.label}，${market.reasons.join("；")}`
+        `大盘环境：${market.label}，${market.reasons.join("；")}`,
+        `行业集中度：同一主题核心池最多 ${config.maxPerSector} 只，${concentration.applied ? `已降级 ${concentration.demoted} 只` : "未触发降级"}`
       ]
     },
     universe: {
@@ -274,6 +347,7 @@ async function liveScan() {
       watch: watchlist.length
     },
     market,
+    concentration,
     picks,
     watchlist,
     avoided

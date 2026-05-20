@@ -40,6 +40,7 @@ jobs:
           SCAN_FLOW_DAYS: 10
           SCAN_FLOW_CANDIDATE_LIMIT: 180
           SCAN_MIN_AMOUNT: 30000000
+          SCAN_MAX_PER_SECTOR: 2
         run: |
           if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             if [ -n "$BIYING_LICENSE" ]; then

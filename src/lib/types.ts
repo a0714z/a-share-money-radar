@@ -67,6 +67,15 @@ export type MoneyFlow = {
   [key: string]: string | number | undefined;
 };
 
+export type CompanyProfile = {
+  name?: string;
+  bscope?: string;
+  idea?: string;
+  instype?: string;
+  organ?: string;
+  [key: string]: string | number | undefined;
+};
+
 export type SparkPoint = {
   date: string;
   close: number;
@@ -118,6 +127,16 @@ export type StockPick = {
   flow5d: number;
   flowRatio5d: number;
   dddxAvg: number;
+  sector?: string;
+  themes?: string[];
+  sectorSource?: "biying" | "fallback";
+  concentration?: {
+    sector: string;
+    groupRank: number;
+    groupSize: number;
+    maxPerSector: number;
+    demoted: boolean;
+  };
   reasons: string[];
   risks: string[];
   history: SparkPoint[];
@@ -145,9 +164,27 @@ export type ScanReport = {
     watch: number;
   };
   market?: MarketRegime;
+  concentration?: SectorConcentrationReport;
   picks: StockPick[];
   watchlist: StockPick[];
   avoided: StockPick[];
+};
+
+export type SectorConcentrationGroup = {
+  sector: string;
+  totalStrong: number;
+  keptCore: number;
+  demoted: number;
+  maxPerSector: number;
+  instruments: string[];
+};
+
+export type SectorConcentrationReport = {
+  maxPerSector: number;
+  applied: boolean;
+  demoted: number;
+  groups: SectorConcentrationGroup[];
+  notes: string[];
 };
 
 export type MarketIndexSignal = {

@@ -1,4 +1,4 @@
-import type { KLine, MoneyFlow, RealQuote, StockListItem } from "../src/lib/types";
+import type { CompanyProfile, KLine, MoneyFlow, RealQuote, StockListItem } from "../src/lib/types";
 
 const API_BASE = "https://api.biyingapi.com";
 const ALL_BASE = "https://all.biyingapi.com";
@@ -83,5 +83,10 @@ export class BiyingClient {
       }),
       `moneyFlow:${code}`
     );
+  }
+
+  async companyProfile(code: string) {
+    const value = await fetchJson<CompanyProfile | CompanyProfile[]>(`/hscp/gsjj/${code}/${this.license}`);
+    return Array.isArray(value) ? value[0] : value;
   }
 }

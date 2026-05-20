@@ -29,7 +29,7 @@ import {
 } from "recharts";
 import { sampleReport } from "./data/sample-report";
 import { sampleReview } from "./data/sample-review";
-import type { MarketRegime, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, Signal, StockPick } from "./lib/types";
+import type { MarketRegime, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, SectorConcentrationReport, Signal, StockPick } from "./lib/types";
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
@@ -134,6 +134,7 @@ function PickTable({
             <th>Rank</th>
             <th>代码</th>
             <th>名称</th>
+            <th>主题</th>
             <th>信号</th>
             <th>分数</th>
             <th>涨跌</th>
@@ -152,6 +153,7 @@ function PickTable({
               <td>{pick.rank}</td>
               <td className="code">{pick.instrument}</td>
               <td>{pick.name}</td>
+              <td>{pick.sector ?? "-"}</td>
               <td>
                 <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
               </td>
@@ -187,6 +189,13 @@ function PickDetail({ pick }: { pick: StockPick }) {
         <strong>{pick.price.toFixed(2)}</strong>
         <span className={pick.pctChange >= 0 ? "up" : "down"}>{formatPct(pick.pctChange)}</span>
         <span>信心 {pick.confidence}%</span>
+      </div>
+
+      <div className="theme-line">
+        <span className="theme-primary">{pick.sector ?? "未分组"}</span>
+        {(pick.themes ?? []).slice(0, 5).map((theme) => (
+          <span key={theme}>{theme}</span>
+        ))}
       </div>
 
       <div className="chart-block">
@@ -310,6 +319,41 @@ function MarketPanel({ market }: { market?: MarketRegime }) {
               <span className={index.aboveMa20 ? "tag-ok" : "tag-warn"}>20日</span>
               <span className={index.aboveMa60 ? "tag-ok" : "tag-warn"}>60日</span>
               <span className={index.return5d >= 0 ? "tag-ok" : "tag-warn"}>{formatPct(index.return5d)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ConcentrationPanel({ concentration }: { concentration?: SectorConcentrationReport }) {
+  if (!concentration) return null;
+
+  return (
+    <section className="concentration-panel">
+      <div className="market-head">
+        <div>
+          <h2>行业集中度</h2>
+          <span>同一主题核心池最多 {concentration.maxPerSector} 只</span>
+        </div>
+        <div className="market-score">
+          <strong>{concentration.applied ? "已触发" : "未触发"}</strong>
+          <span>{concentration.demoted} 只降级</span>
+        </div>
+      </div>
+      <div className="sector-bars">
+        {concentration.groups.slice(0, 8).map((group) => (
+          <div key={group.sector} className={group.demoted ? "sector-bar is-capped" : "sector-bar"}>
+            <div>
+              <strong>{group.sector}</strong>
+              <span>
+                核心 {group.keptCore}/{group.totalStrong}
+                {group.demoted ? ` · 降级 ${group.demoted}` : ""}
+              </span>
+            </div>
+            <div className="sector-track">
+              <span style={{ width: `${Math.min(100, (group.keptCore / Math.max(group.totalStrong, 1)) * 100)}%` }} />
             </div>
           </div>
         ))}
@@ -526,6 +570,7 @@ export default function App() {
           </section>
 
           <MarketPanel market={report.market} />
+          <ConcentrationPanel concentration={report.concentration} />
 
           <section className="workspace">
             <div className="list-panel">

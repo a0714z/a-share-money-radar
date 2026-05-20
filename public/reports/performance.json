@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 09:10:40",
+    "generatedAt": "2026-05-20 09:25:29",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 1,
@@ -11,9 +11,9 @@
     ]
   },
   "summary": {
-    "totalSignals": 6,
+    "totalSignals": 5,
     "completed10d": 0,
-    "tracking": 6,
+    "tracking": 5,
     "horizons": {
       "1d": {
         "completed": 0
@@ -165,37 +165,6 @@
       "flowRatio5d": 12.3,
       "valuePosition": 37.6,
       "pullbackFromHigh": 8.9,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-19",
-      "code": "000966",
-      "instrument": "000966.SZ",
-      "name": "长源电力",
-      "rank": 7,
-      "score": 83.2,
-      "signalPrice": 5.09,
-      "flowRatio5d": 4.59,
-      "valuePosition": 50.6,
-      "pullbackFromHigh": 14.5,
       "horizons": {
         "1d": {
           "days": 1,

@@ -195,13 +195,18 @@ button {
   background: #c2413f;
 }
 
-.market-panel {
+.market-panel,
+.concentration-panel {
   margin: -8px 0 22px;
   padding: 16px;
   border: 1px solid #dce3df;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 16px 32px rgba(20, 32, 26, 0.06);
+}
+
+.concentration-panel {
+  margin-top: -8px;
 }
 
 .market-head {
@@ -285,6 +290,49 @@ button {
 .tag-warn {
   color: #8b2d2c;
   background: #f8dedc;
+}
+
+.sector-bars {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sector-bar {
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.sector-bar div:first-child {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sector-bar span {
+  color: #657168;
+  font-size: 13px;
+}
+
+.sector-track {
+  height: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eee9;
+}
+
+.sector-track span {
+  display: block;
+  height: 100%;
+  background: #159a65;
+}
+
+.sector-bar.is-capped .sector-track span {
+  background: #d99a26;
 }
 
 .workspace {
@@ -386,7 +434,7 @@ button {
 
 table {
   width: 100%;
-  min-width: 860px;
+  min-width: 940px;
   border-collapse: collapse;
 }
 
@@ -566,6 +614,27 @@ tbody tr.is-selected {
   color: #657168;
 }
 
+.theme-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -4px 0 14px;
+}
+
+.theme-line span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #516058;
+  background: #edf2ef;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.theme-line .theme-primary {
+  color: #075535;
+  background: #dff6e9;
+}
+
 .chart-block {
   margin-top: 14px;
   padding: 14px 8px 8px;
@@ -688,7 +757,8 @@ tbody tr.is-selected {
     flex-direction: column;
   }
 
-  .market-index-grid {
+  .market-index-grid,
+  .sector-bars {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -716,7 +786,8 @@ tbody tr.is-selected {
   .summary-grid,
   .detail-grid,
   .review-kpis,
-  .market-index-grid {
+  .market-index-grid,
+  .sector-bars {
     grid-template-columns: 1fr;
   }
 
