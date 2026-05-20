@@ -190,20 +190,20 @@ function PickTable({
               className={selected?.instrument === pick.instrument ? "is-selected" : ""}
               onClick={() => onSelect(pick)}
             >
-              <td>{pick.rank}</td>
-              <td className="code">{pick.instrument}</td>
-              <td>{pick.name}</td>
-              <td>{pick.sector ?? "-"}</td>
-              <td>
+              <td data-label="Rank">{pick.rank}</td>
+              <td data-label="代码" className="code">{pick.instrument}</td>
+              <td data-label="名称">{pick.name}</td>
+              <td data-label="主题">{pick.sector ?? "-"}</td>
+              <td data-label="信号">
                 <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
               </td>
-              <td>
+              <td data-label="分数">
                 <strong>{pick.score.toFixed(1)}</strong>
               </td>
-              <td className={pick.pctChange >= 0 ? "up" : "down"}>{formatPct(pick.pctChange)}</td>
-              <td className={pick.flow5d >= 0 ? "up" : "down"}>{formatMoney(pick.flow5d)}</td>
-              <td>{pick.valuePosition.toFixed(1)}%</td>
-              <td>{formatMoney(pick.amount)}</td>
+              <td data-label="涨跌" className={pick.pctChange >= 0 ? "up" : "down"}>{formatPct(pick.pctChange)}</td>
+              <td data-label="5日资金" className={pick.flow5d >= 0 ? "up" : "down"}>{formatMoney(pick.flow5d)}</td>
+              <td data-label="分位">{pick.valuePosition.toFixed(1)}%</td>
+              <td data-label="成交额">{formatMoney(pick.amount)}</td>
             </tr>
           ))}
         </tbody>
@@ -615,25 +615,25 @@ function ReviewTable({ records }: { records: ReviewRecord[] }) {
         <tbody>
           {records.map((record) => (
             <tr key={`${record.signalDate}-${record.instrument}`}>
-              <td>{record.signalDate}</td>
-              <td className="code">{record.instrument}</td>
-              <td>{record.name}</td>
-              <td>{record.signalPrice.toFixed(2)}</td>
+              <td data-label="信号日">{record.signalDate}</td>
+              <td data-label="代码" className="code">{record.instrument}</td>
+              <td data-label="名称">{record.name}</td>
+              <td data-label="信号价">{record.signalPrice.toFixed(2)}</td>
               {reviewHorizons.map((horizon) => (
-                <td key={horizon}>
+                <td key={horizon} data-label={horizonLabel(horizon)}>
                   <ReviewReturn value={record.horizons[horizon].returnPct} />
                 </td>
               ))}
-              <td>
+              <td data-label="10日浮盈">
                 <ReviewReturn value={record.maxRunup10d} />
               </td>
-              <td>
+              <td data-label="3日低吸">
                 <ReviewReturn value={record.bestEntryDrawdown3d} />
               </td>
-              <td>
+              <td data-label="10日回撤">
                 <ReviewReturn value={record.maxDrawdown10d} />
               </td>
-              <td>{triggerText(record.planReplay?.firstTrigger)}</td>
+              <td data-label="计划触发">{triggerText(record.planReplay?.firstTrigger)}</td>
             </tr>
           ))}
         </tbody>
