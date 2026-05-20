@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 17:36:12",
+    "generatedAt": "2026-05-20 17:47:19",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 2,
@@ -11,9 +11,9 @@
     ]
   },
   "summary": {
-    "totalSignals": 13,
+    "totalSignals": 6,
     "completed10d": 0,
-    "tracking": 13,
+    "tracking": 6,
     "horizons": {
       "1d": {
         "completed": 5,
@@ -69,232 +69,15 @@
   "records": [
     {
       "signalDate": "2026-05-20",
-      "code": "600171",
-      "instrument": "600171.SH",
-      "name": "上海贝岭",
+      "code": "600301",
+      "instrument": "600301.SH",
+      "name": "华锡有色",
       "rank": 1,
-      "score": 92.4,
-      "signalPrice": 30.27,
-      "flowRatio5d": 2.3,
+      "score": 82.8,
+      "signalPrice": 53.59,
+      "flowRatio5d": 5.35,
       "valuePosition": 44.9,
-      "pullbackFromHigh": 14.7,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "601168",
-      "instrument": "601168.SH",
-      "name": "西部矿业",
-      "rank": 10,
-      "score": 86.6,
-      "signalPrice": 30.08,
-      "flowRatio5d": 2.55,
-      "valuePosition": 42.4,
-      "pullbackFromHigh": 27.1,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "600835",
-      "instrument": "600835.SH",
-      "name": "上海机电",
-      "rank": 11,
-      "score": 85.9,
-      "signalPrice": 26.34,
-      "flowRatio5d": 6.84,
-      "valuePosition": 43.4,
-      "pullbackFromHigh": 22.1,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "600336",
-      "instrument": "600336.SH",
-      "name": "澳柯玛",
-      "rank": 16,
-      "score": 84.1,
-      "signalPrice": 8.26,
-      "flowRatio5d": 7.85,
-      "valuePosition": 55.4,
-      "pullbackFromHigh": 14.2,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "600094",
-      "instrument": "600094.SH",
-      "name": "大名城",
-      "rank": 2,
-      "score": 90.5,
-      "signalPrice": 4.88,
-      "flowRatio5d": 13.81,
-      "valuePosition": 60.7,
-      "pullbackFromHigh": 13.3,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "601156",
-      "instrument": "601156.SH",
-      "name": "东航物流",
-      "rank": 20,
-      "score": 83.8,
-      "signalPrice": 16.24,
-      "flowRatio5d": 10.43,
-      "valuePosition": 24.8,
-      "pullbackFromHigh": 17.3,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "600651",
-      "instrument": "600651.SH",
-      "name": "飞乐音响",
-      "rank": 3,
-      "score": 89.7,
-      "signalPrice": 7.25,
-      "flowRatio5d": 7.45,
-      "valuePosition": 27.8,
-      "pullbackFromHigh": 22.5,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-20",
-      "code": "600596",
-      "instrument": "600596.SH",
-      "name": "新安股份",
-      "rank": 7,
-      "score": 87.4,
-      "signalPrice": 12.29,
-      "flowRatio5d": 2.14,
-      "valuePosition": 52.4,
-      "pullbackFromHigh": 12.5,
+      "pullbackFromHigh": 31.1,
       "horizons": {
         "1d": {
           "days": 1,
