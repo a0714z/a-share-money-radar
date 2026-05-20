@@ -42,6 +42,19 @@ function sweetSpotScore(position: number) {
   return 18;
 }
 
+function safeDivide(value: number, base: number, fallback = 0) {
+  return Number.isFinite(value) && Number.isFinite(base) && base !== 0 ? value / base : fallback;
+}
+
+function closeLocation(close: number, high: number, low: number) {
+  const range = Math.max(0.01, high - low);
+  return clamp((close - low) / range, 0, 1);
+}
+
+function countPositive(values: number[]) {
+  return values.filter((value) => value > 0).length;
+}
+
 function ratingFromSetup(args: {
   score: number;
   risks: string[];
@@ -51,6 +64,11 @@ function ratingFromSetup(args: {
   pctChange: number;
   flow3d: number;
   flowToday: number;
+  flowPositiveDays5: number;
+  flowAcceleration: number;
+  priceVolumeScore: number;
+  closeLocation: number;
+  amountRatio20: number;
 }) {
   const isEntryZone =
     args.score >= 83 &&
@@ -62,7 +80,11 @@ function ratingFromSetup(args: {
     args.pullback <= 28 &&
     args.pctChange < 4.8 &&
     args.flow3d > 0 &&
-    args.flowToday > 0;
+    args.flowToday > 0 &&
+    args.flowPositiveDays5 >= 3 &&
+    args.priceVolumeScore >= 58 &&
+    args.closeLocation >= 0.34 &&
+    !(args.amountRatio20 > 2.6 && args.pctChange < 0);
 
   if (isEntryZone) return { signal: "strong" as const, rating: "强关注" };
   if (args.score >= 72) return { signal: "watch" as const, rating: "观察" };
@@ -72,16 +94,25 @@ function ratingFromSetup(args: {
 function buildReasons(args: {
   flowRatio5d: number;
   flowToday: number;
+  flowPositiveDays5: number;
+  flowAcceleration: number;
   position: number;
   pullback: number;
   distanceToMa20: number;
   distanceToMa60: number;
   turnover: number;
   volumeRatio: number;
+  amountRatio20: number;
+  priceVolumeScore: number;
+  closeLocation: number;
 }) {
   const reasons: string[] = [];
   if (args.flowRatio5d > 0.035) reasons.push("5日大单净流入占比抬升");
   if (args.flowToday > 0) reasons.push("今日主买大单继续为正");
+  if (args.flowPositiveDays5 >= 4) reasons.push("近5日资金连续性较好");
+  if (args.flowAcceleration > 0.012) reasons.push("近3日资金流入加速");
+  if (args.priceVolumeScore >= 78) reasons.push("量价配合健康");
+  if (args.closeLocation >= 0.62 && args.amountRatio20 >= 1.05 && args.amountRatio20 <= 2.4) reasons.push("放量收在日内偏强位置");
   if (args.position >= 0.18 && args.position <= 0.55) reasons.push("价格处在近120日中低分位");
   if (args.pullback >= 8 && args.pullback <= 28) reasons.push("离阶段高点有回撤空间");
   if (Math.abs(args.distanceToMa20) <= 6) reasons.push("收盘价贴近20日均线");
@@ -97,8 +128,14 @@ function buildRisks(args: {
   turnover: number;
   volumeRatio: number;
   flowRatio5d: number;
+  flowPositiveDays5: number;
+  flowAcceleration: number;
   distanceToMa60: number;
+  distanceToMa20: number;
   amount: number;
+  amountRatio20: number;
+  priceVolumeScore: number;
+  closeLocation: number;
   historyLength: number;
 }) {
   const risks: string[] = [];
@@ -106,8 +143,15 @@ function buildRisks(args: {
   if (args.position > 0.72) risks.push("价格已接近阶段高位");
   if (args.turnover > 9) risks.push("换手过热");
   if (args.volumeRatio > 3) risks.push("量比异常放大");
+  if (args.amountRatio20 > 2.6 && args.pctChange < 0) risks.push("放量下跌，承接偏弱");
+  if (args.pctChange > 2.5 && args.amountRatio20 < 0.75) risks.push("缩量上涨，持续性待确认");
+  if (args.priceVolumeScore < 42) risks.push("量价配合偏弱");
+  if (args.closeLocation < 0.32 && args.amountRatio20 > 1.25) risks.push("放量但收盘位置偏低");
   if (args.flowRatio5d < 0) risks.push("近5日大单净流入仍为负");
+  if (args.flowPositiveDays5 <= 1) risks.push("资金流入连续性不足");
+  if (args.flowAcceleration < -0.012) risks.push("近3日资金流入转弱");
   if (args.distanceToMa60 < -8) risks.push("跌破60日成本区较多");
+  if (args.distanceToMa20 < -6 && args.flowRatio5d > 0.03) risks.push("资金流入但价格未站回20日线");
   if (args.amount < 30_000_000) risks.push("成交额偏低");
   if (args.historyLength < 80) risks.push("上市或有效历史样本不足");
   return risks;
@@ -203,6 +247,8 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const pb = quote.sjl ?? quote.pb_ratio;
 
   const sample = cleanHistory.slice(-120);
+  const recent20 = cleanHistory.slice(-20);
+  const recent5 = cleanHistory.slice(-5);
   const highs = sample.map((bar) => bar.h);
   const lows = sample.map((bar) => bar.l);
   const highN = Math.max(...highs);
@@ -218,6 +264,49 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const ma60 = last(ma60s);
   const distanceToMa20 = ma20 ? pctChange(close, ma20) : 0;
   const distanceToMa60 = ma60 ? pctChange(close, ma60) : 0;
+  const latestHigh = Number(quote.h ?? latestBar.h ?? close);
+  const latestLow = Number(quote.l ?? latestBar.l ?? close);
+  const dayCloseLocation = closeLocation(close, latestHigh, latestLow);
+  const avgAmount20 = average(recent20.slice(0, -1).map((bar) => bar.a));
+  const avgAmount5 = average(recent5.slice(0, -1).map((bar) => bar.a));
+  const amountRatio20 = safeDivide(amount, avgAmount20, 1);
+  const amountRatio5 = safeDivide(amount, avgAmount5, amountRatio20);
+  const amountExpansionScore =
+    amountRatio20 >= 1.05 && amountRatio20 <= 2.2
+      ? 100
+      : amountRatio20 >= 0.75 && amountRatio20 < 1.05
+        ? 72
+        : amountRatio20 > 2.2 && amountRatio20 <= 3
+          ? 58
+          : amountRatio20 < 0.55
+            ? 32
+            : 42;
+  const closeStrengthScore = dayCloseLocation >= 0.68 ? 95 : dayCloseLocation >= 0.52 ? 76 : dayCloseLocation >= 0.35 ? 52 : 26;
+  const shortAmountScore =
+    amountRatio5 >= 0.9 && amountRatio5 <= 2.1
+      ? 88
+      : amountRatio5 > 2.1 && amountRatio5 <= 2.8 && pct >= 0
+        ? 66
+        : amountRatio5 < 0.65 && pct > 0
+          ? 36
+          : amountRatio5 > 2.8 && pct < 0
+            ? 24
+            : 54;
+  const priceMoveQualityScore =
+    pct > 0
+      ? amountRatio20 >= 0.85
+        ? 80 + Math.min(16, pct * 2)
+        : 48
+      : pct > -2
+        ? amountRatio20 <= 1.7
+          ? 68
+          : 46
+        : amountRatio20 > 1.3
+          ? 24
+          : 42;
+  const priceVolumeScore = clamp(
+    amountExpansionScore * 0.3 + closeStrengthScore * 0.3 + shortAmountScore * 0.18 + priceMoveQualityScore * 0.22
+  );
 
   const cleanFlows = byDateAsc(flows).slice(-10);
   const flowBars = cleanFlows.map((flow) => {
@@ -233,8 +322,15 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const flowToday = last(flowBars)?.net ?? 0;
   const flow3d = sum(flowBars.slice(-3).map((flow) => flow.net));
   const flow5d = sum(flowBars.slice(-5).map((flow) => flow.net));
+  const prevFlow3d = sum(flowBars.slice(-6, -3).map((flow) => flow.net));
   const flowAmount5d = sum(cleanFlows.slice(-5).map(flowAmount));
-  const flowRatio5d = flowAmount5d > 0 ? flow5d / flowAmount5d : 0;
+  const flowAmount3d = sum(cleanFlows.slice(-3).map(flowAmount));
+  const prevFlowAmount3d = sum(cleanFlows.slice(-6, -3).map(flowAmount));
+  const flowRatio5d = safeDivide(flow5d, flowAmount5d);
+  const flowRatio3d = safeDivide(flow3d, flowAmount3d);
+  const prevFlowRatio3d = safeDivide(prevFlow3d, prevFlowAmount3d);
+  const flowAcceleration = flowRatio3d - prevFlowRatio3d;
+  const flowPositiveDays5 = countPositive(flowBars.slice(-5).map((flow) => flow.net));
   const dddxAvg = average(cleanFlows.slice(-5).map((flow) => Number(flow.dddx ?? 0)));
 
   const valueBase = sweetSpotScore(position);
@@ -245,10 +341,17 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const moneyScore = clamp(
     50 +
       flowRatio5d * 720 +
+      flowAcceleration * 460 +
+      (flowPositiveDays5 - 2.5) * 5 +
       (flow3d > 0 ? 12 : -12) +
       (flowToday > 0 ? 10 : -8) +
       clamp(dddxAvg, -8, 8) * 2.2
   );
+
+  const volumePricePenalty =
+    (amountRatio20 > 2.6 && pct < 0 ? 12 : 0) +
+    (pct > 3.5 && amountRatio20 < 0.7 ? 10 : 0) +
+    (dayCloseLocation < 0.28 && amountRatio20 > 1.2 ? 8 : 0);
 
   const trendScore = clamp(
     48 +
@@ -270,8 +373,14 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     turnover,
     volumeRatio,
     flowRatio5d,
+    flowPositiveDays5,
+    flowAcceleration,
     distanceToMa60,
+    distanceToMa20,
     amount,
+    amountRatio20,
+    priceVolumeScore,
+    closeLocation: dayCloseLocation,
     historyLength: cleanHistory.length
   });
 
@@ -280,9 +389,10 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     (position > 0.82 ? 14 : 0) +
     (flowRatio5d < -0.025 ? 12 : 0) +
     (amount < 20_000_000 ? 16 : 0) +
-    (distanceToMa60 < -12 ? 10 : 0);
+    (distanceToMa60 < -12 ? 10 : 0) +
+    volumePricePenalty;
 
-  const score = clamp(moneyScore * 0.4 + valueScore * 0.3 + trendScore * 0.2 + liquidityScore * 0.1 - hardPenalty);
+  const score = clamp(moneyScore * 0.34 + priceVolumeScore * 0.22 + valueScore * 0.22 + trendScore * 0.14 + liquidityScore * 0.08 - hardPenalty);
   const rating = ratingFromSetup({
     score,
     risks,
@@ -291,17 +401,27 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     pullback,
     pctChange: pct,
     flow3d,
-    flowToday
+    flowToday,
+    flowPositiveDays5,
+    flowAcceleration,
+    priceVolumeScore,
+    closeLocation: dayCloseLocation,
+    amountRatio20
   });
   const reasons = buildReasons({
     flowRatio5d,
     flowToday,
+    flowPositiveDays5,
+    flowAcceleration,
     position,
     pullback,
     distanceToMa20,
     distanceToMa60,
     turnover,
-    volumeRatio
+    volumeRatio,
+    amountRatio20,
+    priceVolumeScore,
+    closeLocation: dayCloseLocation
   });
   const tradePlan = buildTradePlan({
     signal: rating.signal,

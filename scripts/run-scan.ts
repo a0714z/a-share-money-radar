@@ -96,14 +96,20 @@ function roughSetupScore(stock: StockListItem, quote: RealQuote, minAmount: numb
   const turnover = Number(quote.hs ?? quote.tr ?? 0);
   const volumeRatio = Number(quote.lb ?? 0);
   const marketCap = Number(quote.lt ?? quote.sz ?? 0);
+  const high = Number(quote.h ?? quote.p);
+  const low = Number(quote.l ?? quote.p);
+  const closeLocation = Math.max(0, Math.min(1, (Number(quote.p) - low) / Math.max(0.01, high - low)));
   const boardBonus = code.startsWith("6") || code.startsWith("000") ? 4 : 0;
   const notChasing = pct < 6.5 ? 18 : -18;
   const mediumTermValue = zdf60 < 35 && zdf60 > -35 ? 18 - Math.abs(zdf60) * 0.2 : -10;
   const liquidity = Math.min(24, Math.log10(Math.max(amount, 1)) * 3);
   const turnoverScore = turnover >= 0.6 && turnover <= 7 ? 18 : turnover > 10 ? -12 : 6;
-  const volumeScore = volumeRatio >= 0.7 && volumeRatio <= 2.4 ? 12 : volumeRatio > 4 ? -8 : 3;
+  const volumeScore = volumeRatio >= 0.8 && volumeRatio <= 2.3 ? 14 : volumeRatio > 3.5 ? -10 : volumeRatio < 0.55 ? -5 : 4;
+  const closeStrength = closeLocation >= 0.58 ? 10 : closeLocation >= 0.38 ? 4 : -8;
+  const badVolumePrice = (pct < -2.5 && volumeRatio > 1.4 ? -16 : 0) + (pct > 5.2 && volumeRatio > 2.8 ? -10 : 0);
+  const healthyVolumePrice = pct > -1.5 && pct < 4.8 && volumeRatio >= 0.75 && volumeRatio <= 2.4 ? 8 : 0;
   const capScore = marketCap >= 2_000_000_000 ? 6 : -8;
-  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + capScore;
+  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + badVolumePrice + capScore;
 }
 
 function attachRanks(items: StockPick[]) {
