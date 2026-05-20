@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
   BadgeCheck,
   BarChart3,
   CalendarClock,
   CircleDollarSign,
   Filter,
   History,
+  Link as LinkIcon,
   ListChecks,
   Percent,
   Radar,
@@ -79,6 +81,21 @@ function marketActionText(market?: MarketRegime) {
 
 function allPicks(report: ScanReport) {
   return [...report.picks, ...report.watchlist, ...report.avoided].sort((a, b) => a.rank - b.rank);
+}
+
+function parseStockHash() {
+  const match = window.location.hash.match(/^#\/stock\/([^/?#]+)/);
+  return match ? decodeURIComponent(match[1]).toUpperCase() : undefined;
+}
+
+function stockHash(instrument: string) {
+  return `#/stock/${encodeURIComponent(instrument)}`;
+}
+
+function findPick(report: ScanReport, instrument?: string) {
+  if (!instrument) return undefined;
+  const key = instrument.toUpperCase();
+  return allPicks(report).find((pick) => pick.instrument.toUpperCase() === key || pick.code.toUpperCase() === key);
 }
 
 function triggerText(trigger?: NonNullable<ReviewRecord["planReplay"]>["firstTrigger"]) {
@@ -160,11 +177,13 @@ function ScoreRing({ value }: { value: number }) {
 function PickTable({
   picks,
   selected,
-  onSelect
+  onSelect,
+  onOpen
 }: {
   picks: StockPick[];
   selected?: StockPick;
   onSelect: (pick: StockPick) => void;
+  onOpen: (pick: StockPick) => void;
 }) {
   return (
     <div className="table-wrap">
@@ -181,6 +200,7 @@ function PickTable({
             <th>5日资金</th>
             <th>分位</th>
             <th>成交额</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -204,6 +224,17 @@ function PickTable({
               <td data-label="5日资金" className={pick.flow5d >= 0 ? "up" : "down"}>{formatMoney(pick.flow5d)}</td>
               <td data-label="分位">{pick.valuePosition.toFixed(1)}%</td>
               <td data-label="成交额">{formatMoney(pick.amount)}</td>
+              <td data-label="操作">
+                <button
+                  className="mini-action"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onOpen(pick);
+                  }}
+                >
+                  详情
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -213,7 +244,26 @@ function PickTable({
   );
 }
 
-function PickDetail({ pick, reviewRecords }: { pick: StockPick; reviewRecords: ReviewRecord[] }) {
+function DetailActions({ pick, onBack }: { pick: StockPick; onBack?: () => void }) {
+  const href = stockHash(pick.instrument);
+
+  return (
+    <div className="detail-actions">
+      {onBack && (
+        <button className="icon-action" onClick={onBack} title="返回列表">
+          <ArrowLeft size={16} />
+          <span>返回</span>
+        </button>
+      )}
+      <a className="icon-action" href={href} title="打开可分享详情链接">
+        <LinkIcon size={16} />
+        <span>详情链接</span>
+      </a>
+    </div>
+  );
+}
+
+function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRecords: ReviewRecord[]; onBack?: () => void }) {
   const plan = pick.tradePlan;
   const historySignals = reviewRecords
     .filter((record) => record.instrument === pick.instrument)
@@ -222,6 +272,7 @@ function PickDetail({ pick, reviewRecords }: { pick: StockPick; reviewRecords: R
 
   return (
     <aside className="detail-panel">
+      <DetailActions pick={pick} onBack={onBack} />
       <div className="detail-head">
         <div>
           <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
@@ -710,21 +761,61 @@ function ReviewPanel({ review }: { review: ReviewReport }) {
   );
 }
 
+function StockDetailPage({
+  pick,
+  reviewRecords,
+  onBack
+}: {
+  pick?: StockPick;
+  reviewRecords: ReviewRecord[];
+  onBack: () => void;
+}) {
+  if (!pick) {
+    return (
+      <section className="list-panel standalone-empty">
+        <div className="panel-toolbar">
+          <div>
+            <h2>未找到标的</h2>
+            <span>这个详情链接没有匹配到当前报告里的候选项</span>
+          </div>
+          <button className="icon-action" onClick={onBack}>
+            <ArrowLeft size={16} />
+            <span>返回</span>
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="stock-page">
+      <PickDetail pick={pick} reviewRecords={reviewRecords} onBack={onBack} />
+    </section>
+  );
+}
+
 export default function App() {
   const [report, setReport] = useState<ScanReport>(sampleReport);
   const [review, setReview] = useState<ReviewReport>(sampleReview);
   const [view, setView] = useState<"radar" | "review">("radar");
+  const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
   const [selected, setSelected] = useState<StockPick | undefined>(sampleReport.picks[0]);
   const [status, setStatus] = useState<"loading" | "live" | "sample">("loading");
 
   useEffect(() => {
+    const handleHash = () => setStockRoute(parseStockHash());
+    window.addEventListener("hashchange", handleHash);
+    return () => window.removeEventListener("hashchange", handleHash);
+  }, []);
+
+  useEffect(() => {
     loadReport()
       .then((liveReport) => {
         setReport(liveReport);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
-        setSelected(allPicks(liveReport)[0]);
+        setSelected(findPick(liveReport, parseStockHash()) ?? allPicks(liveReport)[0]);
       })
       .catch(() => {
         setStatus("sample");
@@ -758,6 +849,21 @@ export default function App() {
     }
   }, [rows, selected]);
 
+  const clearRoute = () => {
+    if (window.location.hash) {
+      window.history.pushState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+    setStockRoute(undefined);
+  };
+
+  const openStock = (pick: StockPick) => {
+    setSelected(pick);
+    window.location.hash = stockHash(pick.instrument);
+    setStockRoute(pick.instrument);
+  };
+
+  const routedPick = findPick(report, stockRoute);
+
   const liveBadge = status === "live" ? "Live" : status === "loading" ? "Loading" : "Sample";
 
   return (
@@ -774,10 +880,22 @@ export default function App() {
         </div>
         <div className="top-actions">
           <div className="view-switch">
-            <button className={view === "radar" ? "active" : ""} onClick={() => setView("radar")}>
+            <button
+              className={view === "radar" && !stockRoute ? "active" : ""}
+              onClick={() => {
+                clearRoute();
+                setView("radar");
+              }}
+            >
               今日选股
             </button>
-            <button className={view === "review" ? "active" : ""} onClick={() => setView("review")}>
+            <button
+              className={view === "review" && !stockRoute ? "active" : ""}
+              onClick={() => {
+                clearRoute();
+                setView("review");
+              }}
+            >
               复盘统计
             </button>
           </div>
@@ -788,7 +906,9 @@ export default function App() {
         </div>
       </header>
 
-      {view === "radar" ? (
+      {stockRoute ? (
+        <StockDetailPage pick={routedPick} reviewRecords={review.records} onBack={clearRoute} />
+      ) : view === "radar" ? (
         <>
           <section className="summary-grid">
             <Metric icon={CalendarClock} label="交易日" value={report.meta.tradeDate} tone="blue" />
@@ -827,7 +947,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
-              <PickTable picks={rows} selected={selected} onSelect={setSelected} />
+              <PickTable picks={rows} selected={selected} onSelect={setSelected} onOpen={openStock} />
             </div>
             {selected && <PickDetail pick={selected} reviewRecords={review.records} />}
           </section>
