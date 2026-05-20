@@ -497,7 +497,7 @@ async function liveScan() {
       notes: [
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
-        "评分侧重资金流入、价格分位、均线成本区和流动性",
+        "评分侧重资金连续性、流入加速度、放量质量、收盘强弱和成本区位置",
         `大盘环境：${market.label}，${market.reasons.join("；")}`,
         `行业集中度：同一主题核心池最多 ${config.maxPerSector} 只，${concentration.applied ? `已降级 ${concentration.demoted} 只` : "未触发降级"}`
       ]
