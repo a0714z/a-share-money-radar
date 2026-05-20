@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generatedAt": "2026-05-20 09:55:27",
+    "generatedAt": "2026-05-20 10:37:38",
     "source": "Biying API + archived scan reports",
     "mode": "live",
-    "historyReports": 1,
+    "historyReports": 2,
     "notes": [
       "只统计核心强关注池，不把观察池计入胜率",
       "收益按信号日收盘价到后续第 N 个交易日收盘价计算",
@@ -11,9 +11,9 @@
     ]
   },
   "summary": {
-    "totalSignals": 5,
+    "totalSignals": 12,
     "completed10d": 0,
-    "tracking": 5,
+    "tracking": 12,
     "horizons": {
       "1d": {
         "completed": 0
@@ -30,6 +30,223 @@
     }
   },
   "records": [
+    {
+      "signalDate": "2026-05-20",
+      "code": "000027",
+      "instrument": "000027.SZ",
+      "name": "深圳能源",
+      "rank": 1,
+      "score": 91.6,
+      "signalPrice": 7.41,
+      "flowRatio5d": 5.59,
+      "valuePosition": 47,
+      "pullbackFromHigh": 12.6,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "600158",
+      "instrument": "600158.SH",
+      "name": "中体产业",
+      "rank": 13,
+      "score": 86.4,
+      "signalPrice": 12.1,
+      "flowRatio5d": 7.49,
+      "valuePosition": 57.1,
+      "pullbackFromHigh": 18.7,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "000997",
+      "instrument": "000997.SZ",
+      "name": "新 大 陆",
+      "rank": 14,
+      "score": 86.2,
+      "signalPrice": 23.27,
+      "flowRatio5d": 6.21,
+      "valuePosition": 31.3,
+      "pullbackFromHigh": 26.4,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "600171",
+      "instrument": "600171.SH",
+      "name": "上海贝岭",
+      "rank": 2,
+      "score": 91.6,
+      "signalPrice": 30.35,
+      "flowRatio5d": 5.69,
+      "valuePosition": 45.7,
+      "pullbackFromHigh": 14.5,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "000571",
+      "instrument": "000571.SZ",
+      "name": "新大洲A",
+      "rank": 20,
+      "score": 83.7,
+      "signalPrice": 5.87,
+      "flowRatio5d": 15.9,
+      "valuePosition": 33.8,
+      "pullbackFromHigh": 26.2,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "000725",
+      "instrument": "000725.SZ",
+      "name": "京东方Ａ",
+      "rank": 3,
+      "score": 89.4,
+      "signalPrice": 4.26,
+      "flowRatio5d": 3.53,
+      "valuePosition": 50,
+      "pullbackFromHigh": 9.9,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-20",
+      "code": "000543",
+      "instrument": "000543.SZ",
+      "name": "皖能电力",
+      "rank": 5,
+      "score": 88.9,
+      "signalPrice": 8.48,
+      "flowRatio5d": 6.72,
+      "valuePosition": 43.1,
+      "pullbackFromHigh": 10.1,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
     {
       "signalDate": "2026-05-19",
       "code": "000725",
