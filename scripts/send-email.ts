@@ -10,7 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 const latestPath = resolve(root, "public/reports/latest.json");
 const reviewPath = resolve(root, "public/reports/performance.json");
-const defaultRecipient = "zxl4418@163.com";
+const defaultRecipient = "";
 
 dotenv.config({ path: resolve(root, ".env.local"), override: false, quiet: true });
 dotenv.config({ path: resolve(root, ".env"), override: false, quiet: true });
@@ -208,6 +208,7 @@ async function main() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   const missing = [
+    ["NOTIFY_EMAIL_TO", to],
     ["SMTP_HOST", host],
     ["SMTP_USER", user],
     ["SMTP_PASS", pass]

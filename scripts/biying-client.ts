@@ -19,6 +19,7 @@ function toUrl(path: string, options: FetchOptions = {}) {
 
 async function fetchJson<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const url = toUrl(path, options);
+  const safePath = url.pathname.replace(/\/[^/]+$/, "/[redacted]");
   const response = await fetch(url, {
     headers: {
       Accept: "application/json"
@@ -26,14 +27,14 @@ async function fetchJson<T>(path: string, options: FetchOptions = {}): Promise<T
   });
 
   if (!response.ok) {
-    throw new Error(`Biying API ${response.status}: ${url.pathname}`);
+    throw new Error(`Biying API ${response.status}: ${safePath}`);
   }
 
   const text = await response.text();
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error(`Biying API returned non-JSON for ${url.pathname}: ${text.slice(0, 80)}`);
+    throw new Error(`Biying API returned non-JSON for ${safePath}: ${text.slice(0, 80)}`);
   }
 }
 

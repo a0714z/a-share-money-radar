@@ -73,7 +73,7 @@ jobs:
       - name: Send email notification
         if: ${{ github.event_name != 'push' }}
         env:
-          NOTIFY_EMAIL_TO: zxl4418@163.com
+          NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
