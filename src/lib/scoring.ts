@@ -42,9 +42,30 @@ function sweetSpotScore(position: number) {
   return 18;
 }
 
-function ratingFromScore(score: number, risks: string[]) {
-  if (score >= 78 && risks.length <= 2) return { signal: "strong" as const, rating: "强关注" };
-  if (score >= 66) return { signal: "watch" as const, rating: "观察" };
+function ratingFromSetup(args: {
+  score: number;
+  risks: string[];
+  flowRatio5d: number;
+  position: number;
+  pullback: number;
+  pctChange: number;
+  flow3d: number;
+  flowToday: number;
+}) {
+  const isEntryZone =
+    args.score >= 83 &&
+    args.risks.length <= 2 &&
+    args.flowRatio5d >= 0.02 &&
+    args.position >= 0.2 &&
+    args.position <= 0.65 &&
+    args.pullback >= 8 &&
+    args.pullback <= 28 &&
+    args.pctChange < 4.8 &&
+    args.flow3d > 0 &&
+    args.flowToday > 0;
+
+  if (isEntryZone) return { signal: "strong" as const, rating: "强关注" };
+  if (args.score >= 72) return { signal: "watch" as const, rating: "观察" };
   return { signal: "wait" as const, rating: "等待" };
 }
 
@@ -189,7 +210,16 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     (distanceToMa60 < -12 ? 10 : 0);
 
   const score = clamp(moneyScore * 0.4 + valueScore * 0.3 + trendScore * 0.2 + liquidityScore * 0.1 - hardPenalty);
-  const rating = ratingFromScore(score, risks);
+  const rating = ratingFromSetup({
+    score,
+    risks,
+    flowRatio5d,
+    position,
+    pullback,
+    pctChange: pct,
+    flow3d,
+    flowToday
+  });
   const reasons = buildReasons({
     flowRatio5d,
     flowToday,

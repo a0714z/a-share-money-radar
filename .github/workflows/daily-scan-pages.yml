@@ -32,22 +32,29 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Generate report
+      - name: Generate or keep report
         env:
           BIYING_LICENSE: ${{ secrets.BIYING_LICENSE }}
-          SCAN_TOP_N: 60
+          SCAN_TOP_N: 8
           SCAN_HISTORY_DAYS: 120
           SCAN_FLOW_DAYS: 10
           SCAN_FLOW_CANDIDATE_LIMIT: 180
           SCAN_MIN_AMOUNT: 30000000
         run: |
-          if [ -n "$BIYING_LICENSE" ]; then
-            npm run scan
-          else
+          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "$BIYING_LICENSE" ]; then
+              npm run scan
+            else
+              npm run scan:sample
+            fi
+          elif [ ! -f public/reports/latest.json ]; then
             npm run scan:sample
+          else
+            echo "Using committed latest report for push build"
           fi
 
       - name: Commit latest report
+        if: ${{ github.event_name != 'push' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -58,6 +65,11 @@ jobs:
             git commit -m "Update daily scan report [skip ci]"
             git push
           fi
+
+      - name: Validate committed report
+        if: ${{ github.event_name == 'push' }}
+        run: |
+          node -e "const r=require('./public/reports/latest.json'); if (!r.picks || !r.meta) process.exit(1); console.log('report ok:', r.meta.tradeDate, r.universe.strong)"
 
       - name: Build
         env:

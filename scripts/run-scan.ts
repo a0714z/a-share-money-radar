@@ -36,7 +36,7 @@ function intEnv(name: string, fallback: number) {
 
 function configFromEnv(): ScanConfig {
   return {
-    topN: intEnv("SCAN_TOP_N", 60),
+    topN: intEnv("SCAN_TOP_N", 8),
     historyDays: intEnv("SCAN_HISTORY_DAYS", 120),
     flowDays: intEnv("SCAN_FLOW_DAYS", 10),
     flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 180),
@@ -144,6 +144,13 @@ async function liveScan() {
     .sort((a, b) => b.rough - a.rough)
     .slice(0, config.flowCandidateLimit);
 
+  if (!roughCandidates.length) {
+    const quoteTime = quotes.find((quote) => quote.t)?.t ?? "unknown";
+    throw new Error(
+      `No scan candidates found at ${quoteTime}. The market data may be pre-open, stale, or missing turnover; keeping the previous report.`
+    );
+  }
+
   console.log(`[scan] scoring ${roughCandidates.length} candidates with history + money flow`);
   const scored = await mapLimit(roughCandidates, 24, async ({ stock, quote }, index) => {
     const exchange = inferExchange(stock.dm, stock.jys);
@@ -164,6 +171,11 @@ async function liveScan() {
     .filter((item): item is StockPick => Boolean(item))
     .sort((a, b) => b.score - a.score);
   const ranked = attachRanks(sorted);
+
+  if (!ranked.length) {
+    throw new Error("No candidates could be scored; keeping the previous report.");
+  }
+
   const picks = ranked.filter((item) => item.signal === "strong").slice(0, config.topN);
   const watchlist = ranked.filter((item) => item.signal === "watch").slice(0, Math.max(20, config.topN));
   const avoided = ranked.filter((item) => item.signal === "wait").slice(0, 25);
@@ -188,8 +200,8 @@ async function liveScan() {
       quoted: universe.filter((stock) => stockByCode.has(plainCode(stock.dm)) && quoteByCode.has(plainCode(stock.dm))).length,
       candidates: roughCandidates.length,
       scored: ranked.length,
-      strong: ranked.filter((item) => item.signal === "strong").length,
-      watch: ranked.filter((item) => item.signal === "watch").length
+      strong: picks.length,
+      watch: watchlist.length
     },
     picks,
     watchlist,
