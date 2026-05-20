@@ -197,7 +197,8 @@ button {
 
 .market-panel,
 .concentration-panel,
-.status-panel {
+.status-panel,
+.change-panel {
   margin: -8px 0 22px;
   padding: 16px;
   border: 1px solid #dce3df;
@@ -211,6 +212,10 @@ button {
 }
 
 .status-panel {
+  margin-top: -8px;
+}
+
+.change-panel {
   margin-top: -8px;
 }
 
@@ -267,6 +272,102 @@ button {
   display: block;
   margin-top: 6px;
   font-size: 18px;
+}
+
+.change-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.change-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.change-head span {
+  color: #657168;
+}
+
+.change-head strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.change-panel p {
+  margin: 12px 0 14px;
+  color: #31443a;
+  font-weight: 800;
+}
+
+.change-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.change-block {
+  min-height: 156px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.change-block h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.change-list {
+  display: grid;
+  gap: 8px;
+}
+
+.change-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #e7ece9;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.change-item strong,
+.change-item span {
+  display: block;
+}
+
+.change-item span {
+  color: #657168;
+  font-size: 12px;
+}
+
+.change-item > div:last-child {
+  text-align: right;
+}
+
+.change-empty {
+  padding: 26px 10px;
+  color: #657168;
+  text-align: center;
+}
+
+.sector-change-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.sector-change-strip span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .market-head {
@@ -938,7 +1039,8 @@ tbody tr.is-selected {
 
   .market-index-grid,
   .sector-bars,
-  .status-grid {
+  .status-grid,
+  .change-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -971,6 +1073,7 @@ tbody tr.is-selected {
   .market-index-grid,
   .sector-bars,
   .status-grid,
+  .change-grid,
   .signal-history-row {
     grid-template-columns: 1fr;
   }

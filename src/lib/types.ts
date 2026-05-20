@@ -180,9 +180,44 @@ export type ScanReport = {
   };
   market?: MarketRegime;
   concentration?: SectorConcentrationReport;
+  changes?: DailyChangeSummary;
   picks: StockPick[];
   watchlist: StockPick[];
   avoided: StockPick[];
+};
+
+export type DailyChangeItem = {
+  code: string;
+  instrument: string;
+  name: string;
+  sector?: string;
+  currentRank?: number;
+  previousRank?: number;
+  currentSignal?: Signal;
+  previousSignal?: Signal;
+  score?: number;
+  flowRatio5d?: number;
+  consecutiveStrongDays?: number;
+};
+
+export type SectorChange = {
+  sector: string;
+  currentStrong: number;
+  previousStrong: number;
+  delta: number;
+};
+
+export type DailyChangeSummary = {
+  previousTradeDate?: string;
+  strongCountChange: number;
+  headline: string;
+  newStrong: DailyChangeItem[];
+  upgradedToStrong: DailyChangeItem[];
+  consecutiveStrong: DailyChangeItem[];
+  downgradedFromStrong: DailyChangeItem[];
+  exitedStrong: DailyChangeItem[];
+  sectorChanges: SectorChange[];
+  notes: string[];
 };
 
 export type SectorConcentrationGroup = {

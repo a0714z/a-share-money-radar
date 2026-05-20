@@ -30,7 +30,17 @@ import {
 } from "recharts";
 import { sampleReport } from "./data/sample-report";
 import { sampleReview } from "./data/sample-review";
-import type { MarketRegime, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, SectorConcentrationReport, Signal, StockPick } from "./lib/types";
+import type {
+  DailyChangeItem,
+  MarketRegime,
+  ReviewHorizon,
+  ReviewRecord,
+  ReviewReport,
+  ScanReport,
+  SectorConcentrationReport,
+  Signal,
+  StockPick
+} from "./lib/types";
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
@@ -77,6 +87,27 @@ function triggerText(trigger?: NonNullable<ReviewRecord["planReplay"]>["firstTri
   if (trigger === "target1") return "触达目标一";
   if (trigger === "target2") return "触达目标二";
   return "未触发";
+}
+
+function ChangeItemList({ items, empty }: { items: DailyChangeItem[]; empty: string }) {
+  if (!items.length) return <div className="change-empty">{empty}</div>;
+
+  return (
+    <div className="change-list">
+      {items.slice(0, 5).map((item) => (
+        <div key={item.instrument} className="change-item">
+          <div>
+            <strong>{item.name}</strong>
+            <span className="code">{item.instrument}</span>
+          </div>
+          <div>
+            <span>{item.sector ?? "未分组"}</span>
+            <strong>{item.score !== undefined ? item.score.toFixed(1) : "-"}</strong>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 async function loadReport() {
@@ -430,6 +461,58 @@ function SystemStatusPanel({
   );
 }
 
+function ChangeSummaryPanel({ report }: { report: ScanReport }) {
+  const changes = report.changes;
+  if (!changes) return null;
+
+  const newOrUpgraded = [...changes.newStrong, ...changes.upgradedToStrong].sort((a, b) => (a.currentRank ?? 999) - (b.currentRank ?? 999));
+  const leftCore = [...changes.downgradedFromStrong, ...changes.exitedStrong];
+  const topSectors = changes.sectorChanges.filter((sector) => sector.currentStrong > 0).slice(0, 4);
+
+  return (
+    <section className="change-panel">
+      <div className="change-head">
+        <div>
+          <h2>今日变化</h2>
+          <span>{changes.previousTradeDate ? `对比 ${changes.previousTradeDate}` : "暂无上一交易日对比"}</span>
+        </div>
+        <strong className={changes.strongCountChange >= 0 ? "up" : "down"}>
+          {changes.strongCountChange > 0 ? "+" : ""}
+          {changes.strongCountChange}
+        </strong>
+      </div>
+      <p>{changes.headline}</p>
+      <div className="change-grid">
+        <div className="change-block">
+          <h3>新晋强关注</h3>
+          <ChangeItemList items={newOrUpgraded} empty="今天没有新晋强关注" />
+        </div>
+        <div className="change-block">
+          <h3>连续入选</h3>
+          <ChangeItemList
+            items={changes.consecutiveStrong.map((item) => ({
+              ...item,
+              sector: item.consecutiveStrongDays ? `${item.sector ?? "未分组"} · ${item.consecutiveStrongDays}天` : item.sector
+            }))}
+            empty="暂无连续入选标的"
+          />
+        </div>
+        <div className="change-block">
+          <h3>降级/退出</h3>
+          <ChangeItemList items={leftCore} empty="今天没有核心池降级或退出" />
+        </div>
+      </div>
+      <div className="sector-change-strip">
+        {topSectors.map((sector) => (
+          <span key={sector.sector} className={sector.delta >= 0 ? "tag-ok" : "tag-warn"}>
+            {sector.sector} {sector.currentStrong}只 {sector.delta > 0 ? `+${sector.delta}` : sector.delta}
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function MarketPanel({ market }: { market?: MarketRegime }) {
   if (!market) return null;
 
@@ -716,6 +799,7 @@ export default function App() {
           </section>
 
           <SystemStatusPanel report={report} review={review} status={status} />
+          <ChangeSummaryPanel report={report} />
           <MarketPanel market={report.market} />
           <ConcentrationPanel concentration={report.concentration} />
 

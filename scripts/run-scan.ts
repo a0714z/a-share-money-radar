@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
@@ -7,7 +8,18 @@ import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { scoreCandidate } from "../src/lib/scoring";
 import { attachSector, buildConcentrationReport, downgradeForConcentration } from "../src/lib/sector";
-import type { KLine, MarketRegime, RealQuote, ScanReport, SectorConcentrationReport, StockListItem, StockPick } from "../src/lib/types";
+import type {
+  DailyChangeItem,
+  KLine,
+  MarketRegime,
+  RealQuote,
+  ScanReport,
+  SectorChange,
+  SectorConcentrationReport,
+  Signal,
+  StockListItem,
+  StockPick
+} from "../src/lib/types";
 import { isMainBoardNonSt, toInstrumentCode, inferExchange, plainCode } from "../src/lib/universe";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -96,6 +108,153 @@ function roughSetupScore(stock: StockListItem, quote: RealQuote, minAmount: numb
 
 function attachRanks(items: StockPick[]) {
   return items.map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
+async function readJson<T>(path: string) {
+  return JSON.parse(await readFile(path, "utf8")) as T;
+}
+
+async function readHistoryReports() {
+  if (!existsSync(historyDir)) return [];
+  const files = (await readdir(historyDir)).filter((file) => file.endsWith(".json")).sort();
+  const reports: ScanReport[] = [];
+  for (const file of files) {
+    try {
+      reports.push(await readJson<ScanReport>(resolve(historyDir, file)));
+    } catch (error) {
+      console.warn(`[scan] history ${file} skipped: ${(error as Error).message}`);
+    }
+  }
+  return reports.sort((a, b) => a.meta.tradeDate.localeCompare(b.meta.tradeDate));
+}
+
+function allReportPicks(report: ScanReport) {
+  return [...report.picks, ...report.watchlist, ...report.avoided];
+}
+
+function pickSignal(report: ScanReport, instrument: string): Signal | undefined {
+  return allReportPicks(report).find((pick) => pick.instrument === instrument)?.signal;
+}
+
+function changeItem(pick: StockPick, previous?: StockPick, consecutiveStrongDays?: number): DailyChangeItem {
+  return {
+    code: pick.code,
+    instrument: pick.instrument,
+    name: pick.name,
+    sector: pick.sector,
+    currentRank: pick.rank,
+    previousRank: previous?.rank,
+    currentSignal: pick.signal,
+    previousSignal: previous?.signal,
+    score: pick.score,
+    flowRatio5d: pick.flowRatio5d,
+    consecutiveStrongDays
+  };
+}
+
+function sectorCounts(picks: StockPick[]) {
+  const counts = new Map<string, number>();
+  for (const pick of picks) {
+    const sector = pick.sector ?? "其他";
+    counts.set(sector, (counts.get(sector) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function buildSectorChanges(current: ScanReport, previous?: ScanReport): SectorChange[] {
+  const currentCounts = sectorCounts(current.picks);
+  const previousCounts = sectorCounts(previous?.picks ?? []);
+  const sectors = new Set([...currentCounts.keys(), ...previousCounts.keys()]);
+
+  return [...sectors]
+    .map((sector) => {
+      const currentStrong = currentCounts.get(sector) ?? 0;
+      const previousStrong = previousCounts.get(sector) ?? 0;
+      return { sector, currentStrong, previousStrong, delta: currentStrong - previousStrong };
+    })
+    .filter((item) => item.currentStrong || item.previousStrong)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta) || b.currentStrong - a.currentStrong)
+    .slice(0, 8);
+}
+
+function consecutiveStrongDays(instrument: string, current: ScanReport, history: ScanReport[]) {
+  let days = current.picks.some((pick) => pick.instrument === instrument) ? 1 : 0;
+  if (!days) return 0;
+
+  for (const report of [...history].filter((item) => item.meta.tradeDate < current.meta.tradeDate).sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate))) {
+    if (!report.picks.some((pick) => pick.instrument === instrument)) break;
+    days += 1;
+  }
+  return days;
+}
+
+function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanReport["changes"] {
+  const previous = [...history]
+    .filter((report) => report.meta.tradeDate < current.meta.tradeDate)
+    .sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate))[0];
+
+  if (!previous) {
+    return {
+      strongCountChange: current.picks.length,
+      headline: `今日强关注 ${current.picks.length} 只，暂无上一交易日报告可对比。`,
+      newStrong: current.picks.map((pick) => changeItem(pick)),
+      upgradedToStrong: [],
+      consecutiveStrong: [],
+      downgradedFromStrong: [],
+      exitedStrong: [],
+      sectorChanges: buildSectorChanges(current),
+      notes: ["首次生成变化摘要，后续交易日会显示新晋、降级和连续入选。"]
+    };
+  }
+
+  const previousByInstrument = new Map(allReportPicks(previous).map((pick) => [pick.instrument, pick]));
+  const currentByInstrument = new Map(allReportPicks(current).map((pick) => [pick.instrument, pick]));
+  const previousStrong = new Set(previous.picks.map((pick) => pick.instrument));
+  const currentStrong = new Set(current.picks.map((pick) => pick.instrument));
+  const newStrong = current.picks.filter((pick) => !previousByInstrument.has(pick.instrument)).map((pick) => changeItem(pick));
+  const upgradedToStrong = current.picks
+    .filter((pick) => previousByInstrument.has(pick.instrument) && pickSignal(previous, pick.instrument) !== "strong")
+    .map((pick) => changeItem(pick, previousByInstrument.get(pick.instrument)));
+  const consecutiveStrong = current.picks
+    .filter((pick) => previousStrong.has(pick.instrument))
+    .map((pick) => changeItem(pick, previousByInstrument.get(pick.instrument), consecutiveStrongDays(pick.instrument, current, history)))
+    .sort((a, b) => (b.consecutiveStrongDays ?? 0) - (a.consecutiveStrongDays ?? 0) || (a.currentRank ?? 0) - (b.currentRank ?? 0));
+  const downgradedFromStrong = previous.picks
+    .filter((pick) => currentByInstrument.has(pick.instrument) && !currentStrong.has(pick.instrument))
+    .map((pick) => changeItem(currentByInstrument.get(pick.instrument)!, pick));
+  const exitedStrong = previous.picks
+    .filter((pick) => !currentByInstrument.has(pick.instrument))
+    .map((pick) => ({
+      ...changeItem(pick, pick),
+      currentSignal: undefined,
+      previousSignal: "strong" as const
+    }));
+  const strongCountChange = current.picks.length - previous.picks.length;
+  const sectorChanges = buildSectorChanges(current, previous);
+  const topSector = sectorChanges.find((item) => item.currentStrong > 0);
+  const deltaText = strongCountChange > 0 ? `增加 ${strongCountChange}` : strongCountChange < 0 ? `减少 ${Math.abs(strongCountChange)}` : "持平";
+  const headline = [
+    `今日强关注 ${current.picks.length} 只，较 ${previous.meta.tradeDate} ${deltaText}`,
+    `新晋 ${newStrong.length + upgradedToStrong.length} 只`,
+    `连续入选 ${consecutiveStrong.length} 只`,
+    `降级/退出 ${downgradedFromStrong.length + exitedStrong.length} 只`,
+    topSector ? `${topSector.sector} 当前 ${topSector.currentStrong} 只` : ""
+  ]
+    .filter(Boolean)
+    .join("；");
+
+  return {
+    previousTradeDate: previous.meta.tradeDate,
+    strongCountChange,
+    headline,
+    newStrong,
+    upgradedToStrong,
+    consecutiveStrong,
+    downgradedFromStrong,
+    exitedStrong,
+    sectorChanges,
+    notes: ["新晋包含上一交易日未进入候选池、今日进入强关注的标的。", "连续入选只统计核心强关注池。"]
+  };
 }
 
 function tradeDateFromPicks(picks: StockPick[]) {
@@ -352,6 +511,7 @@ async function liveScan() {
     watchlist,
     avoided
   };
+  report.changes = buildChangeSummary(report, await readHistoryReports());
 
   await writeReport(report);
 }
