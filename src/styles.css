@@ -730,6 +730,102 @@ tbody tr.is-selected {
   margin-top: 0;
 }
 
+.health-panel {
+  margin: -8px 0 22px;
+  padding: 16px;
+  border: 1px solid #dce3df;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 16px 32px rgba(20, 32, 26, 0.06);
+}
+
+.health-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.health-label {
+  color: #657168;
+  font-weight: 800;
+}
+
+.health-main h2 {
+  margin: 6px 0;
+  font-size: 28px;
+}
+
+.health-main p {
+  margin: 0;
+  color: #31443a;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.health-score {
+  display: grid;
+  min-width: 128px;
+  place-items: center;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f8fbf8;
+}
+
+.health-score strong {
+  font-size: 34px;
+  line-height: 1;
+}
+
+.health-score span {
+  margin-top: 7px;
+  color: #657168;
+  font-weight: 900;
+}
+
+.health-good .health-score {
+  color: #075535;
+  background: #dff6e9;
+}
+
+.health-watch .health-score {
+  color: #735012;
+  background: #fff2c7;
+}
+
+.health-tighten .health-score {
+  color: #8b2d2c;
+  background: #f8dedc;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.health-grid div {
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.health-grid span,
+.health-grid small {
+  display: block;
+  color: #657168;
+}
+
+.health-grid strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 21px;
+  overflow-wrap: anywhere;
+}
+
 .review-chart {
   padding: 16px 12px 4px;
 }
@@ -1122,16 +1218,27 @@ tbody tr.is-selected {
   .market-panel,
   .concentration-panel,
   .status-panel,
-  .change-panel {
+  .change-panel,
+  .health-panel {
     padding: 12px;
     box-shadow: 0 10px 22px rgba(20, 32, 26, 0.05);
   }
 
   .market-head,
   .status-head,
-  .change-head {
+  .change-head,
+  .health-main {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .health-score {
+    width: 100%;
+    place-items: start;
+  }
+
+  .health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .market-index-grid,
@@ -1222,6 +1329,7 @@ tbody tr.is-selected {
   .detail-grid,
   .trade-plan-grid,
   .review-kpis,
+  .health-grid,
   .market-index-grid,
   .sector-bars,
   .status-grid,
@@ -1247,6 +1355,7 @@ tbody tr.is-selected {
   .market-index,
   .sector-bar,
   .change-block,
+  .health-grid div,
   .review-kpis div,
   .detail-grid div,
   .trade-plan-grid div {
@@ -1257,6 +1366,18 @@ tbody tr.is-selected {
   .change-panel p {
     font-size: 14px;
     line-height: 1.55;
+  }
+
+  .health-main h2 {
+    font-size: 24px;
+  }
+
+  .health-main p {
+    font-size: 14px;
+  }
+
+  .health-score strong {
+    font-size: 30px;
   }
 
   .change-item {

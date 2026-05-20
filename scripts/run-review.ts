@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
 import { pctChange, round } from "../src/lib/math";
-import type { KLine, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, StockPick } from "../src/lib/types";
+import type { KLine, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, StockPick, StrategyHealth } from "../src/lib/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -214,8 +214,71 @@ function summarize(records: ReviewRecord[]): ReviewReport["summary"] {
       target2HitRate: round((target2Hits / planRecords.length) * 100, 1)
     };
   }
+  summary.health = buildStrategyHealth(records, summary);
 
   return summary;
+}
+
+function buildStrategyHealth(records: ReviewRecord[], summary: ReviewReport["summary"]): StrategyHealth {
+  const sampleWindow = 20;
+  const recent = records
+    .filter((record) => record.horizons["5d"].status === "complete" || record.planReplay)
+    .sort((a, b) => `${b.signalDate}-${b.rank}`.localeCompare(`${a.signalDate}-${a.rank}`))
+    .slice(0, sampleWindow);
+  const returns5d = recent.map((record) => record.horizons["5d"].returnPct).filter((value): value is number => Number.isFinite(value));
+  const drawdowns = recent.map((record) => record.maxDrawdown10d).filter((value): value is number => Number.isFinite(value));
+  const planRecords = recent.filter((record) => record.planReplay);
+  const target1HitRate = planRecords.length ? round((planRecords.filter((record) => record.planReplay?.target1Touched).length / planRecords.length) * 100, 1) : undefined;
+  const stopLossRate = planRecords.length ? round((planRecords.filter((record) => record.planReplay?.stopLossTouched).length / planRecords.length) * 100, 1) : undefined;
+  const avgReturn5d = returns5d.length ? round(returns5d.reduce((total, value) => total + value, 0) / returns5d.length, 2) : undefined;
+  const winRate5d = returns5d.length ? round((returns5d.filter((value) => value > 0).length / returns5d.length) * 100, 1) : undefined;
+  const avgMaxDrawdown10d = drawdowns.length ? round(drawdowns.reduce((total, value) => total + value, 0) / drawdowns.length, 2) : summary.avgMaxDrawdown10d;
+
+  let score = 50;
+  if (avgReturn5d !== undefined) score += Math.max(-24, Math.min(24, avgReturn5d * 4));
+  if (winRate5d !== undefined) score += (winRate5d - 50) * 0.4;
+  if (target1HitRate !== undefined) score += (target1HitRate - 25) * 0.22;
+  if (stopLossRate !== undefined) score -= stopLossRate * 0.28;
+  if (avgMaxDrawdown10d !== undefined) score += Math.max(-18, Math.min(8, avgMaxDrawdown10d * 2));
+  if (returns5d.length < 5) score -= 10;
+  score = round(Math.max(0, Math.min(100, score)), 1);
+
+  const status: StrategyHealth["status"] = score >= 66 ? "good" : score >= 45 ? "watch" : "tighten";
+  const label = status === "good" ? "良好" : status === "watch" ? "观察" : "收缩";
+  const action: StrategyHealth["action"] = status === "good" ? "normal" : status === "watch" ? "light" : "pause";
+  const sampleText = returns5d.length ? `近 ${returns5d.length} 个5日完成样本` : "5日完成样本不足";
+  const returnText = avgReturn5d !== undefined ? `平均收益 ${avgReturn5d > 0 ? "+" : ""}${avgReturn5d}%` : "平均收益追踪中";
+  const drawdownText = avgMaxDrawdown10d !== undefined ? `平均回撤 ${avgMaxDrawdown10d}%` : "回撤追踪中";
+  const headline =
+    status === "good"
+      ? `${sampleText}，${returnText}，系统状态良好，可按计划执行。`
+      : status === "watch"
+        ? `${sampleText}，${returnText}，${drawdownText}，建议轻仓观察。`
+        : `${sampleText}，${returnText}，${drawdownText}，建议收缩仓位并等待复盘改善。`;
+
+  return {
+    status,
+    label,
+    score,
+    sampleSize: recent.length,
+    sampleWindow,
+    action,
+    headline,
+    metrics: {
+      avgReturn5d,
+      winRate5d,
+      avgMaxDrawdown10d,
+      target1HitRate,
+      stopLossRate,
+      completed5d: returns5d.length,
+      completedPlan: planRecords.length
+    },
+    notes: [
+      "健康度基于最近核心强关注信号，不包含观察池。",
+      "样本不足时自动降低健康分，避免过度相信短期结果。",
+      "目标和止损命中率按交易计划后续10个交易日估算。"
+    ]
+  };
 }
 
 async function writeReview(report: ReviewReport) {

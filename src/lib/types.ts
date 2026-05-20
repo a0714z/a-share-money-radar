@@ -307,6 +307,26 @@ export type HorizonSummary = {
   medianReturn?: number;
 };
 
+export type StrategyHealth = {
+  status: "good" | "watch" | "tighten";
+  label: string;
+  score: number;
+  sampleSize: number;
+  sampleWindow: number;
+  action: "normal" | "light" | "pause";
+  headline: string;
+  metrics: {
+    avgReturn5d?: number;
+    winRate5d?: number;
+    avgMaxDrawdown10d?: number;
+    target1HitRate?: number;
+    stopLossRate?: number;
+    completed5d: number;
+    completedPlan: number;
+  };
+  notes: string[];
+};
+
 export type ReviewReport = {
   meta: {
     generatedAt: string;
@@ -322,6 +342,7 @@ export type ReviewReport = {
     horizons: Record<ReviewHorizon, HorizonSummary>;
     avgMaxDrawdown10d?: number;
     avgBestEntryDrawdown3d?: number;
+    health?: StrategyHealth;
     planReplay?: {
       completed: number;
       entryTouches: number;

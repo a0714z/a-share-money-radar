@@ -694,6 +694,57 @@ function ReviewTable({ records }: { records: ReviewRecord[] }) {
   );
 }
 
+function StrategyHealthPanel({ review }: { review: ReviewReport }) {
+  const health = review.summary.health;
+  if (!health) return null;
+
+  const actionText = health.action === "normal" ? "正常执行" : health.action === "light" ? "轻仓观察" : "暂停加仓";
+  const toneClass = health.status === "good" ? "health-good" : health.status === "watch" ? "health-watch" : "health-tighten";
+
+  return (
+    <section className={`health-panel ${toneClass}`}>
+      <div className="health-main">
+        <div>
+          <span className="health-label">策略健康度</span>
+          <h2>{health.label}</h2>
+          <p>{health.headline}</p>
+        </div>
+        <div className="health-score">
+          <strong>{health.score.toFixed(1)}</strong>
+          <span>{actionText}</span>
+        </div>
+      </div>
+      <div className="health-grid">
+        <div>
+          <span>5日均收</span>
+          <strong>{health.metrics.avgReturn5d !== undefined ? formatPct(health.metrics.avgReturn5d) : "追踪中"}</strong>
+          <small>{health.metrics.completed5d} 个样本</small>
+        </div>
+        <div>
+          <span>5日胜率</span>
+          <strong>{health.metrics.winRate5d !== undefined ? `${health.metrics.winRate5d}%` : "追踪中"}</strong>
+          <small>最近 {health.sampleWindow} 个核心信号</small>
+        </div>
+        <div>
+          <span>平均回撤</span>
+          <strong>{health.metrics.avgMaxDrawdown10d !== undefined ? formatPct(health.metrics.avgMaxDrawdown10d) : "追踪中"}</strong>
+          <small>10日窗口</small>
+        </div>
+        <div>
+          <span>目标一</span>
+          <strong>{health.metrics.target1HitRate !== undefined ? `${health.metrics.target1HitRate}%` : "追踪中"}</strong>
+          <small>{health.metrics.completedPlan} 个计划样本</small>
+        </div>
+        <div>
+          <span>止损触发</span>
+          <strong>{health.metrics.stopLossRate !== undefined ? `${health.metrics.stopLossRate}%` : "追踪中"}</strong>
+          <small>越低越好</small>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ReviewPanel({ review }: { review: ReviewReport }) {
   const summaryBars = reviewHorizons.map((horizon) => ({
     name: horizonLabel(horizon),
@@ -713,6 +764,8 @@ function ReviewPanel({ review }: { review: ReviewReport }) {
         <Metric icon={AlertTriangle} label="10日回撤" value={review.summary.avgMaxDrawdown10d !== undefined ? formatPct(review.summary.avgMaxDrawdown10d) : "追踪中"} tone="red" />
         <Metric icon={BadgeCheck} label="目标一命中" value={review.summary.planReplay?.target1HitRate !== undefined ? `${review.summary.planReplay.target1HitRate}%` : "追踪中"} tone="green" />
       </div>
+
+      <StrategyHealthPanel review={review} />
 
       <div className="review-layout">
         <section className="list-panel review-chart-panel">
