@@ -121,11 +121,15 @@ function changeSummaryText(report: ScanReport) {
   if (!changes) return ["今日变化：暂无上一交易日对比。"];
   const newOrUpgraded = [...changes.newStrong, ...changes.upgradedToStrong];
   const leftCore = [...changes.downgradedFromStrong, ...changes.exitedStrong];
+  const setupPositive = [...(changes.newSetups ?? []), ...(changes.strengthenedSetups ?? []), ...(changes.breakoutSetups ?? [])];
+  const setupNegative = [...(changes.weakenedSetups ?? []), ...(changes.invalidatedSetups ?? [])];
   return [
     `今日变化：${changes.headline}`,
     `新晋/升级：${compactNames(newOrUpgraded)}`,
     `连续入选：${compactNames(changes.consecutiveStrong)}`,
-    `降级/退出：${compactNames(leftCore)}`
+    `降级/退出：${compactNames(leftCore)}`,
+    `阶段转强：${compactNames(setupPositive)}`,
+    `转弱/失效：${compactNames(setupNegative)}`
   ];
 }
 
@@ -193,17 +197,23 @@ function pickCard(pick: StockPick) {
     </tr>`;
 }
 
-function htmlList(title: string, items: Array<{ name: string; instrument: string; sector?: string; score?: number }>) {
+function htmlList(
+  title: string,
+  items: Array<{ name: string; instrument: string; sector?: string; score?: number; currentSetupState?: string; setupAgeDays?: number }>
+) {
   const body = items.length
     ? items
         .slice(0, 5)
-        .map(
-          (item) => `
+        .map((item) => {
+          const secondary = item.currentSetupState
+            ? `${item.currentSetupState}${item.setupAgeDays ? ` · ${item.setupAgeDays}天` : ""}`
+            : item.sector ?? "未分组";
+          return `
             <div style="padding:10px 12px;border:1px solid #e5e7eb;border-radius:8px;background:#ffffff;">
               <div style="font-weight:800;color:#111827;">${escapeHtml(item.name)} <span style="font-weight:500;color:#6b7280;">${escapeHtml(item.instrument)}</span></div>
-              <div style="margin-top:4px;color:#4b5563;font-size:13px;">${escapeHtml(item.sector ?? "未分组")} ${Number.isFinite(item.score) ? `· ${round(item.score ?? 0, 1)}` : ""}</div>
-            </div>`
-        )
+              <div style="margin-top:4px;color:#4b5563;font-size:13px;">${escapeHtml(secondary)} ${Number.isFinite(item.score) ? `· ${round(item.score ?? 0, 1)}` : ""}</div>
+            </div>`;
+        })
         .join("")
     : `<div style="padding:12px;color:#6b7280;border:1px solid #e5e7eb;border-radius:8px;background:#ffffff;">暂无</div>`;
   return `
@@ -218,10 +228,17 @@ function changeSummaryHtml(report: ScanReport) {
   if (!changes) return "";
   const newOrUpgraded = [...changes.newStrong, ...changes.upgradedToStrong];
   const leftCore = [...changes.downgradedFromStrong, ...changes.exitedStrong];
+  const weakOrInvalidSetups = [...(changes.weakenedSetups ?? []), ...(changes.invalidatedSetups ?? [])];
   return `
     <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">
       <div style="font-weight:800;margin-bottom:8px;">今日变化</div>
       <div style="color:#111827;line-height:1.7;font-weight:700;">${escapeHtml(changes.headline)}</div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;">
+        ${htmlList("新异动", changes.newSetups ?? [])}
+        ${htmlList("承接转强", changes.strengthenedSetups ?? [])}
+        ${htmlList("二次突破", changes.breakoutSetups ?? [])}
+        ${htmlList("转弱/失效", weakOrInvalidSetups)}
+      </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;">
         ${htmlList("新晋/升级", newOrUpgraded)}
         ${htmlList("连续入选", changes.consecutiveStrong)}

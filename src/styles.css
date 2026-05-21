@@ -318,6 +318,11 @@ a {
   gap: 10px;
 }
 
+.setup-change-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
 .change-block {
   min-height: 156px;
   padding: 12px;

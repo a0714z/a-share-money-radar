@@ -118,18 +118,23 @@ function ChangeItemList({ items, empty }: { items: DailyChangeItem[]; empty: str
 
   return (
     <div className="change-list">
-      {items.slice(0, 5).map((item) => (
-        <div key={item.instrument} className="change-item">
-          <div>
-            <strong>{item.name}</strong>
-            <span className="code">{item.instrument}</span>
+      {items.slice(0, 5).map((item) => {
+        const stageText = item.currentSetupState
+          ? `${item.currentSetupState}${item.setupAgeDays ? ` · ${item.setupAgeDays}天` : ""}`
+          : item.sector ?? "未分组";
+        return (
+          <div key={item.instrument} className="change-item">
+            <div>
+              <strong>{item.name}</strong>
+              <span className="code">{item.instrument}</span>
+            </div>
+            <div>
+              <span>{stageText}</span>
+              <strong>{item.score !== undefined ? item.score.toFixed(1) : "-"}</strong>
+            </div>
           </div>
-          <div>
-            <span>{item.sector ?? "未分组"}</span>
-            <strong>{item.score !== undefined ? item.score.toFixed(1) : "-"}</strong>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -532,6 +537,10 @@ function ChangeSummaryPanel({ report }: { report: ScanReport }) {
 
   const newOrUpgraded = [...changes.newStrong, ...changes.upgradedToStrong].sort((a, b) => (a.currentRank ?? 999) - (b.currentRank ?? 999));
   const leftCore = [...changes.downgradedFromStrong, ...changes.exitedStrong];
+  const newSetups = changes.newSetups ?? [];
+  const strengthenedSetups = changes.strengthenedSetups ?? [];
+  const breakoutSetups = changes.breakoutSetups ?? [];
+  const weakOrInvalidSetups = [...(changes.weakenedSetups ?? []), ...(changes.invalidatedSetups ?? [])];
   const topSectors = changes.sectorChanges.filter((sector) => sector.currentStrong > 0).slice(0, 4);
 
   return (
@@ -547,6 +556,24 @@ function ChangeSummaryPanel({ report }: { report: ScanReport }) {
         </strong>
       </div>
       <p>{changes.headline}</p>
+      <div className="change-grid setup-change-grid">
+        <div className="change-block">
+          <h3>新异动</h3>
+          <ChangeItemList items={newSetups} empty="暂无新异动" />
+        </div>
+        <div className="change-block">
+          <h3>承接转强</h3>
+          <ChangeItemList items={strengthenedSetups} empty="暂无承接转强" />
+        </div>
+        <div className="change-block">
+          <h3>二次突破</h3>
+          <ChangeItemList items={breakoutSetups} empty="暂无二次突破" />
+        </div>
+        <div className="change-block">
+          <h3>转弱/失效</h3>
+          <ChangeItemList items={weakOrInvalidSetups} empty="暂无转弱或失效" />
+        </div>
+      </div>
       <div className="change-grid">
         <div className="change-block">
           <h3>新晋强关注</h3>

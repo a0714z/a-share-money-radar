@@ -156,6 +156,9 @@ function changeItem(pick: StockPick, previous?: StockPick, consecutiveStrongDays
     previousRank: previous?.rank,
     currentSignal: pick.signal,
     previousSignal: previous?.signal,
+    currentSetupState: pick.setupState,
+    previousSetupState: previous?.setupState,
+    setupAgeDays: pick.setupAgeDays,
     score: pick.score,
     flowRatio5d: pick.flowRatio5d,
     consecutiveStrongDays
@@ -202,8 +205,23 @@ function isActiveSetup(pick?: StockPick) {
   return Boolean(pick?.setupState && pick.setupState !== "常规观察");
 }
 
-function annotateSetupTracking(picks: StockPick[], history: ScanReport[]) {
-  const reports = [...history].sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate));
+function setupRankOf(pick?: StockPick) {
+  if (!isActiveSetup(pick)) return 0;
+  return pick?.setupStateRank ?? 0;
+}
+
+function isWeakSetupState(state?: StockPick["setupState"]) {
+  return state === "承接转弱" || state === "放量派发风险";
+}
+
+function sortChangeItems(items: DailyChangeItem[]) {
+  return items.sort((a, b) => (a.currentRank ?? 999) - (b.currentRank ?? 999) || (b.score ?? 0) - (a.score ?? 0));
+}
+
+function annotateSetupTracking(picks: StockPick[], history: ScanReport[], currentTradeDate: string) {
+  const reports = [...history]
+    .filter((report) => report.meta.tradeDate < currentTradeDate)
+    .sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate));
 
   return picks.map((pick) => {
     if (!isActiveSetup(pick)) return { ...pick, setupAgeDays: 0 };
@@ -233,6 +251,8 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
     .sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate))[0];
 
   if (!previous) {
+    const newSetups = sortChangeItems(allReportPicks(current).filter(isActiveSetup).map((pick) => changeItem(pick))).slice(0, 20);
+
     return {
       strongCountChange: current.picks.length,
       headline: `今日强关注 ${current.picks.length} 只，暂无上一交易日报告可对比。`,
@@ -241,6 +261,11 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
       consecutiveStrong: [],
       downgradedFromStrong: [],
       exitedStrong: [],
+      newSetups,
+      strengthenedSetups: [],
+      breakoutSetups: [],
+      weakenedSetups: [],
+      invalidatedSetups: [],
       sectorChanges: buildSectorChanges(current),
       notes: ["首次生成变化摘要，后续交易日会显示新晋、降级和连续入选。"]
     };
@@ -268,15 +293,53 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
       currentSignal: undefined,
       previousSignal: "strong" as const
     }));
+  const setupChanges = allReportPicks(current).map((pick) => ({
+    pick,
+    previous: previousByInstrument.get(pick.instrument)
+  }));
+  const newSetups = sortChangeItems(
+    setupChanges.filter(({ pick, previous }) => isActiveSetup(pick) && !isActiveSetup(previous)).map(({ pick, previous }) => changeItem(pick, previous))
+  ).slice(0, 20);
+  const strengthenedSetups = sortChangeItems(
+    setupChanges
+      .filter(
+        ({ pick, previous }) =>
+          isActiveSetup(pick) &&
+          isActiveSetup(previous) &&
+          pick.setupState !== "二次突破" &&
+          !isWeakSetupState(pick.setupState) &&
+          setupRankOf(pick) > setupRankOf(previous)
+      )
+      .map(({ pick, previous }) => changeItem(pick, previous))
+  ).slice(0, 20);
+  const breakoutSetups = sortChangeItems(
+    setupChanges
+      .filter(({ pick, previous }) => pick.setupState === "二次突破" && previous?.setupState !== "二次突破")
+      .map(({ pick, previous }) => changeItem(pick, previous))
+  ).slice(0, 20);
+  const weakenedSetups = sortChangeItems(
+    setupChanges
+      .filter(({ pick, previous }) => isWeakSetupState(pick.setupState) && previous?.setupState !== pick.setupState)
+      .map(({ pick, previous }) => changeItem(pick, previous))
+  ).slice(0, 20);
+  const invalidatedSetups = sortChangeItems(
+    setupChanges
+      .filter(({ pick, previous }) => pick.setupState === "跌破失效" && previous?.setupState !== "跌破失效")
+      .map(({ pick, previous }) => changeItem(pick, previous))
+  ).slice(0, 20);
   const strongCountChange = current.picks.length - previous.picks.length;
   const sectorChanges = buildSectorChanges(current, previous);
   const topSector = sectorChanges.find((item) => item.currentStrong > 0);
   const deltaText = strongCountChange > 0 ? `增加 ${strongCountChange}` : strongCountChange < 0 ? `减少 ${Math.abs(strongCountChange)}` : "持平";
+  const positiveSetupChanges = newSetups.length + strengthenedSetups.length + breakoutSetups.length;
+  const negativeSetupChanges = weakenedSetups.length + invalidatedSetups.length;
   const headline = [
     `今日强关注 ${current.picks.length} 只，较 ${previous.meta.tradeDate} ${deltaText}`,
     `新晋 ${newStrong.length + upgradedToStrong.length} 只`,
     `连续入选 ${consecutiveStrong.length} 只`,
     `降级/退出 ${downgradedFromStrong.length + exitedStrong.length} 只`,
+    `阶段转强 ${positiveSetupChanges} 只`,
+    negativeSetupChanges ? `转弱/失效 ${negativeSetupChanges} 只` : "",
     topSector ? `${topSector.sector} 当前 ${topSector.currentStrong} 只` : ""
   ]
     .filter(Boolean)
@@ -291,8 +354,17 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
     consecutiveStrong,
     downgradedFromStrong,
     exitedStrong,
+    newSetups,
+    strengthenedSetups,
+    breakoutSetups,
+    weakenedSetups,
+    invalidatedSetups,
     sectorChanges,
-    notes: ["新晋包含上一交易日未进入候选池、今日进入强关注的标的。", "连续入选只统计核心强关注池。"]
+    notes: [
+      "新晋包含上一交易日未进入候选池、今日进入强关注的标的。",
+      "连续入选只统计核心强关注池。",
+      "阶段变化按上一交易日候选池对比，突出新异动、承接转强、二次突破、承接转弱与跌破失效。"
+    ]
   };
 }
 
@@ -531,7 +603,8 @@ async function liveScan() {
     .filter((item): item is StockPick => Boolean(item))
     .sort((a, b) => b.score - a.score);
   const historyReports = await readHistoryReports();
-  const ranked = attachRanks(annotateSetupTracking(await enrichSectors(client, sorted), historyReports));
+  const currentTradeDate = tradeDateFromPicks(sorted);
+  const ranked = attachRanks(annotateSetupTracking(await enrichSectors(client, sorted), historyReports, currentTradeDate));
 
   if (!ranked.length) {
     throw new Error("No candidates could be scored; keeping the previous report.");
@@ -542,7 +615,7 @@ async function liveScan() {
   const report: ScanReport = {
     meta: {
       generatedAt: chinaDateTime(),
-      tradeDate: tradeDateFromPicks(ranked),
+      tradeDate: currentTradeDate,
       source: "Biying API",
       mode: "live",
       docsUrl: "https://www.biyingapi.com/doc_hs",

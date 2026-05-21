@@ -202,6 +202,9 @@ export type DailyChangeItem = {
   previousRank?: number;
   currentSignal?: Signal;
   previousSignal?: Signal;
+  currentSetupState?: SetupState;
+  previousSetupState?: SetupState;
+  setupAgeDays?: number;
   score?: number;
   flowRatio5d?: number;
   consecutiveStrongDays?: number;
@@ -223,6 +226,11 @@ export type DailyChangeSummary = {
   consecutiveStrong: DailyChangeItem[];
   downgradedFromStrong: DailyChangeItem[];
   exitedStrong: DailyChangeItem[];
+  newSetups: DailyChangeItem[];
+  strengthenedSetups: DailyChangeItem[];
+  breakoutSetups: DailyChangeItem[];
+  weakenedSetups: DailyChangeItem[];
+  invalidatedSetups: DailyChangeItem[];
   sectorChanges: SectorChange[];
   notes: string[];
 };
