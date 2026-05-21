@@ -214,6 +214,14 @@ function isWeakSetupState(state?: StockPick["setupState"]) {
   return state === "承接转弱" || state === "放量派发风险";
 }
 
+function isInvalidSetupState(state?: StockPick["setupState"]) {
+  return state === "跌破失效";
+}
+
+function isPositiveNonBreakoutSetup(pick?: StockPick) {
+  return isActiveSetup(pick) && pick?.setupState !== "二次突破" && !isWeakSetupState(pick?.setupState) && !isInvalidSetupState(pick?.setupState);
+}
+
 function sortChangeItems(items: DailyChangeItem[]) {
   return items.sort((a, b) => (a.currentRank ?? 999) - (b.currentRank ?? 999) || (b.score ?? 0) - (a.score ?? 0));
 }
@@ -251,7 +259,11 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
     .sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate))[0];
 
   if (!previous) {
-    const newSetups = sortChangeItems(allReportPicks(current).filter(isActiveSetup).map((pick) => changeItem(pick))).slice(0, 20);
+    const firstSetupChanges = allReportPicks(current).map((pick) => ({ pick, previous: undefined }));
+    const newSetups = sortChangeItems(firstSetupChanges.filter(({ pick }) => isPositiveNonBreakoutSetup(pick)).map(({ pick }) => changeItem(pick))).slice(0, 20);
+    const breakoutSetups = sortChangeItems(firstSetupChanges.filter(({ pick }) => pick.setupState === "二次突破").map(({ pick }) => changeItem(pick))).slice(0, 20);
+    const weakenedSetups = sortChangeItems(firstSetupChanges.filter(({ pick }) => isWeakSetupState(pick.setupState)).map(({ pick }) => changeItem(pick))).slice(0, 20);
+    const invalidatedSetups = sortChangeItems(firstSetupChanges.filter(({ pick }) => isInvalidSetupState(pick.setupState)).map(({ pick }) => changeItem(pick))).slice(0, 20);
 
     return {
       strongCountChange: current.picks.length,
@@ -263,9 +275,9 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
       exitedStrong: [],
       newSetups,
       strengthenedSetups: [],
-      breakoutSetups: [],
-      weakenedSetups: [],
-      invalidatedSetups: [],
+      breakoutSetups,
+      weakenedSetups,
+      invalidatedSetups,
       sectorChanges: buildSectorChanges(current),
       notes: ["首次生成变化摘要，后续交易日会显示新晋、降级和连续入选。"]
     };
@@ -298,16 +310,14 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
     previous: previousByInstrument.get(pick.instrument)
   }));
   const newSetups = sortChangeItems(
-    setupChanges.filter(({ pick, previous }) => isActiveSetup(pick) && !isActiveSetup(previous)).map(({ pick, previous }) => changeItem(pick, previous))
+    setupChanges.filter(({ pick, previous }) => isPositiveNonBreakoutSetup(pick) && !isActiveSetup(previous)).map(({ pick, previous }) => changeItem(pick, previous))
   ).slice(0, 20);
   const strengthenedSetups = sortChangeItems(
     setupChanges
       .filter(
         ({ pick, previous }) =>
-          isActiveSetup(pick) &&
+          isPositiveNonBreakoutSetup(pick) &&
           isActiveSetup(previous) &&
-          pick.setupState !== "二次突破" &&
-          !isWeakSetupState(pick.setupState) &&
           setupRankOf(pick) > setupRankOf(previous)
       )
       .map(({ pick, previous }) => changeItem(pick, previous))
@@ -324,7 +334,7 @@ function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanRep
   ).slice(0, 20);
   const invalidatedSetups = sortChangeItems(
     setupChanges
-      .filter(({ pick, previous }) => pick.setupState === "跌破失效" && previous?.setupState !== "跌破失效")
+      .filter(({ pick, previous }) => isInvalidSetupState(pick.setupState) && previous?.setupState !== "跌破失效")
       .map(({ pick, previous }) => changeItem(pick, previous))
   ).slice(0, 20);
   const strongCountChange = current.picks.length - previous.picks.length;
