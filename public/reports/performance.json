@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-21 08:17:49",
+    "generatedAt": "2026-05-21 08:20:21",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 3,
@@ -11,9 +11,9 @@
     ]
   },
   "summary": {
-    "totalSignals": 7,
+    "totalSignals": 8,
     "completed10d": 0,
-    "tracking": 7,
+    "tracking": 8,
     "horizons": {
       "1d": {
         "completed": 5,
@@ -69,10 +69,41 @@
   "records": [
     {
       "signalDate": "2026-05-21",
+      "code": "603607",
+      "instrument": "603607.SH",
+      "name": "京华激光",
+      "rank": 1,
+      "score": 80.6,
+      "signalPrice": 24.73,
+      "flowRatio5d": 15.75,
+      "valuePosition": 47.7,
+      "pullbackFromHigh": 14.1,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
+    {
+      "signalDate": "2026-05-21",
       "code": "600835",
       "instrument": "600835.SH",
       "name": "上海机电",
-      "rank": 1,
+      "rank": 2,
       "score": 80,
       "signalPrice": 26.34,
       "flowRatio5d": 6.84,
