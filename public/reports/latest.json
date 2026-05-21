@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-21 17:26:22",
+    "generatedAt": "2026-05-21 17:41:57",
     "tradeDate": "2026-05-21",
     "source": "Biying API",
     "mode": "live",
@@ -19,7 +19,7 @@
     "mainBoardNonSt": 3004,
     "quoted": 3004,
     "candidates": 420,
-    "scored": 419,
+    "scored": 420,
     "strong": 0,
     "watch": 20
   },
@@ -738,8 +738,7 @@
         "专精特新"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -1349,8 +1348,7 @@
         "快递概念"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -1960,8 +1958,7 @@
         "海南自贸区"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -2562,8 +2559,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -3164,8 +3160,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -3767,8 +3762,7 @@
       "sector": "半导体显示",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -4373,8 +4367,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -4981,8 +4974,7 @@
         "空客概念"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -5590,8 +5582,7 @@
         "传感器"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -6198,8 +6189,7 @@
         "创投"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -6809,8 +6799,7 @@
         "工业4.0"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -7418,8 +7407,7 @@
         "快递概念"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -8024,8 +8012,7 @@
         "民用航空"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -8630,8 +8617,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -9233,8 +9219,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -9835,8 +9820,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -10438,8 +10422,7 @@
       "sector": "半导体显示",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -11041,8 +11024,7 @@
       "sector": "其他",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "承接确认",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -11645,8 +11627,7 @@
         "太空光伏"
       ],
       "sectorSource": "biying",
-      "setupAgeDays": 2,
-      "setupPreviousState": "缩量回踩",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -12855,8 +12836,7 @@
       "sector": "医药医疗",
       "themes": [],
       "sectorSource": "fallback",
-      "setupAgeDays": 2,
-      "setupPreviousState": "二次突破",
+      "setupAgeDays": 1,
       "setupStateChanged": false
     },
     {
@@ -27215,7 +27195,7 @@
   "changes": {
     "previousTradeDate": "2026-05-20",
     "strongCountChange": -1,
-    "headline": "今日强关注 0 只，较 2026-05-20 减少 1；新晋 0 只；连续入选 0 只；降级/退出 1 只",
+    "headline": "今日强关注 0 只，较 2026-05-20 减少 1；新晋 0 只；连续入选 0 只；降级/退出 1 只；阶段转强 28 只",
     "newStrong": [],
     "upgradedToStrong": [],
     "consecutiveStrong": [],
@@ -27233,6 +27213,349 @@
         "flowRatio5d": 5.35
       }
     ],
+    "newSetups": [
+      {
+        "code": "605598",
+        "instrument": "605598.SH",
+        "name": "上海港湾",
+        "sector": "绿色电力",
+        "currentRank": 1,
+        "currentSignal": "watch",
+        "currentSetupState": "缩量回踩",
+        "setupAgeDays": 1,
+        "score": 77.1,
+        "flowRatio5d": 4.56
+      },
+      {
+        "code": "601021",
+        "instrument": "601021.SH",
+        "name": "春秋航空",
+        "sector": "其他",
+        "currentRank": 2,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 76.8,
+        "flowRatio5d": 15.56
+      },
+      {
+        "code": "001301",
+        "instrument": "001301.SZ",
+        "name": "尚太科技",
+        "sector": "绿色电力",
+        "currentRank": 3,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 76,
+        "flowRatio5d": 12.9
+      },
+      {
+        "code": "002284",
+        "instrument": "002284.SZ",
+        "name": "亚太股份",
+        "sector": "半导体显示",
+        "currentRank": 4,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 75.8,
+        "flowRatio5d": 12.58
+      },
+      {
+        "code": "603786",
+        "instrument": "603786.SH",
+        "name": "科博达",
+        "sector": "半导体显示",
+        "currentRank": 5,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 75.5,
+        "flowRatio5d": 13.18
+      },
+      {
+        "code": "600635",
+        "instrument": "600635.SH",
+        "name": "大众公用",
+        "sector": "绿色电力",
+        "currentRank": 6,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 75.5,
+        "flowRatio5d": 3.9
+      },
+      {
+        "code": "601127",
+        "instrument": "601127.SH",
+        "name": "赛力斯",
+        "sector": "数字科技",
+        "currentRank": 7,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 74.7,
+        "flowRatio5d": 4.18
+      },
+      {
+        "code": "002698",
+        "instrument": "002698.SZ",
+        "name": "博实股份",
+        "sector": "医药医疗",
+        "currentRank": 8,
+        "currentSignal": "watch",
+        "currentSetupState": "缩量回踩",
+        "setupAgeDays": 1,
+        "score": 74.3,
+        "flowRatio5d": 9.28
+      },
+      {
+        "code": "000796",
+        "instrument": "000796.SZ",
+        "name": "凯撒旅业",
+        "sector": "消费服务",
+        "currentRank": 9,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 74.2,
+        "flowRatio5d": 13.8
+      },
+      {
+        "code": "003037",
+        "instrument": "003037.SZ",
+        "name": "三和管桩",
+        "sector": "绿色电力",
+        "currentRank": 10,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 73.8,
+        "flowRatio5d": 27.06
+      },
+      {
+        "code": "603885",
+        "instrument": "603885.SH",
+        "name": "吉祥航空",
+        "sector": "其他",
+        "currentRank": 11,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 72.3,
+        "flowRatio5d": 13.71
+      },
+      {
+        "code": "002880",
+        "instrument": "002880.SZ",
+        "name": "卫光生物",
+        "sector": "医药医疗",
+        "currentRank": 13,
+        "currentSignal": "wait",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 71.8,
+        "flowRatio5d": 3.94
+      },
+      {
+        "code": "600114",
+        "instrument": "600114.SH",
+        "name": "东睦股份",
+        "sector": "其他",
+        "currentRank": 14,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 69.6,
+        "flowRatio5d": -1.45
+      },
+      {
+        "code": "002892",
+        "instrument": "002892.SZ",
+        "name": "科力尔",
+        "sector": "其他",
+        "currentRank": 23,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 66.5,
+        "flowRatio5d": 8.25
+      },
+      {
+        "code": "000685",
+        "instrument": "000685.SZ",
+        "name": "中山公用",
+        "sector": "其他",
+        "currentRank": 34,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 65.1,
+        "flowRatio5d": 3.2
+      },
+      {
+        "code": "600095",
+        "instrument": "600095.SH",
+        "name": "湘财股份",
+        "sector": "其他",
+        "currentRank": 36,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 64.9,
+        "flowRatio5d": 4
+      },
+      {
+        "code": "603055",
+        "instrument": "603055.SH",
+        "name": "台华新材",
+        "sector": "其他",
+        "currentRank": 45,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 64.1,
+        "flowRatio5d": 8.44
+      },
+      {
+        "code": "000969",
+        "instrument": "000969.SZ",
+        "name": "安泰科技",
+        "sector": "半导体显示",
+        "currentRank": 53,
+        "currentSignal": "watch",
+        "currentSetupState": "承接确认",
+        "setupAgeDays": 1,
+        "score": 63.5,
+        "flowRatio5d": 5.7
+      },
+      {
+        "code": "600081",
+        "instrument": "600081.SH",
+        "name": "东风科技",
+        "sector": "半导体显示",
+        "currentRank": 116,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 50.3,
+        "flowRatio5d": -1.54
+      },
+      {
+        "code": "600207",
+        "instrument": "600207.SH",
+        "name": "安彩高科",
+        "sector": "其他",
+        "currentRank": 177,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 38.1,
+        "flowRatio5d": -5.43
+      }
+    ],
+    "strengthenedSetups": [],
+    "breakoutSetups": [
+      {
+        "code": "001301",
+        "instrument": "001301.SZ",
+        "name": "尚太科技",
+        "sector": "绿色电力",
+        "currentRank": 3,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 76,
+        "flowRatio5d": 12.9
+      },
+      {
+        "code": "002284",
+        "instrument": "002284.SZ",
+        "name": "亚太股份",
+        "sector": "半导体显示",
+        "currentRank": 4,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 75.8,
+        "flowRatio5d": 12.58
+      },
+      {
+        "code": "000796",
+        "instrument": "000796.SZ",
+        "name": "凯撒旅业",
+        "sector": "消费服务",
+        "currentRank": 9,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 74.2,
+        "flowRatio5d": 13.8
+      },
+      {
+        "code": "002880",
+        "instrument": "002880.SZ",
+        "name": "卫光生物",
+        "sector": "医药医疗",
+        "currentRank": 13,
+        "currentSignal": "wait",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 71.8,
+        "flowRatio5d": 3.94
+      },
+      {
+        "code": "600095",
+        "instrument": "600095.SH",
+        "name": "湘财股份",
+        "sector": "其他",
+        "currentRank": 36,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 64.9,
+        "flowRatio5d": 4
+      },
+      {
+        "code": "603055",
+        "instrument": "603055.SH",
+        "name": "台华新材",
+        "sector": "其他",
+        "currentRank": 45,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 64.1,
+        "flowRatio5d": 8.44
+      },
+      {
+        "code": "600081",
+        "instrument": "600081.SH",
+        "name": "东风科技",
+        "sector": "半导体显示",
+        "currentRank": 116,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 50.3,
+        "flowRatio5d": -1.54
+      },
+      {
+        "code": "600207",
+        "instrument": "600207.SH",
+        "name": "安彩高科",
+        "sector": "其他",
+        "currentRank": 177,
+        "currentSignal": "watch",
+        "currentSetupState": "二次突破",
+        "setupAgeDays": 1,
+        "score": 38.1,
+        "flowRatio5d": -5.43
+      }
+    ],
+    "weakenedSetups": [],
+    "invalidatedSetups": [],
     "sectorChanges": [
       {
         "sector": "数字科技",
@@ -27243,7 +27566,8 @@
     ],
     "notes": [
       "新晋包含上一交易日未进入候选池、今日进入强关注的标的。",
-      "连续入选只统计核心强关注池。"
+      "连续入选只统计核心强关注池。",
+      "阶段变化按上一交易日候选池对比，突出新异动、承接转强、二次突破、承接转弱与跌破失效。"
     ]
   }
 }
