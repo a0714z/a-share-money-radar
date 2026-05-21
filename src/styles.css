@@ -712,6 +712,15 @@ tbody tr.is-selected {
   background: #eef0f3;
 }
 
+.setup-age {
+  display: inline-flex;
+  margin-left: 6px;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .mini-action,
 .icon-action {
   display: inline-flex;

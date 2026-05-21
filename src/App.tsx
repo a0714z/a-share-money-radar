@@ -68,7 +68,7 @@ function signalText(signal: Signal) {
 function setupStateClass(state?: string) {
   if (state === "二次突破" || state === "承接确认") return "setup-good";
   if (state === "缩量回踩" || state === "爆量启动") return "setup-watch";
-  if (state === "放量派发风险" || state === "跌破失效") return "setup-risk";
+  if (state === "承接转弱" || state === "放量派发风险" || state === "跌破失效") return "setup-risk";
   return "setup-neutral";
 }
 
@@ -227,6 +227,7 @@ function PickTable({
               </td>
               <td data-label="阶段">
                 <span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState ?? "常规观察"}</span>
+                {pick.setupAgeDays ? <span className="setup-age">{pick.setupAgeDays}天</span> : null}
               </td>
               <td data-label="分数">
                 <strong>{pick.score.toFixed(1)}</strong>
@@ -288,6 +289,7 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
         <div>
           <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
           <span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState ?? "常规观察"}</span>
+          {pick.setupAgeDays ? <span className="setup-age">追踪 {pick.setupAgeDays} 天</span> : null}
           <h2>{pick.name}</h2>
           <p>{pick.instrument}</p>
         </div>

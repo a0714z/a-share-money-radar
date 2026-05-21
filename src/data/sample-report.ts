@@ -22,6 +22,7 @@ function pick(seed: Partial<StockPick>): StockPick {
     rating: "强关注",
     setupState: "承接确认",
     setupStateRank: 88,
+    setupAgeDays: 2,
     score: 82.4,
     confidence: 92,
     price: 9.3,

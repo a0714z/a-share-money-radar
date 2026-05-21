@@ -198,6 +198,35 @@ function consecutiveStrongDays(instrument: string, current: ScanReport, history:
   return days;
 }
 
+function isActiveSetup(pick?: StockPick) {
+  return Boolean(pick?.setupState && pick.setupState !== "常规观察");
+}
+
+function annotateSetupTracking(picks: StockPick[], history: ScanReport[]) {
+  const reports = [...history].sort((a, b) => b.meta.tradeDate.localeCompare(a.meta.tradeDate));
+
+  return picks.map((pick) => {
+    if (!isActiveSetup(pick)) return { ...pick, setupAgeDays: 0 };
+
+    let setupAgeDays = 1;
+    let setupPreviousState: StockPick["setupState"] | undefined;
+
+    for (const report of reports) {
+      const previous = allReportPicks(report).find((item) => item.instrument === pick.instrument);
+      if (!setupPreviousState && previous?.setupState) setupPreviousState = previous.setupState;
+      if (!isActiveSetup(previous)) break;
+      setupAgeDays += 1;
+    }
+
+    return {
+      ...pick,
+      setupAgeDays,
+      setupPreviousState,
+      setupStateChanged: Boolean(setupPreviousState && setupPreviousState !== pick.setupState)
+    };
+  });
+}
+
 function buildChangeSummary(current: ScanReport, history: ScanReport[]): ScanReport["changes"] {
   const previous = [...history]
     .filter((report) => report.meta.tradeDate < current.meta.tradeDate)
@@ -501,7 +530,8 @@ async function liveScan() {
   const sorted = scored
     .filter((item): item is StockPick => Boolean(item))
     .sort((a, b) => b.score - a.score);
-  const ranked = attachRanks(await enrichSectors(client, sorted));
+  const historyReports = await readHistoryReports();
+  const ranked = attachRanks(annotateSetupTracking(await enrichSectors(client, sorted), historyReports));
 
   if (!ranked.length) {
     throw new Error("No candidates could be scored; keeping the previous report.");
@@ -540,7 +570,7 @@ async function liveScan() {
     watchlist,
     avoided
   };
-  report.changes = buildChangeSummary(report, await readHistoryReports());
+  report.changes = buildChangeSummary(report, historyReports);
 
   await writeReport(report);
 }

@@ -82,6 +82,8 @@ type IntradayBurstSetup = {
   pullbackAmountRatio: number;
   heavySelloff: boolean;
   breakoutConfirmed: boolean;
+  brokeBurstDayLow: boolean;
+  weakDriftDays: number;
 };
 
 type BearishIntradayBurst = {
@@ -199,6 +201,28 @@ function evaluateBurstSupport(bars: KLine[], burstIndex: number) {
   };
 }
 
+function evaluateDailyInvalidation(args: { dailyBars: KLine[]; tradeDate: string; quote: RealQuote }) {
+  const burstDay = args.dailyBars.find((bar) => normalizeDate(bar.t) === args.tradeDate);
+  if (!burstDay) return { brokeBurstDayLow: false, weakDriftDays: 0 };
+
+  const laterBars = args.dailyBars.filter((bar) => normalizeDate(bar.t) > args.tradeDate);
+  const liveLow = Number(args.quote.l ?? args.quote.p ?? Infinity);
+  const laterLow = Math.min(liveLow, ...(laterBars.length ? laterBars.map((bar) => bar.l) : [Infinity]));
+  const brokeBurstDayLow = laterLow < burstDay.l * 0.995;
+  const firstTwo = laterBars.slice(0, 2);
+  let weakDriftDays = 0;
+  let previousClose = burstDay.c;
+
+  for (const bar of firstTwo) {
+    const weakClose = bar.c < bar.o && bar.c < previousClose;
+    const shrink = bar.a < burstDay.a * 0.8;
+    if (weakClose && shrink) weakDriftDays += 1;
+    previousClose = bar.c;
+  }
+
+  return { brokeBurstDayLow, weakDriftDays };
+}
+
 function findIntradayBurstSetup(args: {
   intraday30m?: KLine[];
   dailyBars: KLine[];
@@ -239,6 +263,7 @@ function findIntradayBurstSetup(args: {
     if (bar.c <= bar.o || intradayAmountRatio < 5 || intradayPct < 2.5 || bodyPct < 0.6 || barCloseLocation < 0.58) continue;
 
     const support = evaluateBurstSupport(bars, index);
+    const dailyInvalidation = evaluateDailyInvalidation({ dailyBars: args.dailyBars, tradeDate, quote: args.quote });
     const burstPowerScore = clamp(
       58 +
         Math.min(18, (intradayAmountRatio - 5) * 2.4) +
@@ -246,10 +271,17 @@ function findIntradayBurstSetup(args: {
         Math.min(12, (intradayPct - 2.5) * 4) +
         (barCloseLocation >= 0.72 ? 8 : 2)
     );
-    const score = clamp(burstPowerScore * 0.72 + support.supportScore * 0.28 - daysSince * 3);
+    const score = clamp(
+      burstPowerScore * 0.72 +
+        support.supportScore * 0.28 -
+        (dailyInvalidation.brokeBurstDayLow ? 22 : 0) -
+        dailyInvalidation.weakDriftDays * 7 -
+        daysSince * 3
+    );
     const setup = {
       score,
       ...support,
+      ...dailyInvalidation,
       tradeDate,
       barTime: String(bar.t ?? ""),
       daysSince,
@@ -302,6 +334,7 @@ function setupStateRank(state: SetupState) {
   if (state === "爆量启动") return 64;
   if (state === "常规观察") return 44;
   if (state === "放量派发风险") return 24;
+  if (state === "承接转弱") return 18;
   return 8;
 }
 
@@ -312,8 +345,10 @@ function deriveSetupState(args: {
 }): { setupState: SetupState; setupStateRank: number } {
   let state: SetupState = "常规观察";
 
-  if (args.intradayBurst?.brokeBurstLow) {
+  if (args.intradayBurst?.brokeBurstLow || args.intradayBurst?.brokeBurstDayLow) {
     state = "跌破失效";
+  } else if (args.intradayBurst && args.intradayBurst.weakDriftDays >= 2) {
+    state = "承接转弱";
   } else if (args.intradayBurst?.heavySelloff || (args.bearishIntradayBurst && !args.intradayBurst)) {
     state = "放量派发风险";
   } else if (args.intradayBurst?.breakoutConfirmed) {
@@ -482,6 +517,8 @@ function buildRisks(args: {
   if (args.surgePullback && !args.surgePullback.heldCostArea) risks.push("回调已跌破启动成本区");
   if (args.intradayBurst && args.intradayBurst.dailyPct >= 7) risks.push("日内涨幅已偏大，避免追高");
   if (args.intradayBurst?.brokeBurstLow) risks.push("爆量后跌破30m启动低点");
+  if (args.intradayBurst?.brokeBurstDayLow) risks.push("跌破爆量日K低点，异动失效");
+  if (args.intradayBurst && args.intradayBurst.weakDriftDays >= 2) risks.push("爆量后连续缩量阴跌，承接转弱");
   if (args.intradayBurst && !args.intradayBurst.heldBodyMidpoint && args.intradayBurst.followBars > 0) risks.push("回踩跌破30m启动实体中位");
   if (args.intradayBurst?.heavySelloff) risks.push("爆量后出现放量回落，抛压偏重");
   if (args.bearishIntradayBurst) {

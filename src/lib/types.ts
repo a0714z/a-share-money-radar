@@ -2,7 +2,7 @@ export type Exchange = "sh" | "sz";
 
 export type Signal = "strong" | "watch" | "wait";
 
-export type SetupState = "二次突破" | "承接确认" | "缩量回踩" | "爆量启动" | "放量派发风险" | "跌破失效" | "常规观察";
+export type SetupState = "二次突破" | "承接确认" | "缩量回踩" | "爆量启动" | "承接转弱" | "放量派发风险" | "跌破失效" | "常规观察";
 
 export type MarketState = "strong" | "neutral" | "weak";
 
@@ -124,6 +124,9 @@ export type StockPick = {
   rating: string;
   setupState: SetupState;
   setupStateRank: number;
+  setupAgeDays?: number;
+  setupPreviousState?: SetupState;
+  setupStateChanged?: boolean;
   score: number;
   confidence: number;
   price: number;
