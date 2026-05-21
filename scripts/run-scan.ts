@@ -401,7 +401,7 @@ function isSurgePullbackPick(pick: StockPick) {
 }
 
 function buildWatchlist(items: StockPick[], limit: number) {
-  const setup = items.filter(isSurgePullbackPick).sort((a, b) => b.score - a.score);
+  const setup = items.filter(isSurgePullbackPick).sort((a, b) => (b.setupStateRank ?? 0) - (a.setupStateRank ?? 0) || b.score - a.score);
   const regular = items.filter((item) => !isSurgePullbackPick(item)).sort((a, b) => b.score - a.score);
   return [...setup, ...regular].slice(0, limit);
 }

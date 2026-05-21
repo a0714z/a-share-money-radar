@@ -679,6 +679,39 @@ tbody tr.is-selected {
   background: #eef0f3;
 }
 
+.setup-state {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 68px;
+  min-height: 26px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.setup-good {
+  color: #075535;
+  background: #dff6e9;
+}
+
+.setup-watch {
+  color: #735012;
+  background: #fff2c7;
+}
+
+.setup-risk {
+  color: #8b2d2c;
+  background: #f8dedc;
+}
+
+.setup-neutral {
+  color: #4b5563;
+  background: #eef0f3;
+}
+
 .mini-action,
 .icon-action {
   display: inline-flex;

@@ -20,6 +20,8 @@ function pick(seed: Partial<StockPick>): StockPick {
     exchange: "sz",
     signal: "strong",
     rating: "强关注",
+    setupState: "承接确认",
+    setupStateRank: 88,
     score: 82.4,
     confidence: 92,
     price: 9.3,

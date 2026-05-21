@@ -1,5 +1,5 @@
 import { average, clamp, last, movingAverage, pctChange, round, sum } from "./math";
-import type { KLine, MoneyFlow, RealQuote, StockListItem, StockPick } from "./types";
+import type { KLine, MoneyFlow, RealQuote, SetupState, StockListItem, StockPick } from "./types";
 import { inferExchange, toInstrumentCode } from "./universe";
 
 export type ScoreInput = {
@@ -295,6 +295,42 @@ function findBearishIntradayBurst(intraday30m?: KLine[]): BearishIntradayBurst |
   return worst;
 }
 
+function setupStateRank(state: SetupState) {
+  if (state === "二次突破") return 100;
+  if (state === "承接确认") return 88;
+  if (state === "缩量回踩") return 76;
+  if (state === "爆量启动") return 64;
+  if (state === "常规观察") return 44;
+  if (state === "放量派发风险") return 24;
+  return 8;
+}
+
+function deriveSetupState(args: {
+  intradayBurst?: IntradayBurstSetup;
+  surgePullback?: SurgePullbackSetup;
+  bearishIntradayBurst?: BearishIntradayBurst;
+}): { setupState: SetupState; setupStateRank: number } {
+  let state: SetupState = "常规观察";
+
+  if (args.intradayBurst?.brokeBurstLow) {
+    state = "跌破失效";
+  } else if (args.intradayBurst?.heavySelloff || (args.bearishIntradayBurst && !args.intradayBurst)) {
+    state = "放量派发风险";
+  } else if (args.intradayBurst?.breakoutConfirmed) {
+    state = "二次突破";
+  } else if (args.intradayBurst && args.intradayBurst.heldBodyMidpoint && !args.intradayBurst.brokeBurstLow) {
+    state = "承接确认";
+  } else if (args.intradayBurst && args.intradayBurst.pullbackAmountRatio > 0 && args.intradayBurst.pullbackAmountRatio <= 0.75) {
+    state = "缩量回踩";
+  } else if (args.intradayBurst) {
+    state = "爆量启动";
+  } else if (args.surgePullback) {
+    state = "缩量回踩";
+  }
+
+  return { setupState: state, setupStateRank: setupStateRank(state) };
+}
+
 function ratingFromSetup(args: {
   score: number;
   risks: string[];
@@ -573,6 +609,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
   const intradayBurst = findIntradayBurstSetup({ intraday30m, dailyBars: cleanHistory, quote, amount, pct });
   const intradayBurstScore = intradayBurst ? intradayBurst.score : 35;
   const bearishIntradayBurst = findBearishIntradayBurst(intraday30m);
+  const setupState = deriveSetupState({ intradayBurst, surgePullback, bearishIntradayBurst });
   const latestHigh = Number(quote.h ?? latestBar.h ?? close);
   const latestLow = Number(quote.l ?? latestBar.l ?? close);
   const dayCloseLocation = closeLocation(close, latestHigh, latestLow);
@@ -784,6 +821,8 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     exchange,
     signal: rating.signal,
     rating: rating.rating,
+    setupState: setupState.setupState,
+    setupStateRank: setupState.setupStateRank,
     score: round(score, 1),
     confidence: round(clamp(cleanFlows.length * 9 + Math.min(cleanHistory.length, 120) * 0.35), 0),
     price: round(close, 2),

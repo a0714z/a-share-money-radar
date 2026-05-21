@@ -65,6 +65,13 @@ function signalText(signal: Signal) {
   return "等待";
 }
 
+function setupStateClass(state?: string) {
+  if (state === "二次突破" || state === "承接确认") return "setup-good";
+  if (state === "缩量回踩" || state === "爆量启动") return "setup-watch";
+  if (state === "放量派发风险" || state === "跌破失效") return "setup-risk";
+  return "setup-neutral";
+}
+
 function marketTone(market?: MarketRegime): "neutral" | "green" | "amber" | "blue" | "red" {
   if (!market) return "neutral";
   if (market.state === "strong") return "green";
@@ -195,6 +202,7 @@ function PickTable({
             <th>名称</th>
             <th>主题</th>
             <th>信号</th>
+            <th>阶段</th>
             <th>分数</th>
             <th>涨跌</th>
             <th>5日资金</th>
@@ -216,6 +224,9 @@ function PickTable({
               <td data-label="主题">{pick.sector ?? "-"}</td>
               <td data-label="信号">
                 <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
+              </td>
+              <td data-label="阶段">
+                <span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState ?? "常规观察"}</span>
               </td>
               <td data-label="分数">
                 <strong>{pick.score.toFixed(1)}</strong>
@@ -276,6 +287,7 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
       <div className="detail-head">
         <div>
           <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
+          <span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState ?? "常规观察"}</span>
           <h2>{pick.name}</h2>
           <p>{pick.instrument}</p>
         </div>

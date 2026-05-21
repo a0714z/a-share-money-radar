@@ -132,7 +132,7 @@ function changeSummaryText(report: ScanReport) {
 function pickLine(pick: StockPick) {
   return [
     `${pick.rank}. ${pick.name} ${pick.instrument}`,
-    `评分 ${round(pick.score, 1)}，现价 ${price(pick.price)}，涨跌 ${pct(pick.pctChange)}`,
+    `阶段 ${pick.setupState ?? "常规观察"}，评分 ${round(pick.score, 1)}，现价 ${price(pick.price)}，涨跌 ${pct(pick.pctChange)}`,
     `主题 ${pick.sector ?? "其他"}，5日资金 ${money(pick.flow5d)} / ${pct(pick.flowRatio5d)}`,
     tradePlanText(pick),
     `详情：${stockUrl(pick.instrument)}`,
@@ -181,7 +181,7 @@ function pickCard(pick: StockPick) {
     <tr>
       <td style="padding:14px 12px;border-bottom:1px solid #e5e7eb;">
         <div style="font-weight:700;color:#111827;">${pick.rank}. ${escapeHtml(pick.name)} <span style="font-weight:500;color:#6b7280;">${escapeHtml(pick.instrument)}</span></div>
-        <div style="margin-top:6px;color:#374151;">${escapeHtml(pick.sector ?? "其他")} · 评分 ${round(pick.score, 1)} · 现价 ${price(pick.price)} · 涨跌 ${pct(pick.pctChange)}</div>
+        <div style="margin-top:6px;color:#374151;">${escapeHtml(pick.sector ?? "其他")} · 阶段 ${escapeHtml(pick.setupState ?? "常规观察")} · 评分 ${round(pick.score, 1)} · 现价 ${price(pick.price)} · 涨跌 ${pct(pick.pctChange)}</div>
         <div style="margin-top:6px;color:#374151;">5日资金 ${money(pick.flow5d)} / ${pct(pick.flowRatio5d)}</div>
         <div style="margin-top:8px;color:#111827;">${escapeHtml(tradePlanText(pick))}</div>
         <div style="margin-top:8px;"><a href="${escapeHtml(stockUrl(pick.instrument))}" style="color:#0f766e;font-weight:800;text-decoration:none;">打开详情</a></div>

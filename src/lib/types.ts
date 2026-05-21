@@ -2,6 +2,8 @@ export type Exchange = "sh" | "sz";
 
 export type Signal = "strong" | "watch" | "wait";
 
+export type SetupState = "二次突破" | "承接确认" | "缩量回踩" | "爆量启动" | "放量派发风险" | "跌破失效" | "常规观察";
+
 export type MarketState = "strong" | "neutral" | "weak";
 
 export type StockListItem = {
@@ -120,6 +122,8 @@ export type StockPick = {
   exchange: Exchange;
   signal: Signal;
   rating: string;
+  setupState: SetupState;
+  setupStateRank: number;
   score: number;
   confidence: number;
   price: number;
