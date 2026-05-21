@@ -68,7 +68,9 @@ type SurgePullbackSetup = {
 
 type IntradayBurstSetup = {
   score: number;
+  tradeDate: string;
   barTime: string;
+  daysSince: number;
   intradayPct: number;
   intradayAmountRatio: number;
   dailyAmountRatio: number;
@@ -141,6 +143,12 @@ function previousDailyBar(bars: KLine[], quoteDate: string) {
   return last(candidates) ?? last(bars.slice(0, -1));
 }
 
+function recentTradeDates(dailyBars: KLine[], quoteDate: string, window = 5) {
+  const dates = dailyBars.map((bar) => normalizeDate(bar.t)).filter(Boolean);
+  if (quoteDate && !dates.includes(quoteDate)) dates.push(quoteDate);
+  return [...new Set(dates)].sort().slice(-window);
+}
+
 function findIntradayBurstSetup(args: {
   intraday30m?: KLine[];
   dailyBars: KLine[];
@@ -152,17 +160,25 @@ function findIntradayBurstSetup(args: {
   if (bars.length < 24) return undefined;
 
   const quoteDate = normalizeDate(args.quote.t) || normalizeDate(last(args.dailyBars)?.t);
-  const previousDay = previousDailyBar(args.dailyBars, quoteDate);
-  const dailyAmountRatio = previousDay?.a ? safeDivide(args.amount, previousDay.a, 0) : 0;
-  if (dailyAmountRatio < 3) return undefined;
-
-  const recentStart = Math.max(20, bars.length - 12);
+  const dailyByDate = new Map(args.dailyBars.map((bar) => [normalizeDate(bar.t), bar]));
+  const dates = recentTradeDates(args.dailyBars, quoteDate, 5);
+  const dateRank = new Map(dates.map((date, index) => [date, dates.length - 1 - index]));
   let best: IntradayBurstSetup | undefined;
 
-  for (let index = recentStart; index < bars.length; index += 1) {
+  for (let index = 20; index < bars.length; index += 1) {
     const bar = bars[index];
     const previous = bars[index - 1];
     if (!bar || !previous) continue;
+
+    const tradeDate = normalizeDate(bar.t);
+    const daysSince = dateRank.get(tradeDate);
+    if (daysSince === undefined) continue;
+
+    const dailyBar = dailyByDate.get(tradeDate);
+    const previousDay = previousDailyBar(args.dailyBars, tradeDate);
+    const dayAmount = tradeDate === quoteDate && args.amount > 0 ? Math.max(args.amount, dailyBar?.a ?? 0) : (dailyBar?.a ?? 0);
+    const dailyAmountRatio = previousDay?.a ? safeDivide(dayAmount, previousDay.a, 0) : 0;
+    if (dailyAmountRatio < 3) continue;
 
     const intradayPct = pctChange(bar.c, previous.c);
     const avgAmount = average(bars.slice(Math.max(0, index - 20), index).map((item) => item.a));
@@ -176,15 +192,18 @@ function findIntradayBurstSetup(args: {
         Math.min(18, (intradayAmountRatio - 5) * 2.4) +
         Math.min(14, (dailyAmountRatio - 3) * 3.2) +
         Math.min(12, (intradayPct - 2.5) * 4) +
-        (barCloseLocation >= 0.72 ? 8 : 2)
+        (barCloseLocation >= 0.72 ? 8 : 2) -
+        daysSince * 3
     );
     const setup = {
       score,
+      tradeDate,
       barTime: String(bar.t ?? ""),
+      daysSince,
       intradayPct: round(intradayPct, 1),
       intradayAmountRatio: round(intradayAmountRatio, 2),
       dailyAmountRatio: round(dailyAmountRatio, 2),
-      dailyPct: round(args.pct, 2)
+      dailyPct: round(tradeDate === quoteDate ? args.pct : dailyBar && previousDay ? pctChange(dailyBar.c, previousDay.c) : args.pct, 2)
     };
 
     if (!best || setup.score > best.score) best = setup;
@@ -217,7 +236,7 @@ function ratingFromSetup(args: {
     args.intradayBurstScore >= 78 &&
     args.score >= 78 &&
     args.priceVolumeScore >= 55 &&
-    args.pctChange >= 2 &&
+    args.pctChange > -4.5 &&
     args.risks.length <= 3;
 
   const classicEntryZone =
@@ -281,7 +300,7 @@ function buildReasons(args: {
   const reasons: string[] = [];
   if (args.intradayBurst) {
     reasons.push(
-      `30m大涨${args.intradayBurst.intradayPct}%且${args.intradayBurst.intradayAmountRatio}倍量，日量为前日${args.intradayBurst.dailyAmountRatio}倍`
+      `近5日${args.intradayBurst.tradeDate}出现30m大涨${args.intradayBurst.intradayPct}%且${args.intradayBurst.intradayAmountRatio}倍量，日量为前日${args.intradayBurst.dailyAmountRatio}倍`
     );
   }
   if (args.surgePullback && args.surgePullback.score >= 72) {

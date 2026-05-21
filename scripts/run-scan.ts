@@ -57,7 +57,7 @@ function configFromEnv(): ScanConfig {
     historyDays: intEnv("SCAN_HISTORY_DAYS", 120),
     intraday30mDays: intEnv("SCAN_30M_BARS", 96),
     flowDays: intEnv("SCAN_FLOW_DAYS", 10),
-    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 260),
+    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 420),
     minAmount: intEnv("SCAN_MIN_AMOUNT", 30_000_000),
     maxPerSector: intEnv("SCAN_MAX_PER_SECTOR", 2)
   };
@@ -520,7 +520,7 @@ async function liveScan() {
       notes: [
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
-        "评分侧重30m爆量大涨、日K成交额较前日3倍以上、资金连续性和成本区位置",
+        "评分侧重近5个交易日内30m爆量大涨、对应日K成交额较前日3倍以上、资金连续性和成本区位置",
         `大盘环境：${market.label}，${market.reasons.join("；")}`,
         `行业集中度：同一主题核心池最多 ${config.maxPerSector} 只，${concentration.applied ? `已降级 ${concentration.demoted} 只` : "未触发降级"}`
       ]
