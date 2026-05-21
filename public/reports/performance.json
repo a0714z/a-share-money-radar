@@ -1,6 +1,6 @@
 {
   "meta": {
-    "generatedAt": "2026-05-21 08:20:21",
+    "generatedAt": "2026-05-21 11:49:18",
     "source": "Biying API + archived scan reports",
     "mode": "live",
     "historyReports": 3,
@@ -31,15 +31,15 @@
         "completed": 0
       }
     },
-    "avgMaxDrawdown10d": -2.56,
-    "avgBestEntryDrawdown3d": -2.56,
+    "avgMaxDrawdown10d": -2.98,
+    "avgBestEntryDrawdown3d": -2.98,
     "planReplay": {
       "completed": 5,
-      "entryTouches": 3,
+      "entryTouches": 4,
       "stopLossHits": 0,
       "target1Hits": 0,
       "target2Hits": 0,
-      "entryTouchRate": 60,
+      "entryTouchRate": 80,
       "stopLossRate": 0,
       "target1HitRate": 0,
       "target2HitRate": 0
@@ -47,13 +47,13 @@
     "health": {
       "status": "tighten",
       "label": "收缩",
-      "score": 29.4,
+      "score": 28.5,
       "sampleSize": 5,
       "sampleWindow": 20,
       "action": "pause",
-      "headline": "5日完成样本不足，平均收益追踪中，平均回撤 -2.56%，建议收缩仓位并等待复盘改善。",
+      "headline": "5日完成样本不足，平均收益追踪中，平均回撤 -2.98%，建议收缩仓位并等待复盘改善。",
       "metrics": {
-        "avgMaxDrawdown10d": -2.56,
+        "avgMaxDrawdown10d": -2.98,
         "target1HitRate": 0,
         "stopLossRate": 0,
         "completed5d": 0,
@@ -69,15 +69,15 @@
   "records": [
     {
       "signalDate": "2026-05-21",
-      "code": "603607",
-      "instrument": "603607.SH",
-      "name": "京华激光",
+      "code": "601198",
+      "instrument": "601198.SH",
+      "name": "东兴证券",
       "rank": 1,
-      "score": 80.6,
-      "signalPrice": 24.73,
-      "flowRatio5d": 15.75,
-      "valuePosition": 47.7,
-      "pullbackFromHigh": 14.1,
+      "score": 81,
+      "signalPrice": 13.75,
+      "flowRatio5d": 8.88,
+      "valuePosition": 61,
+      "pullbackFromHigh": 6.6,
       "horizons": {
         "1d": {
           "days": 1,
@@ -104,11 +104,11 @@
       "instrument": "600835.SH",
       "name": "上海机电",
       "rank": 2,
-      "score": 80,
-      "signalPrice": 26.34,
+      "score": 79.9,
+      "signalPrice": 26.22,
       "flowRatio5d": 6.84,
-      "valuePosition": 43.4,
-      "pullbackFromHigh": 22.1,
+      "valuePosition": 42.5,
+      "pullbackFromHigh": 22.4,
       "horizons": {
         "1d": {
           "days": 1,
@@ -195,7 +195,7 @@
       "status": "tracking",
       "bestEntryDrawdown3d": -1.62,
       "maxDrawdown10d": -1.62,
-      "maxRunup10d": 0,
+      "maxRunup10d": 8.82,
       "planReplay": {
         "entryTouched": true,
         "stopLossTouched": false,
@@ -238,8 +238,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": 0.61,
-      "maxDrawdown10d": 0.61,
+      "bestEntryDrawdown3d": 0.46,
+      "maxDrawdown10d": 0.46,
       "maxRunup10d": 8.76,
       "planReplay": {
         "entryTouched": false,
@@ -281,8 +281,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": -2.99,
-      "maxDrawdown10d": -2.99,
+      "bestEntryDrawdown3d": -3.78,
+      "maxDrawdown10d": -3.78,
       "maxRunup10d": -0.26,
       "planReplay": {
         "entryTouched": true,
@@ -326,14 +326,16 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": -5.28,
-      "maxDrawdown10d": -5.28,
+      "bestEntryDrawdown3d": -6.44,
+      "maxDrawdown10d": -6.44,
       "maxRunup10d": -0.26,
       "planReplay": {
-        "entryTouched": false,
+        "entryTouched": true,
         "stopLossTouched": false,
         "target1Touched": false,
-        "target2Touched": false
+        "target2Touched": false,
+        "firstTrigger": "entry",
+        "firstTriggerDate": "2026-05-21"
       }
     },
     {
