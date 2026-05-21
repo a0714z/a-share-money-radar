@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generatedAt": "2026-05-21 08:07:15",
+    "generatedAt": "2026-05-21 08:17:49",
     "source": "Biying API + archived scan reports",
     "mode": "live",
-    "historyReports": 2,
+    "historyReports": 3,
     "notes": [
       "只统计核心强关注池，不把观察池计入胜率",
       "收益按信号日收盘价到后续第 N 个交易日收盘价计算",
@@ -11,9 +11,9 @@
     ]
   },
   "summary": {
-    "totalSignals": 6,
+    "totalSignals": 7,
     "completed10d": 0,
-    "tracking": 6,
+    "tracking": 7,
     "horizons": {
       "1d": {
         "completed": 5,
@@ -67,6 +67,37 @@
     }
   },
   "records": [
+    {
+      "signalDate": "2026-05-21",
+      "code": "600835",
+      "instrument": "600835.SH",
+      "name": "上海机电",
+      "rank": 1,
+      "score": 80,
+      "signalPrice": 26.34,
+      "flowRatio5d": 6.84,
+      "valuePosition": 43.4,
+      "pullbackFromHigh": 22.1,
+      "horizons": {
+        "1d": {
+          "days": 1,
+          "status": "pending"
+        },
+        "3d": {
+          "days": 3,
+          "status": "pending"
+        },
+        "5d": {
+          "days": 5,
+          "status": "pending"
+        },
+        "10d": {
+          "days": 10,
+          "status": "pending"
+        }
+      },
+      "status": "tracking"
+    },
     {
       "signalDate": "2026-05-20",
       "code": "600301",
