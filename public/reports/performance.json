@@ -1,9 +1,9 @@
 {
   "meta": {
-    "generatedAt": "2026-05-21 11:49:18",
+    "generatedAt": "2026-05-21 16:35:54",
     "source": "Biying API + archived scan reports",
     "mode": "live",
-    "historyReports": 3,
+    "historyReports": 2,
     "notes": [
       "只统计核心强关注池，不把观察池计入胜率",
       "收益按信号日收盘价到后续第 N 个交易日收盘价计算",
@@ -11,15 +11,15 @@
     ]
   },
   "summary": {
-    "totalSignals": 8,
+    "totalSignals": 6,
     "completed10d": 0,
-    "tracking": 8,
+    "tracking": 6,
     "horizons": {
       "1d": {
-        "completed": 5,
-        "winRate": 20,
-        "avgReturn": -1.9,
-        "medianReturn": -2.59
+        "completed": 6,
+        "winRate": 16.7,
+        "avgReturn": -1.91,
+        "medianReturn": -2.26
       },
       "3d": {
         "completed": 0
@@ -31,15 +31,15 @@
         "completed": 0
       }
     },
-    "avgMaxDrawdown10d": -2.98,
-    "avgBestEntryDrawdown3d": -2.98,
+    "avgMaxDrawdown10d": -4.04,
+    "avgBestEntryDrawdown3d": -4.04,
     "planReplay": {
-      "completed": 5,
-      "entryTouches": 4,
+      "completed": 6,
+      "entryTouches": 5,
       "stopLossHits": 0,
       "target1Hits": 0,
       "target2Hits": 0,
-      "entryTouchRate": 80,
+      "entryTouchRate": 83.3,
       "stopLossRate": 0,
       "target1HitRate": 0,
       "target2HitRate": 0
@@ -47,17 +47,17 @@
     "health": {
       "status": "tighten",
       "label": "收缩",
-      "score": 28.5,
-      "sampleSize": 5,
+      "score": 26.4,
+      "sampleSize": 6,
       "sampleWindow": 20,
       "action": "pause",
-      "headline": "5日完成样本不足，平均收益追踪中，平均回撤 -2.98%，建议收缩仓位并等待复盘改善。",
+      "headline": "5日完成样本不足，平均收益追踪中，平均回撤 -4.04%，建议收缩仓位并等待复盘改善。",
       "metrics": {
-        "avgMaxDrawdown10d": -2.98,
+        "avgMaxDrawdown10d": -4.04,
         "target1HitRate": 0,
         "stopLossRate": 0,
         "completed5d": 0,
-        "completedPlan": 5
+        "completedPlan": 6
       },
       "notes": [
         "健康度基于最近核心强关注信号，不包含观察池。",
@@ -67,68 +67,6 @@
     }
   },
   "records": [
-    {
-      "signalDate": "2026-05-21",
-      "code": "601198",
-      "instrument": "601198.SH",
-      "name": "东兴证券",
-      "rank": 1,
-      "score": 81,
-      "signalPrice": 13.75,
-      "flowRatio5d": 8.88,
-      "valuePosition": 61,
-      "pullbackFromHigh": 6.6,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
-    {
-      "signalDate": "2026-05-21",
-      "code": "600835",
-      "instrument": "600835.SH",
-      "name": "上海机电",
-      "rank": 2,
-      "score": 79.9,
-      "signalPrice": 26.22,
-      "flowRatio5d": 6.84,
-      "valuePosition": 42.5,
-      "pullbackFromHigh": 22.4,
-      "horizons": {
-        "1d": {
-          "days": 1,
-          "status": "pending"
-        },
-        "3d": {
-          "days": 3,
-          "status": "pending"
-        },
-        "5d": {
-          "days": 5,
-          "status": "pending"
-        },
-        "10d": {
-          "days": 10,
-          "status": "pending"
-        }
-      },
-      "status": "tracking"
-    },
     {
       "signalDate": "2026-05-20",
       "code": "600301",
@@ -143,7 +81,10 @@
       "horizons": {
         "1d": {
           "days": 1,
-          "status": "pending"
+          "status": "complete",
+          "date": "2026-05-21",
+          "close": 52.55,
+          "returnPct": -1.94
         },
         "3d": {
           "days": 3,
@@ -158,7 +99,18 @@
           "status": "pending"
         }
       },
-      "status": "tracking"
+      "status": "tracking",
+      "bestEntryDrawdown3d": -2.22,
+      "maxDrawdown10d": -2.22,
+      "maxRunup10d": 7.26,
+      "planReplay": {
+        "entryTouched": true,
+        "stopLossTouched": false,
+        "target1Touched": false,
+        "target2Touched": false,
+        "firstTrigger": "entry",
+        "firstTriggerDate": "2026-05-21"
+      }
     },
     {
       "signalDate": "2026-05-19",
@@ -238,8 +190,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": 0.46,
-      "maxDrawdown10d": 0.46,
+      "bestEntryDrawdown3d": -3.01,
+      "maxDrawdown10d": -3.01,
       "maxRunup10d": 8.76,
       "planReplay": {
         "entryTouched": false,
@@ -281,8 +233,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": -3.78,
-      "maxDrawdown10d": -3.78,
+      "bestEntryDrawdown3d": -5.86,
+      "maxDrawdown10d": -5.86,
       "maxRunup10d": -0.26,
       "planReplay": {
         "entryTouched": true,
@@ -326,8 +278,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": -6.44,
-      "maxDrawdown10d": -6.44,
+      "bestEntryDrawdown3d": -6.7,
+      "maxDrawdown10d": -6.7,
       "maxRunup10d": -0.26,
       "planReplay": {
         "entryTouched": true,
@@ -371,8 +323,8 @@
         }
       },
       "status": "tracking",
-      "bestEntryDrawdown3d": -3.52,
-      "maxDrawdown10d": -3.52,
+      "bestEntryDrawdown3d": -4.81,
+      "maxDrawdown10d": -4.81,
       "maxRunup10d": -0.74,
       "planReplay": {
         "entryTouched": true,
