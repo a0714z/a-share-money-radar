@@ -77,6 +77,13 @@ type IntradayBurstSetup = {
   dailyPct: number;
 };
 
+type BearishIntradayBurst = {
+  barTime: string;
+  tradeDate: string;
+  intradayAmountRatio: number;
+  bodyPct: number;
+};
+
 function findSurgePullbackSetup(bars: KLine[], close: number, ma20?: number, ma60?: number): SurgePullbackSetup | undefined {
   if (bars.length < 35) return undefined;
 
@@ -181,11 +188,12 @@ function findIntradayBurstSetup(args: {
     if (dailyAmountRatio < 3) continue;
 
     const intradayPct = pctChange(bar.c, previous.c);
+    const bodyPct = pctChange(bar.c, bar.o);
     const avgAmount = average(bars.slice(Math.max(0, index - 20), index).map((item) => item.a));
     const intradayAmountRatio = safeDivide(bar.a, avgAmount, 0);
     const barCloseLocation = closeLocation(bar.c, bar.h, bar.l);
 
-    if (intradayAmountRatio < 5 || intradayPct < 2.5 || barCloseLocation < 0.58) continue;
+    if (bar.c <= bar.o || intradayAmountRatio < 5 || intradayPct < 2.5 || bodyPct < 0.6 || barCloseLocation < 0.58) continue;
 
     const score = clamp(
       58 +
@@ -210,6 +218,36 @@ function findIntradayBurstSetup(args: {
   }
 
   return best;
+}
+
+function findBearishIntradayBurst(intraday30m?: KLine[]): BearishIntradayBurst | undefined {
+  const bars = byDateAsc(intraday30m ?? []).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && Number.isFinite(bar.a) && bar.a > 0);
+  if (bars.length < 24) return undefined;
+
+  let worst: BearishIntradayBurst | undefined;
+  const start = Math.max(20, bars.length - 40);
+
+  for (let index = start; index < bars.length; index += 1) {
+    const bar = bars[index];
+    if (!bar) continue;
+
+    const avgAmount = average(bars.slice(Math.max(0, index - 20), index).map((item) => item.a));
+    const intradayAmountRatio = safeDivide(bar.a, avgAmount, 0);
+    const bodyPct = pctChange(bar.c, bar.o);
+
+    if (intradayAmountRatio < 5 || bodyPct >= 0) continue;
+
+    const setup = {
+      barTime: String(bar.t ?? ""),
+      tradeDate: normalizeDate(bar.t),
+      intradayAmountRatio: round(intradayAmountRatio, 2),
+      bodyPct: round(bodyPct, 1)
+    };
+
+    if (!worst || setup.intradayAmountRatio > worst.intradayAmountRatio) worst = setup;
+  }
+
+  return worst;
 }
 
 function ratingFromSetup(args: {
@@ -341,6 +379,7 @@ function buildRisks(args: {
   closeLocation: number;
   surgePullback?: SurgePullbackSetup;
   intradayBurst?: IntradayBurstSetup;
+  bearishIntradayBurst?: BearishIntradayBurst;
   historyLength: number;
 }) {
   const risks: string[] = [];
@@ -355,6 +394,9 @@ function buildRisks(args: {
   if (args.surgePullback && args.surgePullback.pullbackAmountRatio > 0.95) risks.push("启动后回调未明显缩量");
   if (args.surgePullback && !args.surgePullback.heldCostArea) risks.push("回调已跌破启动成本区");
   if (args.intradayBurst && args.intradayBurst.dailyPct >= 7) risks.push("日内涨幅已偏大，避免追高");
+  if (args.bearishIntradayBurst) {
+    risks.push(`近5日出现30m爆量阴柱：${args.bearishIntradayBurst.tradeDate} ${args.bearishIntradayBurst.intradayAmountRatio}倍量`);
+  }
   if (args.flowRatio5d < 0) risks.push("近5日大单净流入仍为负");
   if (args.flowPositiveDays5 <= 1) risks.push("资金流入连续性不足");
   if (args.flowAcceleration < -0.012) risks.push("近3日资金流入转弱");
@@ -476,6 +518,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
   const surgePullbackScore = surgePullback ? surgePullback.score : 38;
   const intradayBurst = findIntradayBurstSetup({ intraday30m, dailyBars: cleanHistory, quote, amount, pct });
   const intradayBurstScore = intradayBurst ? intradayBurst.score : 35;
+  const bearishIntradayBurst = findBearishIntradayBurst(intraday30m);
   const latestHigh = Number(quote.h ?? latestBar.h ?? close);
   const latestLow = Number(quote.l ?? latestBar.l ?? close);
   const dayCloseLocation = closeLocation(close, latestHigh, latestLow);
@@ -595,6 +638,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     closeLocation: dayCloseLocation,
     surgePullback,
     intradayBurst,
+    bearishIntradayBurst,
     historyLength: cleanHistory.length
   });
 
@@ -604,6 +648,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     (flowRatio5d < -0.025 ? 12 : 0) +
     (amount < 20_000_000 ? 16 : 0) +
     (distanceToMa60 < -12 ? 10 : 0) +
+    (bearishIntradayBurst ? 12 : 0) +
     volumePricePenalty;
 
   const score = clamp(
