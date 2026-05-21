@@ -68,6 +68,7 @@ type SurgePullbackSetup = {
 
 type IntradayBurstSetup = {
   score: number;
+  supportScore: number;
   tradeDate: string;
   barTime: string;
   daysSince: number;
@@ -75,6 +76,12 @@ type IntradayBurstSetup = {
   intradayAmountRatio: number;
   dailyAmountRatio: number;
   dailyPct: number;
+  followBars: number;
+  brokeBurstLow: boolean;
+  heldBodyMidpoint: boolean;
+  pullbackAmountRatio: number;
+  heavySelloff: boolean;
+  breakoutConfirmed: boolean;
 };
 
 type BearishIntradayBurst = {
@@ -156,6 +163,42 @@ function recentTradeDates(dailyBars: KLine[], quoteDate: string, window = 5) {
   return [...new Set(dates)].sort().slice(-window);
 }
 
+function evaluateBurstSupport(bars: KLine[], burstIndex: number) {
+  const burst = bars[burstIndex];
+  const follow = bars.slice(burstIndex + 1, burstIndex + 9);
+  const bodyMidpoint = (burst.o + burst.c) / 2;
+  const followBars = follow.length;
+  const lows = follow.map((bar) => bar.l);
+  const closes = follow.map((bar) => bar.c);
+  const brokeBurstLow = followBars > 0 && Math.min(...lows) < burst.l * 0.995;
+  const heldBodyMidpoint = followBars > 0 ? Math.min(...closes) >= bodyMidpoint * 0.995 : true;
+  const pullbackBars = follow.filter((bar) => bar.c < burst.c || bar.l < bodyMidpoint);
+  const pullbackAmount = average((pullbackBars.length ? pullbackBars : follow).map((bar) => bar.a));
+  const pullbackAmountRatio = followBars > 0 ? safeDivide(pullbackAmount, burst.a, 1) : 0;
+  const heavySelloff = follow.some((bar) => bar.c < bar.o && bar.a >= burst.a * 0.75 && bar.c < bodyMidpoint);
+  const breakoutConfirmed = follow.some((bar) => bar.c > burst.h * 1.01 && bar.a >= burst.a * 0.45 && bar.c > bar.o);
+
+  const supportScore = clamp(
+    50 +
+      (followBars === 0 ? 4 : 0) +
+      (brokeBurstLow ? -30 : 18) +
+      (heldBodyMidpoint ? 12 : -8) +
+      (pullbackAmountRatio <= 0.55 ? 14 : pullbackAmountRatio <= 0.75 ? 8 : pullbackAmountRatio > 1 ? -12 : 0) +
+      (heavySelloff ? -18 : 0) +
+      (breakoutConfirmed ? 18 : 0)
+  );
+
+  return {
+    supportScore,
+    followBars,
+    brokeBurstLow,
+    heldBodyMidpoint,
+    pullbackAmountRatio: round(pullbackAmountRatio, 2),
+    heavySelloff,
+    breakoutConfirmed
+  };
+}
+
 function findIntradayBurstSetup(args: {
   intraday30m?: KLine[];
   dailyBars: KLine[];
@@ -195,16 +238,18 @@ function findIntradayBurstSetup(args: {
 
     if (bar.c <= bar.o || intradayAmountRatio < 5 || intradayPct < 2.5 || bodyPct < 0.6 || barCloseLocation < 0.58) continue;
 
-    const score = clamp(
+    const support = evaluateBurstSupport(bars, index);
+    const burstPowerScore = clamp(
       58 +
         Math.min(18, (intradayAmountRatio - 5) * 2.4) +
         Math.min(14, (dailyAmountRatio - 3) * 3.2) +
         Math.min(12, (intradayPct - 2.5) * 4) +
-        (barCloseLocation >= 0.72 ? 8 : 2) -
-        daysSince * 3
+        (barCloseLocation >= 0.72 ? 8 : 2)
     );
+    const score = clamp(burstPowerScore * 0.72 + support.supportScore * 0.28 - daysSince * 3);
     const setup = {
       score,
+      ...support,
       tradeDate,
       barTime: String(bar.t ?? ""),
       daysSince,
@@ -341,6 +386,12 @@ function buildReasons(args: {
       `近5日${args.intradayBurst.tradeDate}出现30m大涨${args.intradayBurst.intradayPct}%且${args.intradayBurst.intradayAmountRatio}倍量，日量为前日${args.intradayBurst.dailyAmountRatio}倍`
     );
   }
+  if (args.intradayBurst && !args.intradayBurst.brokeBurstLow && args.intradayBurst.followBars > 0) reasons.push("爆量后未破30m启动低点");
+  if (args.intradayBurst && args.intradayBurst.heldBodyMidpoint && args.intradayBurst.followBars > 0) reasons.push("回踩守住30m启动实体中位");
+  if (args.intradayBurst && args.intradayBurst.pullbackAmountRatio > 0 && args.intradayBurst.pullbackAmountRatio <= 0.75) {
+    reasons.push("爆量后回调缩量，承接较稳");
+  }
+  if (args.intradayBurst?.breakoutConfirmed) reasons.push("爆量后出现二次放量突破");
   if (args.surgePullback && args.surgePullback.score >= 72) {
     reasons.push(
       `前期大涨${args.surgePullback.surgePct}%且${args.surgePullback.surgeAmountRatio}倍量启动，回调${args.surgePullback.pullbackFromSurgeHigh}%`
@@ -394,6 +445,9 @@ function buildRisks(args: {
   if (args.surgePullback && args.surgePullback.pullbackAmountRatio > 0.95) risks.push("启动后回调未明显缩量");
   if (args.surgePullback && !args.surgePullback.heldCostArea) risks.push("回调已跌破启动成本区");
   if (args.intradayBurst && args.intradayBurst.dailyPct >= 7) risks.push("日内涨幅已偏大，避免追高");
+  if (args.intradayBurst?.brokeBurstLow) risks.push("爆量后跌破30m启动低点");
+  if (args.intradayBurst && !args.intradayBurst.heldBodyMidpoint && args.intradayBurst.followBars > 0) risks.push("回踩跌破30m启动实体中位");
+  if (args.intradayBurst?.heavySelloff) risks.push("爆量后出现放量回落，抛压偏重");
   if (args.bearishIntradayBurst) {
     risks.push(`近5日出现30m爆量阴柱：${args.bearishIntradayBurst.tradeDate} ${args.bearishIntradayBurst.intradayAmountRatio}倍量`);
   }
