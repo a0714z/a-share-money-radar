@@ -338,6 +338,25 @@ function setupStateRank(state: SetupState) {
   return 8;
 }
 
+function buildChartBars(bars: KLine[], limit: number) {
+  return bars.slice(-limit).map((bar, index, visibleBars) => {
+    const localCloses = visibleBars.slice(0, index + 1).map((item) => item.c);
+    const localMa20 = localCloses.length >= 20 ? average(localCloses.slice(-20)) : undefined;
+    const localMa60 = localCloses.length >= 60 ? average(localCloses.slice(-60)) : undefined;
+    return {
+      date: String(bar.t ?? "").slice(0, 16),
+      open: round(bar.o, 2),
+      high: round(bar.h, 2),
+      low: round(bar.l, 2),
+      close: round(bar.c, 2),
+      volume: round(bar.v, 0),
+      ma20: localMa20 ? round(localMa20, 2) : undefined,
+      ma60: localMa60 ? round(localMa60, 2) : undefined,
+      amount: round(bar.a, 0)
+    };
+  });
+}
+
 function deriveSetupState(args: {
   intradayBurst?: IntradayBurstSetup;
   surgePullback?: SurgePullbackSetup;
@@ -837,18 +856,11 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
   });
 
   const exchange = inferExchange(stock.dm, stock.jys);
-  const historyWithMa = sample.slice(-80).map((bar, index, bars) => {
-    const localCloses = bars.slice(0, index + 1).map((item) => item.c);
-    const localMa20 = localCloses.length >= 20 ? average(localCloses.slice(-20)) : undefined;
-    const localMa60 = localCloses.length >= 60 ? average(localCloses.slice(-60)) : undefined;
-    return {
-      date: bar.t.slice(0, 10),
-      close: round(bar.c, 2),
-      ma20: localMa20 ? round(localMa20, 2) : undefined,
-      ma60: localMa60 ? round(localMa60, 2) : undefined,
-      amount: round(bar.a, 0)
-    };
-  });
+  const historyWithMa = buildChartBars(sample, 120).map((bar) => ({ ...bar, date: bar.date.slice(0, 10) }));
+  const cleanIntraday30m = byDateAsc(intraday30m ?? []).filter(
+    (bar) => Number.isFinite(bar.c) && bar.c > 0 && Number.isFinite(bar.a) && bar.a > 0
+  );
+  const intraday30mWithMa = cleanIntraday30m.length ? buildChartBars(cleanIntraday30m, 160) : undefined;
 
   return {
     rank: 0,
@@ -885,6 +897,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     reasons: reasons.length ? reasons : ["资金和价格条件接近观察区"],
     risks,
     history: historyWithMa,
+    intraday30m: intraday30mWithMa,
     flowBars,
     updatedAt: quote.t
   };

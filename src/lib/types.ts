@@ -80,7 +80,11 @@ export type CompanyProfile = {
 
 export type SparkPoint = {
   date: string;
+  open?: number;
+  high?: number;
+  low?: number;
   close: number;
+  volume?: number;
   ma20?: number;
   ma60?: number;
   amount?: number;
@@ -162,6 +166,7 @@ export type StockPick = {
   reasons: string[];
   risks: string[];
   history: SparkPoint[];
+  intraday30m?: SparkPoint[];
   flowBars: FlowPoint[];
   updatedAt?: string;
 };

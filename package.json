@@ -27,6 +27,7 @@
   "dependencies": {
     "@vitejs/plugin-react": "^6.0.2",
     "dotenv": "^17.4.2",
+    "lightweight-charts": "^4.2.3",
     "lucide-react": "^1.16.0",
     "nodemailer": "^8.0.7",
     "react": "^19.2.6",

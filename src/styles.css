@@ -1219,6 +1219,96 @@ tbody tr.is-selected {
   border-radius: 8px;
 }
 
+.kline-block {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.kline-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.kline-toolbar .chart-title {
+  padding: 0;
+}
+
+.chart-frame-switch {
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid #d8dfda;
+  border-radius: 8px;
+  background: #eef2ef;
+}
+
+.chart-frame-switch button {
+  min-width: 58px;
+  border: 0;
+  border-radius: 6px;
+  color: #526057;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.chart-frame-switch button.active {
+  color: #102018;
+  background: #ffffff;
+}
+
+.chart-frame-switch button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.kline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.kline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.kline-legend i {
+  display: inline-block;
+  width: 16px;
+  height: 3px;
+  border-radius: 999px;
+}
+
+.legend-candle {
+  background: #159a65;
+}
+
+.legend-ma20 {
+  background: #2563eb;
+}
+
+.legend-ma60 {
+  background: #9a6a15;
+}
+
+.kline-canvas {
+  width: 100%;
+  min-height: 380px;
+}
+
 .history-card {
   margin-top: 14px;
   padding: 14px 8px 8px;
@@ -1731,6 +1821,7 @@ tbody tr.is-selected {
   }
 
   .chart-block,
+  .kline-block,
   .history-card,
   .trade-plan {
     margin-top: 12px;
@@ -2056,9 +2147,27 @@ tbody tr.is-selected {
   }
 
   .chart-block,
+  .kline-block,
   .history-card,
   .trade-plan {
     margin-top: 10px;
+  }
+
+  .kline-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .chart-frame-switch {
+    width: 100%;
+  }
+
+  .chart-frame-switch button {
+    flex: 1;
+  }
+
+  .kline-canvas {
+    min-height: 320px;
   }
 }
 

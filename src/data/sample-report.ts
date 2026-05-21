@@ -5,11 +5,33 @@ const history = [
   9.14, 9.2, 9.28, 9.23, 9.18, 9.12, 9.05, 9.0, 8.94, 8.98, 9.08, 9.18, 9.3
 ].map((close, index) => ({
   date: `2026-04-${String(index + 1).padStart(2, "0")}`,
+  open: Number((close * (index % 2 ? 1.006 : 0.994)).toFixed(2)),
+  high: Number((close * 1.018).toFixed(2)),
+  low: Number((close * 0.982).toFixed(2)),
   close,
+  volume: 280_000 + index * 8_500,
   ma20: index > 18 ? 8.95 + index * 0.01 : undefined,
   ma60: index > 25 ? 8.88 + index * 0.006 : undefined,
   amount: 120_000_000 + index * 2_400_000
 }));
+
+const intraday30m = Array.from({ length: 48 }, (_, index) => {
+  const day = 16 + Math.floor(index / 8);
+  const slot = index % 8;
+  const hour = slot < 4 ? 9 + Math.floor((slot + 1) / 2) : 13 + Math.floor((slot - 4) / 2);
+  const minute = slot % 2 ? "30" : "00";
+  const close = 8.92 + index * 0.008 + Math.sin(index / 2) * 0.045;
+  return {
+    date: `2026-05-${String(day).padStart(2, "0")} ${String(hour).padStart(2, "0")}:${minute}`,
+    open: Number((close - Math.sin(index) * 0.025).toFixed(2)),
+    high: Number((close + 0.05).toFixed(2)),
+    low: Number((close - 0.06).toFixed(2)),
+    close: Number(close.toFixed(2)),
+    volume: 62_000 + index * 1_700,
+    ma20: index > 18 ? Number((8.98 + index * 0.006).toFixed(2)) : undefined,
+    amount: 18_000_000 + index * 650_000
+  };
+});
 
 function pick(seed: Partial<StockPick>): StockPick {
   return {
@@ -47,6 +69,7 @@ function pick(seed: Partial<StockPick>): StockPick {
     reasons: ["5日大单净流入占比抬升", "价格处在近120日中低分位", "收盘价贴近20日均线", "量比温和放大"],
     risks: ["样例数据，仅用于界面预览"],
     history,
+    intraday30m,
     flowBars: [
       { date: "2026-05-12", net: -18_000_000, ratio: -0.018 },
       { date: "2026-05-13", net: 22_000_000, ratio: 0.021 },

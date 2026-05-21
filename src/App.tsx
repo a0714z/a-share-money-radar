@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -6,7 +6,6 @@ import {
   BadgeCheck,
   BarChart3,
   CalendarClock,
-  CircleDollarSign,
   Filter,
   History,
   Link as LinkIcon,
@@ -19,17 +18,15 @@ import {
   TrendingUp
 } from "lucide-react";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
+import { ColorType, CrosshairMode, createChart } from "lightweight-charts";
 import { sampleReport } from "./data/sample-report";
 import { sampleReview } from "./data/sample-review";
 import type {
@@ -361,6 +358,181 @@ function DetailActions({ pick, onBack }: { pick: StockPick; onBack?: () => void 
   );
 }
 
+type ChartFrame = "daily" | "30m";
+
+function chartTimestamp(date: string) {
+  const normalized = date.includes(" ") ? `${date.replace(" ", "T")}${date.length === 16 ? ":00" : ""}+08:00` : `${date}T00:00:00+08:00`;
+  return Math.floor(new Date(normalized).getTime() / 1000);
+}
+
+function chartVolumeLabel(points: StockPick["history"]) {
+  const hasVolume = points.some((point) => Number.isFinite(point.volume) && Number(point.volume) > 0);
+  return hasVolume ? "成交量" : "成交额";
+}
+
+function KLineChart({ pick }: { pick: StockPick }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [frame, setFrame] = useState<ChartFrame>("daily");
+  const frames = useMemo(
+    () => [
+      { key: "daily" as const, label: "日K", points: pick.history },
+      { key: "30m" as const, label: "30分钟", points: pick.intraday30m ?? [] }
+    ],
+    [pick.history, pick.intraday30m]
+  );
+  const active = frames.find((item) => item.key === frame && item.points.length) ?? frames[0];
+
+  useEffect(() => {
+    if (!containerRef.current || !active.points.length) return;
+
+    const container = containerRef.current;
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientWidth < 520 ? 320 : 380,
+      layout: {
+        background: { type: ColorType.Solid, color: "#ffffff" },
+        textColor: "#526057",
+        fontFamily: "Inter, PingFang SC, Microsoft YaHei, Arial, sans-serif"
+      },
+      grid: {
+        vertLines: { color: "#edf1ee" },
+        horzLines: { color: "#edf1ee" }
+      },
+      rightPriceScale: {
+        borderColor: "#dfe7e2",
+        scaleMargins: { top: 0.08, bottom: 0.28 }
+      },
+      timeScale: {
+        borderColor: "#dfe7e2",
+        timeVisible: active.key === "30m",
+        secondsVisible: false
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal
+      },
+      localization: {
+        priceFormatter: (price: number) => price.toFixed(2)
+      }
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#159a65",
+      downColor: "#bd3c3c",
+      borderUpColor: "#159a65",
+      borderDownColor: "#bd3c3c",
+      wickUpColor: "#159a65",
+      wickDownColor: "#bd3c3c"
+    });
+    const volumeSeries = chart.addHistogramSeries({
+      priceFormat: { type: "volume" },
+      priceScaleId: "",
+      base: 0
+    });
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.78, bottom: 0 }
+    });
+
+    const ma20Series = chart.addLineSeries({
+      color: "#2563eb",
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+    const ma60Series = chart.addLineSeries({
+      color: "#9a6a15",
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: false
+    });
+
+    const sorted = [...active.points].sort((a, b) => a.date.localeCompare(b.date));
+    const intradayBaseTime = active.key === "30m" ? chartTimestamp(sorted[0]?.date ?? "") : 0;
+    const pointTime = (point: StockPick["history"][number], index: number) =>
+      active.key === "30m" ? ((intradayBaseTime + index * 30 * 60) as never) : (point.date.slice(0, 10) as never);
+    const candles = sorted.map((point, index) => {
+      const close = Number(point.close);
+      const open = Number.isFinite(point.open) ? Number(point.open) : close;
+      const high = Number.isFinite(point.high) ? Number(point.high) : Math.max(open, close);
+      const low = Number.isFinite(point.low) ? Number(point.low) : Math.min(open, close);
+      return {
+        time: pointTime(point, index),
+        open,
+        high,
+        low,
+        close
+      };
+    });
+    const volumes = sorted.map((point, index) => {
+      const candle = candles[index];
+      return {
+        time: candle.time,
+        value: Number(point.volume && point.volume > 0 ? point.volume : point.amount ?? 0),
+        color: candle.close >= candle.open ? "rgba(21, 154, 101, 0.46)" : "rgba(189, 60, 60, 0.42)"
+      };
+    });
+    const ma20 = sorted.flatMap((point, index) =>
+      Number.isFinite(point.ma20) ? [{ time: pointTime(point, index), value: Number(point.ma20) }] : []
+    );
+    const ma60 = sorted.flatMap((point, index) =>
+      Number.isFinite(point.ma60) ? [{ time: pointTime(point, index), value: Number(point.ma60) }] : []
+    );
+
+    candleSeries.setData(candles);
+    volumeSeries.setData(volumes);
+    ma20Series.setData(ma20);
+    ma60Series.setData(ma60);
+
+    const applyVisibleRange = () => {
+      const visibleBars = active.key === "30m" ? 48 : 48;
+      chart.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, candles.length - visibleBars),
+        to: candles.length + 2
+      });
+    };
+    applyVisibleRange();
+
+    const resize = () => {
+      chart.applyOptions({ width: container.clientWidth, height: container.clientWidth < 520 ? 320 : 380 });
+      applyVisibleRange();
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(container);
+    window.addEventListener("resize", resize);
+    resize();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+      chart.remove();
+    };
+  }, [active]);
+
+  return (
+    <div className="kline-block">
+      <div className="kline-toolbar">
+        <div className="chart-title">
+          <BarChart3 size={16} />
+          <span>K线与{chartVolumeLabel(active.points)}</span>
+        </div>
+        <div className="chart-frame-switch">
+          {frames.map((item) => (
+            <button key={item.key} className={active.key === item.key ? "active" : ""} disabled={!item.points.length} onClick={() => setFrame(item.key)}>
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="kline-legend">
+        <span><i className="legend-candle" /> 蜡烛</span>
+        <span><i className="legend-ma20" /> MA20</span>
+        <span><i className="legend-ma60" /> MA60</span>
+        <span>{active.points.length} 根</span>
+      </div>
+      <div ref={containerRef} className="kline-canvas" />
+    </div>
+  );
+}
+
 function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRecords: ReviewRecord[]; onBack?: () => void }) {
   const plan = pick.tradePlan;
   const historySignals = reviewRecords
@@ -439,45 +611,7 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
         </div>
       )}
 
-      <div className="chart-block">
-        <div className="chart-title">
-          <BarChart3 size={16} />
-          <span>价格与成本线</span>
-        </div>
-        <ResponsiveContainer width="100%" height={210}>
-          <AreaChart data={pick.history} margin={{ top: 10, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="priceFill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="5%" stopColor="#159a65" stopOpacity={0.24} />
-                <stop offset="95%" stopColor="#159a65" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid stroke="#e7ece9" vertical={false} />
-            <XAxis dataKey="date" minTickGap={24} tickLine={false} axisLine={false} />
-            <YAxis domain={["dataMin", "dataMax"]} tickLine={false} axisLine={false} width={36} />
-            <Tooltip formatter={(value) => Number(value ?? 0).toFixed(2)} />
-            <Area type="monotone" dataKey="close" stroke="#159a65" fill="url(#priceFill)" strokeWidth={2} dot={false} />
-            <Line type="monotone" dataKey="ma20" stroke="#2563eb" strokeWidth={1.6} dot={false} />
-            <Line type="monotone" dataKey="ma60" stroke="#9a6a15" strokeWidth={1.4} dot={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div className="chart-block">
-        <div className="chart-title">
-          <CircleDollarSign size={16} />
-          <span>大单净额</span>
-        </div>
-        <ResponsiveContainer width="100%" height={150}>
-          <BarChart data={pick.flowBars} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <CartesianGrid stroke="#edf1ee" vertical={false} />
-            <XAxis dataKey="date" minTickGap={18} tickLine={false} axisLine={false} />
-            <YAxis tickFormatter={(value) => formatMoney(Number(value))} tickLine={false} axisLine={false} width={42} />
-            <Tooltip formatter={(value) => formatMoney(Number(value ?? 0))} />
-            <Bar dataKey="net" radius={[4, 4, 0, 0]} fill="#159a65" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <KLineChart pick={pick} />
 
       <div className="detail-grid">
         <div>
