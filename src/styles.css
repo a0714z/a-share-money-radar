@@ -157,6 +157,24 @@ a {
   margin: 22px 0;
 }
 
+.radar-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.radar-view > .summary-grid {
+  order: 1;
+}
+
+.radar-view > .insight-stack {
+  order: 2;
+  margin-top: 0;
+}
+
+.radar-view > .workspace {
+  order: 3;
+}
+
 .metric {
   display: flex;
   align-items: center;
@@ -614,6 +632,11 @@ a {
   -webkit-overflow-scrolling: touch;
 }
 
+.mobile-pick-list,
+.mobile-review-list {
+  display: none;
+}
+
 .review-table {
   max-height: calc(100vh - 330px);
 }
@@ -753,6 +776,122 @@ tbody tr.is-selected {
 .mini-action:hover,
 .icon-action:hover {
   background: #edf7f2;
+}
+
+.mobile-pick-card,
+.mobile-review-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 10px 22px rgba(20, 32, 26, 0.06);
+}
+
+.mobile-pick-card.is-selected {
+  border-color: rgba(21, 154, 101, 0.45);
+  background: #f4fbf7;
+}
+
+.mobile-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mobile-card-head h3 {
+  margin: 3px 0 2px;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.mobile-card-head p,
+.mobile-rank,
+.mobile-card-grid span,
+.mobile-review-grid span,
+.mobile-muted {
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mobile-card-head p {
+  margin: 0;
+}
+
+.mobile-card-badges {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.mobile-card-badges strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.mobile-price-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-price-row > strong {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.mobile-price-row .setup-state {
+  margin-left: auto;
+}
+
+.mobile-card-grid,
+.mobile-review-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-card-grid div,
+.mobile-review-grid div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #e8eee9;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.mobile-card-grid strong,
+.mobile-review-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-plan-range {
+  display: grid !important;
+  gap: 2px;
+}
+
+.mobile-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mobile-card-foot > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  color: #526057;
+  font-size: 13px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .up {
@@ -1606,5 +1745,337 @@ tbody tr.is-selected {
   .reason-block li {
     font-size: 14px;
     line-height: 1.5;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    background: #f7f6f1;
+  }
+
+  .app-shell {
+    width: 100%;
+    padding: 8px 10px 88px;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    gap: 10px;
+    margin: -8px -10px 10px;
+    padding: 10px;
+    border-bottom: 1px solid rgba(216, 223, 218, 0.92);
+    background: rgba(247, 246, 241, 0.96);
+    backdrop-filter: blur(14px);
+  }
+
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+  }
+
+  .brand h1 {
+    font-size: 22px;
+  }
+
+  .brand span {
+    font-size: 12px;
+  }
+
+  .top-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 82px;
+    gap: 8px;
+  }
+
+  .view-switch,
+  .live-badge {
+    height: 38px;
+  }
+
+  .live-badge {
+    width: auto;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .summary-grid,
+  .review-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .radar-view {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .radar-view > .summary-grid {
+    order: 1;
+  }
+
+  .radar-view > .workspace {
+    order: 2;
+  }
+
+  .radar-view > .insight-stack {
+    order: 3;
+    margin-top: 10px;
+  }
+
+  .metric {
+    min-height: 56px;
+    padding: 9px 10px;
+  }
+
+  .metric-icon {
+    display: none;
+  }
+
+  .metric span {
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .metric strong {
+    margin-top: 4px;
+    font-size: 17px;
+    line-height: 1.12;
+  }
+
+  .market-panel,
+  .concentration-panel,
+  .status-panel,
+  .change-panel,
+  .health-panel {
+    margin: 10px 0;
+    padding: 12px;
+    box-shadow: none;
+  }
+
+  .market-index-grid,
+  .sector-bars,
+  .status-grid,
+  .health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .change-grid,
+  .setup-change-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .market-index,
+  .sector-bar,
+  .status-grid div,
+  .change-block,
+  .health-grid div {
+    min-height: 0;
+    padding: 10px;
+  }
+
+  .market-index p {
+    margin: 8px 0;
+    font-size: 19px;
+  }
+
+  .workspace,
+  .review-layout {
+    gap: 10px;
+  }
+
+  .workspace > .detail-panel {
+    display: none;
+  }
+
+  .list-panel,
+  .detail-panel {
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .panel-toolbar {
+    padding: 12px;
+  }
+
+  .panel-toolbar h2 {
+    font-size: 18px;
+  }
+
+  .panel-toolbar span {
+    font-size: 12px;
+  }
+
+  .controls {
+    gap: 8px;
+  }
+
+  .search-box {
+    width: 100%;
+    height: 38px;
+  }
+
+  .segments {
+    width: 100%;
+    min-height: 38px;
+    overflow-x: auto;
+  }
+
+  .segments button {
+    min-width: 72px;
+    padding: 7px 9px;
+    flex: 1 0 auto;
+  }
+
+  .table-wrap,
+  .review-table {
+    max-height: none;
+    padding: 10px;
+    overflow: visible;
+  }
+
+  .desktop-table {
+    display: none !important;
+  }
+
+  .mobile-pick-list,
+  .mobile-review-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mobile-review-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .mobile-card-grid div,
+  .mobile-review-grid div {
+    padding: 9px;
+  }
+
+  .mobile-card-grid strong,
+  .mobile-review-grid strong {
+    font-size: 15px;
+  }
+
+  .mobile-card-head h3 {
+    font-size: 17px;
+  }
+
+  .mobile-card-badges strong {
+    font-size: 22px;
+  }
+
+  .mobile-price-row {
+    gap: 8px;
+  }
+
+  .mobile-price-row > strong {
+    font-size: 24px;
+  }
+
+  .mobile-price-row .setup-state {
+    max-width: 112px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .review-panel {
+    margin-top: 12px;
+  }
+
+  .review-chart {
+    padding: 10px 4px 0;
+  }
+
+  .review-kpis,
+  .detail-grid,
+  .trade-plan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stock-page {
+    width: 100%;
+    margin-top: 10px;
+  }
+
+  .detail-panel {
+    padding: 12px;
+  }
+
+  .detail-actions {
+    position: sticky;
+    top: 104px;
+    z-index: 8;
+    justify-content: stretch;
+    padding-bottom: 8px;
+    background: #ffffff;
+  }
+
+  .detail-actions .icon-action {
+    flex: 1;
+  }
+
+  .detail-head {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .detail-head h2 {
+    font-size: 23px;
+  }
+
+  .score-ring {
+    width: 76px;
+    height: 76px;
+  }
+
+  .score-ring span {
+    width: 58px;
+    height: 58px;
+    font-size: 17px;
+  }
+
+  .price-line {
+    margin: 12px 0;
+    padding: 12px;
+  }
+
+  .price-line strong {
+    font-size: 28px;
+  }
+
+  .chart-block,
+  .history-card,
+  .trade-plan {
+    margin-top: 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .top-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-card-grid div:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .mobile-review-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

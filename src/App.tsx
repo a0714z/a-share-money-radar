@@ -186,6 +186,82 @@ function ScoreRing({ value }: { value: number }) {
   );
 }
 
+function PlanRange({ pick }: { pick: StockPick }) {
+  const plan = pick.tradePlan;
+  if (!plan) return <span className="mobile-muted">暂无交易计划</span>;
+
+  return (
+    <>
+      <span>{plan.entryLow.toFixed(2)}-{plan.entryHigh.toFixed(2)}</span>
+      <span>{plan.positionLabel}{plan.positionPct}%</span>
+    </>
+  );
+}
+
+function MobilePickCard({
+  pick,
+  selected,
+  onSelect,
+  onOpen
+}: {
+  pick: StockPick;
+  selected?: StockPick;
+  onSelect: (pick: StockPick) => void;
+  onOpen: (pick: StockPick) => void;
+}) {
+  return (
+    <article className={selected?.instrument === pick.instrument ? "mobile-pick-card is-selected" : "mobile-pick-card"} onClick={() => onSelect(pick)}>
+      <div className="mobile-card-head">
+        <div>
+          <div className="mobile-rank">#{pick.rank}</div>
+          <h3>{pick.name}</h3>
+          <p>{pick.instrument}</p>
+        </div>
+        <div className="mobile-card-badges">
+          <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
+          <strong>{pick.score.toFixed(1)}</strong>
+        </div>
+      </div>
+
+      <div className="mobile-price-row">
+        <strong>{pick.price.toFixed(2)}</strong>
+        <span className={pick.pctChange >= 0 ? "up" : "down"}>{formatPct(pick.pctChange)}</span>
+        <span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState ?? "常规观察"}</span>
+      </div>
+
+      <div className="mobile-card-grid">
+        <div>
+          <span>5日资金</span>
+          <strong className={pick.flow5d >= 0 ? "up" : "down"}>{formatMoney(pick.flow5d)}</strong>
+        </div>
+        <div>
+          <span>资金占比</span>
+          <strong className={pick.flowRatio5d >= 0 ? "up" : "down"}>{formatPct(pick.flowRatio5d)}</strong>
+        </div>
+        <div>
+          <span>关注区</span>
+          <strong className="mobile-plan-range">
+            <PlanRange pick={pick} />
+          </strong>
+        </div>
+      </div>
+
+      <div className="mobile-card-foot">
+        <span>{pick.sector ?? "未分组"}</span>
+        <button
+          className="mini-action"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpen(pick);
+          }}
+        >
+          详情
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function PickTable({
   picks,
   selected,
@@ -199,7 +275,12 @@ function PickTable({
 }) {
   return (
     <div className="table-wrap">
-      <table>
+      <div className="mobile-pick-list">
+        {picks.map((pick) => (
+          <MobilePickCard key={pick.instrument} pick={pick} selected={selected} onSelect={onSelect} onOpen={onOpen} />
+        ))}
+      </div>
+      <table className="desktop-table">
         <thead>
           <tr>
             <th>Rank</th>
@@ -684,10 +765,47 @@ function ReviewReturn({ value }: { value?: number }) {
   return <span className={value! >= 0 ? "up" : "down"}>{formatPct(value)}</span>;
 }
 
+function MobileReviewCard({ record }: { record: ReviewRecord }) {
+  return (
+    <article className="mobile-review-card">
+      <div className="mobile-card-head">
+        <div>
+          <div className="mobile-rank">{record.signalDate}</div>
+          <h3>{record.name}</h3>
+          <p>{record.instrument} · 信号价 {record.signalPrice.toFixed(2)}</p>
+        </div>
+        <div className="mobile-card-badges">
+          <span className="signal signal-strong">Rank {record.rank}</span>
+          <strong>{record.score.toFixed(1)}</strong>
+        </div>
+      </div>
+      <div className="mobile-review-grid">
+        {reviewHorizons.map((horizon) => (
+          <div key={horizon}>
+            <span>{horizonLabel(horizon)}</span>
+            <strong>
+              <ReviewReturn value={record.horizons[horizon].returnPct} />
+            </strong>
+          </div>
+        ))}
+      </div>
+      <div className="mobile-card-foot">
+        <span>{triggerText(record.planReplay?.firstTrigger)}</span>
+        <span>浮盈 <ReviewReturn value={record.maxRunup10d} /></span>
+      </div>
+    </article>
+  );
+}
+
 function ReviewTable({ records }: { records: ReviewRecord[] }) {
   return (
     <div className="table-wrap review-table">
-      <table>
+      <div className="mobile-review-list">
+        {records.map((record) => (
+          <MobileReviewCard key={`${record.signalDate}-${record.instrument}`} record={record} />
+        ))}
+      </div>
+      <table className="desktop-table">
         <thead>
           <tr>
             <th>信号日</th>
@@ -1003,7 +1121,7 @@ export default function App() {
       {stockRoute ? (
         <StockDetailPage pick={routedPick} reviewRecords={review.records} onBack={clearRoute} />
       ) : view === "radar" ? (
-        <>
+        <div className="radar-view">
           <section className="summary-grid">
             <Metric icon={CalendarClock} label="交易日" value={report.meta.tradeDate} tone="blue" />
             <Metric icon={ShieldCheck} label="主板非 ST" value={report.universe.mainBoardNonSt.toLocaleString("zh-CN")} />
@@ -1011,11 +1129,6 @@ export default function App() {
             <Metric icon={TrendingUp} label="强关注" value={report.universe.strong} tone="green" />
             <Metric icon={Radar} label="市场状态" value={report.market?.label ?? "未评估"} tone={marketTone(report.market)} />
           </section>
-
-          <SystemStatusPanel report={report} review={review} status={status} />
-          <ChangeSummaryPanel report={report} />
-          <MarketPanel market={report.market} />
-          <ConcentrationPanel concentration={report.concentration} />
 
           <section className="workspace">
             <div className="list-panel">
@@ -1045,7 +1158,14 @@ export default function App() {
             </div>
             {selected && <PickDetail pick={selected} reviewRecords={review.records} />}
           </section>
-        </>
+
+          <div className="insight-stack">
+            <SystemStatusPanel report={report} review={review} status={status} />
+            <ChangeSummaryPanel report={report} />
+            <MarketPanel market={report.market} />
+            <ConcentrationPanel concentration={report.concentration} />
+          </div>
+        </div>
       ) : (
         <ReviewPanel review={review} />
       )}
