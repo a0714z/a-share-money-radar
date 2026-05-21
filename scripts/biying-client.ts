@@ -68,6 +68,15 @@ export class BiyingClient {
     );
   }
 
+  async history30m(instrument: string, limit: number) {
+    return assertArray<KLine>(
+      await fetchJson(`/hsstock/history/${instrument}/30/n/${this.license}`, {
+        query: { lt: limit }
+      }),
+      `history30m:${instrument}`
+    );
+  }
+
   async indexHistory(instrument: string, start: string, end: string) {
     return assertArray<KLine>(
       await fetchJson(`/hsindex/history/${instrument}/d/${this.license}`, {

@@ -33,6 +33,7 @@ dotenv.config({ path: resolve(root, ".env"), override: false });
 type ScanConfig = {
   topN: number;
   historyDays: number;
+  intraday30mDays: number;
   flowDays: number;
   flowCandidateLimit: number;
   minAmount: number;
@@ -54,8 +55,9 @@ function configFromEnv(): ScanConfig {
   return {
     topN: intEnv("SCAN_TOP_N", 8),
     historyDays: intEnv("SCAN_HISTORY_DAYS", 120),
+    intraday30mDays: intEnv("SCAN_30M_BARS", 96),
     flowDays: intEnv("SCAN_FLOW_DAYS", 10),
-    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 220),
+    flowCandidateLimit: intEnv("SCAN_FLOW_CANDIDATE_LIMIT", 260),
     minAmount: intEnv("SCAN_MIN_AMOUNT", 30_000_000),
     maxPerSector: intEnv("SCAN_MAX_PER_SECTOR", 2)
   };
@@ -100,17 +102,18 @@ function roughSetupScore(stock: StockListItem, quote: RealQuote, minAmount: numb
   const low = Number(quote.l ?? quote.p);
   const closeLocation = Math.max(0, Math.min(1, (Number(quote.p) - low) / Math.max(0.01, high - low)));
   const boardBonus = code.startsWith("6") || code.startsWith("000") ? 4 : 0;
-  const notChasing = pct < 6.5 ? 18 : -18;
+  const burstProxy = pct >= 2.5 && volumeRatio >= 2.5 ? 20 : 0;
+  const notChasing = pct < 6.5 ? 18 : volumeRatio >= 2.5 && closeLocation >= 0.55 ? 4 : -18;
   const mediumTermValue = zdf60 < 35 && zdf60 > -35 ? 18 - Math.abs(zdf60) * 0.2 : -10;
   const liquidity = Math.min(24, Math.log10(Math.max(amount, 1)) * 3);
   const turnoverScore = turnover >= 0.6 && turnover <= 7 ? 18 : turnover > 10 ? -12 : 6;
   const volumeScore = volumeRatio >= 0.8 && volumeRatio <= 2.3 ? 14 : volumeRatio > 3.5 ? -10 : volumeRatio < 0.45 ? -5 : 4;
   const closeStrength = closeLocation >= 0.58 ? 10 : closeLocation >= 0.38 ? 4 : -8;
-  const badVolumePrice = (pct < -2.5 && volumeRatio > 1.4 ? -16 : 0) + (pct > 5.2 && volumeRatio > 2.8 ? -10 : 0);
+  const badVolumePrice = (pct < -2.5 && volumeRatio > 1.4 ? -16 : 0) + (pct > 5.2 && volumeRatio > 2.8 && closeLocation < 0.55 ? -10 : 0);
   const healthyVolumePrice = pct > -1.5 && pct < 4.8 && volumeRatio >= 0.75 && volumeRatio <= 2.4 ? 8 : 0;
   const pullbackProxy = pct > -4.5 && pct < 3.5 && volumeRatio >= 0.45 && volumeRatio <= 1.45 ? 8 : 0;
   const capScore = marketCap >= 2_000_000_000 ? 6 : -8;
-  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + pullbackProxy + badVolumePrice + capScore;
+  return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + burstProxy + pullbackProxy + badVolumePrice + capScore;
 }
 
 function attachRanks(items: StockPick[]) {
@@ -392,7 +395,9 @@ function selectCoreBySector(strong: StockPick[], coreLimit: number, maxPerSector
 }
 
 function isSurgePullbackPick(pick: StockPick) {
-  return pick.reasons.some((reason) => reason.includes("倍量启动") || reason.includes("回调缩量") || reason.includes("回踩"));
+  return pick.reasons.some(
+    (reason) => reason.includes("30m") || reason.includes("日量为前日") || reason.includes("倍量启动") || reason.includes("回调缩量") || reason.includes("回踩")
+  );
 }
 
 function buildWatchlist(items: StockPick[], limit: number) {
@@ -476,8 +481,15 @@ async function liveScan() {
     const instrument = toInstrumentCode(stock.dm, exchange);
     try {
       const code = plainCode(stock.dm);
-      const [history, flows] = await Promise.all([client.history(instrument, config.historyDays), client.moneyFlow(code, config.flowDays)]);
-      const pick = scoreCandidate({ stock, quote, history, flows });
+      const [history, intraday30m, flows] = await Promise.all([
+        client.history(instrument, config.historyDays),
+        client.history30m(instrument, config.intraday30mDays).catch((error) => {
+          console.warn(`[scan] 30m history ${instrument} skipped: ${(error as Error).message}`);
+          return [];
+        }),
+        client.moneyFlow(code, config.flowDays)
+      ]);
+      const pick = scoreCandidate({ stock, quote, history, intraday30m, flows });
       if ((index + 1) % 25 === 0) console.log(`[scan] processed ${index + 1}/${roughCandidates.length}`);
       return pick;
     } catch (error) {
@@ -508,7 +520,7 @@ async function liveScan() {
       notes: [
         "主板代码前缀过滤：000/001/002/003/600/601/603/605",
         "剔除名称包含 ST、*ST、退 的标的",
-        "评分侧重前期大涨倍量启动后的缩量回踩、资金连续性、放量质量和成本区位置",
+        "评分侧重30m爆量大涨、日K成交额较前日3倍以上、资金连续性和成本区位置",
         `大盘环境：${market.label}，${market.reasons.join("；")}`,
         `行业集中度：同一主题核心池最多 ${config.maxPerSector} 只，${concentration.applied ? `已降级 ${concentration.demoted} 只` : "未触发降级"}`
       ]

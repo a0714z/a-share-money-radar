@@ -6,6 +6,7 @@ export type ScoreInput = {
   stock: StockListItem;
   quote: RealQuote;
   history: KLine[];
+  intraday30m?: KLine[];
   flows: MoneyFlow[];
 };
 
@@ -65,6 +66,15 @@ type SurgePullbackSetup = {
   heldCostArea: boolean;
 };
 
+type IntradayBurstSetup = {
+  score: number;
+  barTime: string;
+  intradayPct: number;
+  intradayAmountRatio: number;
+  dailyAmountRatio: number;
+  dailyPct: number;
+};
+
 function findSurgePullbackSetup(bars: KLine[], close: number, ma20?: number, ma60?: number): SurgePullbackSetup | undefined {
   if (bars.length < 35) return undefined;
 
@@ -122,6 +132,67 @@ function findSurgePullbackSetup(bars: KLine[], close: number, ma20?: number, ma6
   return best;
 }
 
+function normalizeDate(value?: string) {
+  return String(value ?? "").slice(0, 10);
+}
+
+function previousDailyBar(bars: KLine[], quoteDate: string) {
+  const candidates = bars.filter((bar) => !quoteDate || normalizeDate(bar.t) < quoteDate);
+  return last(candidates) ?? last(bars.slice(0, -1));
+}
+
+function findIntradayBurstSetup(args: {
+  intraday30m?: KLine[];
+  dailyBars: KLine[];
+  quote: RealQuote;
+  amount: number;
+  pct: number;
+}): IntradayBurstSetup | undefined {
+  const bars = byDateAsc(args.intraday30m ?? []).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && Number.isFinite(bar.a) && bar.a > 0);
+  if (bars.length < 24) return undefined;
+
+  const quoteDate = normalizeDate(args.quote.t) || normalizeDate(last(args.dailyBars)?.t);
+  const previousDay = previousDailyBar(args.dailyBars, quoteDate);
+  const dailyAmountRatio = previousDay?.a ? safeDivide(args.amount, previousDay.a, 0) : 0;
+  if (dailyAmountRatio < 3) return undefined;
+
+  const recentStart = Math.max(20, bars.length - 12);
+  let best: IntradayBurstSetup | undefined;
+
+  for (let index = recentStart; index < bars.length; index += 1) {
+    const bar = bars[index];
+    const previous = bars[index - 1];
+    if (!bar || !previous) continue;
+
+    const intradayPct = pctChange(bar.c, previous.c);
+    const avgAmount = average(bars.slice(Math.max(0, index - 20), index).map((item) => item.a));
+    const intradayAmountRatio = safeDivide(bar.a, avgAmount, 0);
+    const barCloseLocation = closeLocation(bar.c, bar.h, bar.l);
+
+    if (intradayAmountRatio < 5 || intradayPct < 2.5 || barCloseLocation < 0.58) continue;
+
+    const score = clamp(
+      58 +
+        Math.min(18, (intradayAmountRatio - 5) * 2.4) +
+        Math.min(14, (dailyAmountRatio - 3) * 3.2) +
+        Math.min(12, (intradayPct - 2.5) * 4) +
+        (barCloseLocation >= 0.72 ? 8 : 2)
+    );
+    const setup = {
+      score,
+      barTime: String(bar.t ?? ""),
+      intradayPct: round(intradayPct, 1),
+      intradayAmountRatio: round(intradayAmountRatio, 2),
+      dailyAmountRatio: round(dailyAmountRatio, 2),
+      dailyPct: round(args.pct, 2)
+    };
+
+    if (!best || setup.score > best.score) best = setup;
+  }
+
+  return best;
+}
+
 function ratingFromSetup(args: {
   score: number;
   risks: string[];
@@ -138,7 +209,17 @@ function ratingFromSetup(args: {
   amountRatio20: number;
   surgePullbackScore: number;
   hasSurgePullbackSetup: boolean;
+  intradayBurstScore: number;
+  hasIntradayBurstSetup: boolean;
 }) {
+  const burstEntryZone =
+    args.hasIntradayBurstSetup &&
+    args.intradayBurstScore >= 78 &&
+    args.score >= 78 &&
+    args.priceVolumeScore >= 55 &&
+    args.pctChange >= 2 &&
+    args.risks.length <= 3;
+
   const classicEntryZone =
     args.score >= 83 &&
     args.risks.length <= 2 &&
@@ -168,9 +249,12 @@ function ratingFromSetup(args: {
     args.closeLocation >= 0.28 &&
     !(args.amountRatio20 > 2.4 && args.pctChange < -1.5);
 
-  const isEntryZone = pullbackEntryZone || (classicEntryZone && args.surgePullbackScore >= 58);
+  const legacySupport = pullbackEntryZone || (classicEntryZone && args.surgePullbackScore >= 58);
+  const isEntryZone = burstEntryZone;
 
   if (isEntryZone) return { signal: "strong" as const, rating: "强关注" };
+  if (args.hasIntradayBurstSetup && args.intradayBurstScore >= 72) return { signal: "watch" as const, rating: "观察" };
+  if (legacySupport) return { signal: "watch" as const, rating: "观察" };
   if (args.hasSurgePullbackSetup && args.surgePullbackScore >= 72) return { signal: "watch" as const, rating: "观察" };
   if (args.hasSurgePullbackSetup && args.surgePullbackScore >= 68 && args.score >= 68) return { signal: "watch" as const, rating: "观察" };
   if (args.score >= 72) return { signal: "watch" as const, rating: "观察" };
@@ -192,8 +276,14 @@ function buildReasons(args: {
   priceVolumeScore: number;
   closeLocation: number;
   surgePullback?: SurgePullbackSetup;
+  intradayBurst?: IntradayBurstSetup;
 }) {
   const reasons: string[] = [];
+  if (args.intradayBurst) {
+    reasons.push(
+      `30m大涨${args.intradayBurst.intradayPct}%且${args.intradayBurst.intradayAmountRatio}倍量，日量为前日${args.intradayBurst.dailyAmountRatio}倍`
+    );
+  }
   if (args.surgePullback && args.surgePullback.score >= 72) {
     reasons.push(
       `前期大涨${args.surgePullback.surgePct}%且${args.surgePullback.surgeAmountRatio}倍量启动，回调${args.surgePullback.pullbackFromSurgeHigh}%`
@@ -231,6 +321,7 @@ function buildRisks(args: {
   priceVolumeScore: number;
   closeLocation: number;
   surgePullback?: SurgePullbackSetup;
+  intradayBurst?: IntradayBurstSetup;
   historyLength: number;
 }) {
   const risks: string[] = [];
@@ -244,6 +335,7 @@ function buildRisks(args: {
   if (args.closeLocation < 0.32 && args.amountRatio20 > 1.25) risks.push("放量但收盘位置偏低");
   if (args.surgePullback && args.surgePullback.pullbackAmountRatio > 0.95) risks.push("启动后回调未明显缩量");
   if (args.surgePullback && !args.surgePullback.heldCostArea) risks.push("回调已跌破启动成本区");
+  if (args.intradayBurst && args.intradayBurst.dailyPct >= 7) risks.push("日内涨幅已偏大，避免追高");
   if (args.flowRatio5d < 0) risks.push("近5日大单净流入仍为负");
   if (args.flowPositiveDays5 <= 1) risks.push("资金流入连续性不足");
   if (args.flowAcceleration < -0.012) risks.push("近3日资金流入转弱");
@@ -327,7 +419,7 @@ export function buildTradePlan(args: {
   };
 }
 
-export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): StockPick | null {
+export function scoreCandidate({ stock, quote, history, intraday30m, flows }: ScoreInput): StockPick | null {
   const cleanHistory = byDateAsc(history).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && bar.sf !== 1);
   if (cleanHistory.length < 40) return null;
 
@@ -363,6 +455,8 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
   const distanceToMa60 = ma60 ? pctChange(close, ma60) : 0;
   const surgePullback = findSurgePullbackSetup(cleanHistory, close, ma20, ma60);
   const surgePullbackScore = surgePullback ? surgePullback.score : 38;
+  const intradayBurst = findIntradayBurstSetup({ intraday30m, dailyBars: cleanHistory, quote, amount, pct });
+  const intradayBurstScore = intradayBurst ? intradayBurst.score : 35;
   const latestHigh = Number(quote.h ?? latestBar.h ?? close);
   const latestLow = Number(quote.l ?? latestBar.l ?? close);
   const dayCloseLocation = closeLocation(close, latestHigh, latestLow);
@@ -481,6 +575,7 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     priceVolumeScore,
     closeLocation: dayCloseLocation,
     surgePullback,
+    intradayBurst,
     historyLength: cleanHistory.length
   });
 
@@ -493,12 +588,13 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     volumePricePenalty;
 
   const score = clamp(
-    moneyScore * 0.28 +
-      priceVolumeScore * 0.18 +
-      surgePullbackScore * 0.22 +
-      valueScore * 0.16 +
-      trendScore * 0.1 +
-      liquidityScore * 0.06 -
+    moneyScore * 0.24 +
+      priceVolumeScore * 0.16 +
+      intradayBurstScore * 0.26 +
+      surgePullbackScore * 0.16 +
+      valueScore * 0.09 +
+      trendScore * 0.06 +
+      liquidityScore * 0.03 -
       hardPenalty
   );
   const rating = ratingFromSetup({
@@ -516,7 +612,9 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     closeLocation: dayCloseLocation,
     amountRatio20,
     surgePullbackScore,
-    hasSurgePullbackSetup: Boolean(surgePullback)
+    hasSurgePullbackSetup: Boolean(surgePullback),
+    intradayBurstScore,
+    hasIntradayBurstSetup: Boolean(intradayBurst)
   });
   const reasons = buildReasons({
     flowRatio5d,
@@ -532,7 +630,8 @@ export function scoreCandidate({ stock, quote, history, flows }: ScoreInput): St
     amountRatio20,
     priceVolumeScore,
     closeLocation: dayCloseLocation,
-    surgePullback
+    surgePullback,
+    intradayBurst
   });
   const tradePlan = buildTradePlan({
     signal: rating.signal,
