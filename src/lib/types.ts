@@ -158,6 +158,22 @@ export type BearishIntradayBurstEvidence = {
   bodyPct: number;
 };
 
+export type DataQuality = {
+  status: "ok" | "partial" | "stale" | "pre_open";
+  label: string;
+  generatedAt: string;
+  latestQuoteTime?: string;
+  quoteDate?: string;
+  totalQuotes: number;
+  universeQuotes: number;
+  validQuotes: number;
+  validQuoteRatio: number;
+  missingAmountRatio: number;
+  missingTurnoverRatio: number;
+  missingVolumeRatio: number;
+  notes: string[];
+};
+
 export type StockPick = {
   rank: number;
   code: string;
@@ -237,6 +253,7 @@ export type ScanReport = {
     watch: number;
   };
   market?: MarketRegime;
+  dataQuality?: DataQuality;
   concentration?: SectorConcentrationReport;
   changes?: DailyChangeSummary;
   picks: StockPick[];

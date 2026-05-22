@@ -155,6 +155,13 @@ function reviewSummary(review?: ReviewReport) {
   return `复盘：累计核心信号 ${review.summary.totalSignals} 只，追踪中 ${review.summary.tracking} 只，5日完成 ${fiveDay.completed} 只，5日胜率 ${winRate}，5日均值 ${avgReturn}${health}。`;
 }
 
+function dataQualityText(report: ScanReport) {
+  const quality = report.dataQuality;
+  if (!quality) return `数据模式：${report.meta.mode === "live" ? "真实数据" : "样例数据"}`;
+  const notes = quality.notes.length ? `；${quality.notes.join("；")}` : "";
+  return `数据质量：${quality.label}，有效报价 ${quality.validQuoteRatio}%，缺成交额 ${quality.missingAmountRatio}%，缺量比 ${quality.missingVolumeRatio}%${notes}`;
+}
+
 function buildText(report: ScanReport, review?: ReviewReport) {
   const marketLabel = report.market ? `${report.market.label} / ${round(report.market.score, 1)}分` : "未计算";
   const lines = [
@@ -163,7 +170,7 @@ function buildText(report: ScanReport, review?: ReviewReport) {
     `市场：${marketLabel}`,
     `节奏：${marketAction(report)}`,
     `核心强关注：${report.picks.length} 只；观察：${report.watchlist.length} 只；等待：${report.avoided.length} 只`,
-    `数据模式：${report.meta.mode === "live" ? "真实数据" : "样例数据"}`,
+    dataQualityText(report),
     "",
     ...changeSummaryText(report),
     "",
@@ -271,6 +278,7 @@ function healthHtml(review?: ReviewReport) {
 function buildHtml(report: ScanReport, review?: ReviewReport) {
   const subjectDate = escapeHtml(report.meta.tradeDate);
   const marketLabel = report.market ? `${report.market.label} / ${round(report.market.score, 1)}分` : "未计算";
+  const quality = report.dataQuality;
   const cards = report.picks.length
     ? report.picks.map(pickCard).join("")
     : `<tr><td style="padding:14px 12px;border-bottom:1px solid #e5e7eb;color:#374151;">今日没有符合强关注条件的主板非 ST 标的。</td></tr>`;
@@ -287,6 +295,11 @@ function buildHtml(report: ScanReport, review?: ReviewReport) {
         <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;">
           <div style="font-weight:700;margin-bottom:6px;">今日节奏</div>
           <div style="color:#374151;line-height:1.7;">${escapeHtml(marketAction(report))}</div>
+          ${
+            quality
+              ? `<div style="margin-top:8px;color:#4b5563;line-height:1.7;">数据质量：${escapeHtml(quality.label)} · 有效报价 ${quality.validQuoteRatio}% · 缺成交额 ${quality.missingAmountRatio}% · 缺量比 ${quality.missingVolumeRatio}%</div>`
+              : ""
+          }
         </div>
         ${changeSummaryHtml(report)}
         ${healthHtml(review)}

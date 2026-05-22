@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
+import { round } from "../src/lib/math";
 import { scoreCandidate } from "../src/lib/scoring";
 import { attachSector, buildConcentrationReport, downgradeForConcentration } from "../src/lib/sector";
 import type {
+  DataQuality,
   DailyChangeItem,
   KLine,
   MarketRegime,
@@ -398,11 +400,92 @@ function chinaDateTime(date = new Date()) {
     .replace(/\//g, "-");
 }
 
+function chinaTradeDate(date = new Date()) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  })
+    .format(date)
+    .replace(/\//g, "-");
+}
+
 function keepPreviousReport(reason: string) {
   if (!existsSync(outputPath)) return false;
   console.warn(`[scan] ${reason}`);
   console.warn(`[scan] keeping existing report at ${outputPath}`);
   return true;
+}
+
+function quoteDate(value?: string) {
+  return String(value ?? "").slice(0, 10);
+}
+
+function hasPositive(value?: number) {
+  return Number.isFinite(value) && Number(value) > 0;
+}
+
+function buildDataQuality(args: { quotes: RealQuote[]; universe: StockListItem[]; quoteByCode: Map<string, RealQuote> }): DataQuality {
+  const universeQuotes = args.universe.map((stock) => args.quoteByCode.get(plainCode(stock.dm))).filter((quote): quote is RealQuote => Boolean(quote));
+  const latestQuote = [...universeQuotes]
+    .filter((quote) => quote.t)
+    .sort((a, b) => String(b.t).localeCompare(String(a.t)))[0];
+  const latestQuoteTime = latestQuote?.t;
+  const latestQuoteDate = quoteDate(latestQuoteTime);
+  const today = chinaTradeDate();
+  const validQuotes = universeQuotes.filter((quote) => hasPositive(quote.p) && hasPositive(quote.cje)).length;
+  const denominator = Math.max(1, universeQuotes.length);
+  const missingAmount = universeQuotes.filter((quote) => !hasPositive(quote.cje)).length;
+  const missingTurnover = universeQuotes.filter((quote) => !hasPositive(quote.hs) && !hasPositive(quote.tr)).length;
+  const missingVolume = universeQuotes.filter((quote) => !hasPositive(quote.lb)).length;
+  const validQuoteRatio = validQuotes / denominator;
+  const missingAmountRatio = missingAmount / denominator;
+  const missingTurnoverRatio = missingTurnover / denominator;
+  const missingVolumeRatio = missingVolume / denominator;
+  const notes: string[] = [];
+
+  if (latestQuoteDate && latestQuoteDate < today) notes.push(`最新行情日期 ${latestQuoteDate} 早于当前日期 ${today}`);
+  if (validQuoteRatio < 0.15) notes.push("有效成交报价比例极低，可能处于盘前或接口未完成刷新");
+  if (missingAmountRatio > 0.5) notes.push("多数主板标的缺少成交额");
+  if (missingTurnoverRatio > 0.5) notes.push("多数主板标的缺少换手率");
+  if (missingVolumeRatio > 0.5) notes.push("多数主板标的缺少量比，页面会优先参考成交额倍数");
+
+  const status: DataQuality["status"] =
+    validQuoteRatio < 0.15
+      ? "pre_open"
+      : latestQuoteDate && latestQuoteDate < today
+        ? "stale"
+        : missingAmountRatio > 0.35 || missingTurnoverRatio > 0.35
+          ? "partial"
+          : "ok";
+  const label = status === "ok" ? "正常" : status === "partial" ? "部分缺失" : status === "stale" ? "行情滞后" : "盘前/无成交";
+
+  return {
+    status,
+    label,
+    generatedAt: chinaDateTime(),
+    latestQuoteTime,
+    quoteDate: latestQuoteDate || undefined,
+    totalQuotes: args.quotes.length,
+    universeQuotes: universeQuotes.length,
+    validQuotes,
+    validQuoteRatio: round(validQuoteRatio * 100, 1),
+    missingAmountRatio: round(missingAmountRatio * 100, 1),
+    missingTurnoverRatio: round(missingTurnoverRatio * 100, 1),
+    missingVolumeRatio: round(missingVolumeRatio * 100, 1),
+    notes
+  };
+}
+
+function mergeKLines(...groups: KLine[][]) {
+  const byTime = new Map<string, KLine>();
+  for (const group of groups) {
+    for (const bar of group) {
+      if (bar?.t) byTime.set(String(bar.t), bar);
+    }
+  }
+  return [...byTime.values()].sort((a, b) => String(a.t).localeCompare(String(b.t)));
 }
 
 function chinaDateCompact(daysOffset = 0) {
@@ -570,6 +653,7 @@ async function liveScan() {
   console.log("[scan] fetching all realtime quotes");
   const quotes = await client.allRealtime();
   const quoteByCode = new Map(quotes.map((quote) => [plainCode(quote.dm), quote]));
+  const dataQuality = buildDataQuality({ quotes, universe, quoteByCode });
 
   const roughCandidates = universe
     .map((stock) => {
@@ -588,7 +672,7 @@ async function liveScan() {
 
   if (!roughCandidates.length) {
     const quoteTime = quotes.find((quote) => quote.t)?.t ?? "unknown";
-    const message = `No scan candidates found at ${quoteTime}. The market data may be pre-open, stale, or missing turnover.`;
+    const message = `No scan candidates found at ${quoteTime}. Data quality: ${dataQuality.label}, valid quotes ${dataQuality.validQuoteRatio}%.`;
     if (keepPreviousReport(message)) return;
     throw new Error(`${message} No previous report exists.`);
   }
@@ -599,14 +683,19 @@ async function liveScan() {
     const instrument = toInstrumentCode(stock.dm, exchange);
     try {
       const code = plainCode(stock.dm);
-      const [history, intraday30m, flows] = await Promise.all([
+      const [history, history30m, latest30m, flows] = await Promise.all([
         client.history(instrument, config.historyDays),
         client.history30m(instrument, config.intraday30mDays).catch((error) => {
           console.warn(`[scan] 30m history ${instrument} skipped: ${(error as Error).message}`);
           return [];
         }),
+        client.latest30m(instrument, Math.min(config.intraday30mDays, 96)).catch((error) => {
+          console.warn(`[scan] 30m latest ${instrument} skipped: ${(error as Error).message}`);
+          return [];
+        }),
         client.moneyFlow(code, config.flowDays)
       ]);
+      const intraday30m = mergeKLines(history30m, latest30m).slice(-Math.max(config.intraday30mDays, latest30m.length));
       const pick = scoreCandidate({ stock, quote, history, intraday30m, flows });
       if ((index + 1) % 25 === 0) console.log(`[scan] processed ${index + 1}/${roughCandidates.length}`);
       return pick;
@@ -657,6 +746,7 @@ async function liveScan() {
       watch: watchlist.length
     },
     market,
+    dataQuality,
     concentration,
     picks,
     watchlist,

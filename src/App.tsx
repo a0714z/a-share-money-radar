@@ -865,6 +865,8 @@ function SystemStatusPanel({
 }) {
   const reportFresh = report.meta.tradeDate === review.records[0]?.signalDate || review.meta.historyReports > 0;
   const dataTone = status === "live" ? "tag-ok" : status === "loading" ? "tag-warn" : "tag-warn";
+  const quality = report.dataQuality;
+  const qualityTone = quality?.status === "ok" ? "tag-ok" : quality?.status === "partial" ? "tag-warn" : "tag-risk";
 
   return (
     <section className="status-panel">
@@ -896,7 +898,18 @@ function SystemStatusPanel({
           <span>交易计划命中</span>
           <strong>{review.summary.planReplay?.target1HitRate !== undefined ? `${review.summary.planReplay.target1HitRate}%` : "追踪中"}</strong>
         </div>
+        {quality && (
+          <div>
+            <Activity size={16} />
+            <span>数据质量</span>
+            <strong>{quality.label}</strong>
+            <small className={qualityTone}>
+              有效 {quality.validQuoteRatio}% · 缺量比 {quality.missingVolumeRatio}%
+            </small>
+          </div>
+        )}
       </div>
+      {quality?.notes.length ? <p className="data-quality-note">{quality.notes.join("；")}</p> : null}
     </section>
   );
 }

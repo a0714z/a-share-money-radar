@@ -136,6 +136,21 @@ export const sampleReport: ScanReport = {
     strong: 2,
     watch: 4
   },
+  dataQuality: {
+    status: "ok",
+    label: "正常",
+    generatedAt: "2026-05-19 22:15:00",
+    latestQuoteTime: "2026-05-19 15:00:00",
+    quoteDate: "2026-05-19",
+    totalQuotes: 5360,
+    universeQuotes: 3158,
+    validQuotes: 3092,
+    validQuoteRatio: 97.9,
+    missingAmountRatio: 1.3,
+    missingTurnoverRatio: 2.2,
+    missingVolumeRatio: 3.1,
+    notes: []
+  },
   market: {
     state: "strong",
     label: "强势",
