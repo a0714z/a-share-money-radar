@@ -641,21 +641,21 @@ a {
   max-height: calc(100vh - 330px);
 }
 
-table {
+.table-wrap table {
   width: 100%;
   min-width: 1080px;
   border-collapse: collapse;
 }
 
-th,
-td {
+.table-wrap th,
+.table-wrap td {
   padding: 13px 14px;
   border-bottom: 1px solid #edf1ee;
   text-align: left;
   white-space: nowrap;
 }
 
-th {
+.table-wrap th {
   position: sticky;
   top: 0;
   z-index: 1;
@@ -665,14 +665,14 @@ th {
   font-weight: 800;
 }
 
-tbody tr {
+.table-wrap tbody tr {
   transition:
     background 0.15s ease,
     box-shadow 0.15s ease;
 }
 
-tbody tr:hover,
-tbody tr.is-selected {
+.table-wrap tbody tr:hover,
+.table-wrap tbody tr.is-selected {
   background: #edf7f2;
 }
 
@@ -1309,6 +1309,21 @@ tbody tr.is-selected {
   min-height: 380px;
 }
 
+.chart-attribution {
+  display: block;
+  margin-top: 4px;
+  color: #9aa39c;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: right;
+  text-decoration: none;
+}
+
+.chart-attribution:hover {
+  color: #526057;
+}
+
 .history-card {
   margin-top: 14px;
   padding: 14px 8px 8px;
@@ -1707,41 +1722,41 @@ tbody tr.is-selected {
     overflow: visible;
   }
 
-  table,
-  thead,
-  tbody,
-  tr,
-  th,
-  td {
+  .table-wrap table,
+  .table-wrap thead,
+  .table-wrap tbody,
+  .table-wrap tr,
+  .table-wrap th,
+  .table-wrap td {
     display: block;
   }
 
-  table {
+  .table-wrap table {
     min-width: 0;
   }
 
-  thead {
+  .table-wrap thead {
     display: none;
   }
 
-  tbody {
+  .table-wrap tbody {
     display: grid;
     gap: 10px;
   }
 
-  tbody tr {
+  .table-wrap tbody tr {
     padding: 12px;
     border: 1px solid #e2e8e4;
     border-radius: 8px;
     background: #ffffff;
   }
 
-  tbody tr:hover,
-  tbody tr.is-selected {
+  .table-wrap tbody tr:hover,
+  .table-wrap tbody tr.is-selected {
     background: #edf7f2;
   }
 
-  td {
+  .table-wrap td {
     display: grid;
     grid-template-columns: minmax(88px, 0.42fr) minmax(0, 1fr);
     align-items: baseline;
@@ -1751,11 +1766,11 @@ tbody tr.is-selected {
     white-space: normal;
   }
 
-  td:last-child {
+  .table-wrap td:last-child {
     border-bottom: 0;
   }
 
-  td::before {
+  .table-wrap td::before {
     content: attr(data-label);
     color: #657168;
     font-size: 12px;

@@ -392,18 +392,24 @@ function KLineChart({ pick }: { pick: StockPick }) {
       layout: {
         background: { type: ColorType.Solid, color: "#ffffff" },
         textColor: "#526057",
-        fontFamily: "Inter, PingFang SC, Microsoft YaHei, Arial, sans-serif"
+        fontFamily: "Inter, PingFang SC, Microsoft YaHei, Arial, sans-serif",
+        attributionLogo: false
       },
       grid: {
         vertLines: { color: "#edf1ee" },
         horzLines: { color: "#edf1ee" }
       },
+      leftPriceScale: {
+        visible: false
+      },
       rightPriceScale: {
         borderColor: "#dfe7e2",
+        minimumWidth: container.clientWidth < 520 ? 48 : 56,
         scaleMargins: { top: 0.08, bottom: 0.28 }
       },
       timeScale: {
         borderColor: "#dfe7e2",
+        rightOffset: 2,
         timeVisible: active.key === "30m",
         secondsVisible: false
       },
@@ -426,7 +432,9 @@ function KLineChart({ pick }: { pick: StockPick }) {
     const volumeSeries = chart.addHistogramSeries({
       priceFormat: { type: "volume" },
       priceScaleId: "",
-      base: 0
+      base: 0,
+      priceLineVisible: false,
+      lastValueVisible: false
     });
     volumeSeries.priceScale().applyOptions({
       scaleMargins: { top: 0.78, bottom: 0 }
@@ -482,12 +490,13 @@ function KLineChart({ pick }: { pick: StockPick }) {
     ma20Series.setData(ma20);
     ma60Series.setData(ma60);
 
+    const visibleBarCount = () => Math.min(candles.length, container.clientWidth < 520 ? 64 : active.key === "30m" ? 72 : 92);
     const applyVisibleRange = () => {
-      const visibleBars = active.key === "30m" ? 48 : 48;
-      chart.timeScale().setVisibleLogicalRange({
-        from: Math.max(0, candles.length - visibleBars),
-        to: candles.length + 2
-      });
+      const visibleBars = visibleBarCount();
+      const rightOffset = container.clientWidth < 520 ? 1 : 2;
+      const fromIndex = Math.max(0, candles.length - visibleBars);
+      chart.timeScale().applyOptions({ rightOffset });
+      chart.timeScale().setVisibleRange({ from: candles[fromIndex].time, to: candles[candles.length - 1].time });
     };
     applyVisibleRange();
 
@@ -529,6 +538,9 @@ function KLineChart({ pick }: { pick: StockPick }) {
         <span>{active.points.length} 根</span>
       </div>
       <div ref={containerRef} className="kline-canvas" />
+      <a className="chart-attribution" href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
+        图表技术支持 TradingView
+      </a>
     </div>
   );
 }
