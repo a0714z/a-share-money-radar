@@ -120,7 +120,7 @@ function ChangeItemList({ items, empty }: { items: DailyChangeItem[]; empty: str
           ? `${item.currentSetupState}${item.setupAgeDays ? ` · ${item.setupAgeDays}天` : ""}`
           : item.sector ?? "未分组";
         return (
-          <div key={item.instrument} className="change-item">
+          <a key={item.instrument} className="change-item" href={stockHash(item.instrument)} aria-label={`打开 ${item.name} 详情`}>
             <div>
               <strong>{item.name}</strong>
               <span className="code">{item.instrument}</span>
@@ -129,7 +129,7 @@ function ChangeItemList({ items, empty }: { items: DailyChangeItem[]; empty: str
               <span>{stageText}</span>
               <strong>{item.score !== undefined ? item.score.toFixed(1) : "-"}</strong>
             </div>
-          </div>
+          </a>
         );
       })}
     </div>

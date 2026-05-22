@@ -384,6 +384,21 @@ a {
   border: 1px solid #e7ece9;
   border-radius: 8px;
   background: #ffffff;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.change-item:hover,
+.change-item:focus-visible {
+  border-color: #b9cdc1;
+  box-shadow: 0 8px 18px rgba(20, 32, 26, 0.08);
+  outline: none;
+  transform: translateY(-1px);
 }
 
 .change-item strong,
