@@ -313,6 +313,7 @@ export type PlanReport = {
     source: string;
     mode: "live" | "sample";
     lookbackDays: number;
+    setupWindowDays: number;
     intraday30mBars: number;
     notes: string[];
   };

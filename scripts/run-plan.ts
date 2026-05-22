@@ -17,6 +17,7 @@ dotenv.config({ path: resolve(root, ".env"), override: false });
 
 type PlanConfig = {
   historyDays: number;
+  setupWindowDays: number;
   intraday30mBars: number;
   dailyCandidateLimit: number;
   topN: number;
@@ -52,7 +53,8 @@ function intEnv(name: string, fallback: number) {
 
 function configFromEnv(): PlanConfig {
   return {
-    historyDays: intEnv("PLAN_HISTORY_DAYS", 260),
+    historyDays: intEnv("PLAN_HISTORY_DAYS", 80),
+    setupWindowDays: intEnv("PLAN_SETUP_WINDOW_DAYS", 20),
     intraday30mBars: intEnv("PLAN_30M_BARS", 160),
     dailyCandidateLimit: intEnv("PLAN_DAILY_CANDIDATE_LIMIT", 260),
     topN: intEnv("PLAN_TOP_N", 40),
@@ -121,9 +123,9 @@ async function writeReport(report: PlanReport) {
   console.log(`[plan] wrote ${outputPath}`);
 }
 
-function evaluateDailySetup(stock: StockListItem, history: KLine[], minAmount: number): DailySetup | undefined {
+function evaluateDailySetup(stock: StockListItem, history: KLine[], minAmount: number, setupWindowDays: number): DailySetup | undefined {
   const bars = byDateAsc(history).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && bar.sf !== 1);
-  if (bars.length < 80) return undefined;
+  if (bars.length < 40) return undefined;
 
   const latestIndex = bars.length - 1;
   const latest = bars[latestIndex];
@@ -134,7 +136,7 @@ function evaluateDailySetup(stock: StockListItem, history: KLine[], minAmount: n
   const ma20 = last(movingAverage(closes, 20));
   const ma60 = last(movingAverage(closes, 60));
   let best: DailySetup | undefined;
-  const start = Math.max(30, bars.length - 45);
+  const start = Math.max(20, bars.length - setupWindowDays);
 
   for (let index = start; index <= latestIndex; index += 1) {
     const surge = bars[index];
@@ -145,7 +147,7 @@ function evaluateDailySetup(stock: StockListItem, history: KLine[], minAmount: n
     const avgAmount20 = average(bars.slice(Math.max(0, index - 20), index).map((bar) => bar.a));
     const surgeAmountRatio = safeDivide(surge.a, avgAmount20, 0);
     const daysSinceSurge = latestIndex - index;
-    if (surgePct < 7 || surgeAmountRatio < 2 || surge.c <= surge.o || closeLocation(surge) < 0.58 || daysSinceSurge > 20) continue;
+    if (surgePct < 7 || surgeAmountRatio < 2 || surge.c <= surge.o || closeLocation(surge) < 0.58 || daysSinceSurge > setupWindowDays) continue;
 
     const after = bars.slice(index + 1);
     const bodyMidpoint = (surge.o + surge.c) / 2;
@@ -271,7 +273,7 @@ async function runPlan() {
     try {
       const history = await client.history(toInstrumentCode(stock.dm, inferExchange(stock.dm, stock.jys)), config.historyDays);
       if ((index + 1) % 200 === 0) console.log(`[plan] daily ${index + 1}/${universe.length}`);
-      return evaluateDailySetup(stock, history, config.minAmount);
+      return evaluateDailySetup(stock, history, config.minAmount, config.setupWindowDays);
     } catch (error) {
       console.warn(`[plan] daily skip ${stock.dm} ${stock.mc}: ${(error as Error).message}`);
       return undefined;
@@ -318,9 +320,10 @@ async function runPlan() {
       source: "Biying API",
       mode: "live",
       lookbackDays: config.historyDays,
+      setupWindowDays: config.setupWindowDays,
       intraday30mBars: config.intraday30mBars,
       notes: [
-        "预案先用半年到一年日K寻找爆量阳线后的缩量回调、承接和成本区，再用30m K线确认承接、二次突破和放量阴线风险。",
+        `预案只在最近 ${config.setupWindowDays} 个交易日内寻找爆量阳线后的缩量回调、承接和成本区，再用30m K线确认承接、二次突破和放量阴线风险。`,
         "预案用于盘前准备；盘中分钟扫描只负责验证触发、失效和风险升级。"
       ]
     },

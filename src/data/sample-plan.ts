@@ -7,9 +7,10 @@ export const samplePlan: PlanReport = {
     tradeDate: sampleReport.meta.tradeDate,
     source: "Sample",
     mode: "sample",
-    lookbackDays: 260,
+    lookbackDays: 80,
+    setupWindowDays: 20,
     intraday30mBars: 160,
-    notes: ["样例预案用于页面占位；真实预案需要服务器运行 npm run plan。"]
+    notes: ["样例预案用于页面占位；真实预案只在最近20个交易日内寻找爆量回调结构。"]
   },
   summary: {
     universe: sampleReport.universe.mainBoardNonSt,

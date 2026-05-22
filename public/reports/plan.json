@@ -4,10 +4,11 @@
     "tradeDate": "待服务器生成",
     "source": "Biying API",
     "mode": "sample",
-    "lookbackDays": 260,
+    "lookbackDays": 80,
+    "setupWindowDays": 20,
     "intraday30mBars": 160,
     "notes": [
-      "预案先用半年到一年日K寻找爆量阳线后的缩量回调、承接和成本区，再用30m K线确认承接、二次突破和放量阴线风险。"
+      "预案只在最近20个交易日内寻找爆量阳线后的缩量回调、承接和成本区，再用30m K线确认承接、二次突破和放量阴线风险。"
     ]
   },
   "summary": {

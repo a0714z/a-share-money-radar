@@ -1329,7 +1329,7 @@ function PlanPanel({ plan, reviewRecords }: { plan: PlanReport; reviewRecords: R
             <div>
               <h2>盘前交易预案</h2>
               <span>
-                {plan.meta.generatedAt} · 日K {plan.meta.lookbackDays} 天 · 30m {plan.meta.intraday30mBars} 根
+                {plan.meta.generatedAt} · 形态近 {plan.meta.setupWindowDays ?? plan.meta.lookbackDays} 天 · 背景K {plan.meta.lookbackDays} 天 · 30m {plan.meta.intraday30mBars} 根
               </span>
             </div>
           </div>
