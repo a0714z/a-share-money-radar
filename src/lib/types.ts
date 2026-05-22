@@ -118,6 +118,46 @@ export type TradePlan = {
   notes: string[];
 };
 
+export type IntradayBurstEvidence = {
+  score: number;
+  supportScore: number;
+  tradeDate: string;
+  barTime: string;
+  daysSince: number;
+  intradayPct: number;
+  intradayAmountRatio: number;
+  dailyAmountRatio: number;
+  dailyPct: number;
+  followBars: number;
+  burstLow: number;
+  burstHigh: number;
+  bodyMidpoint: number;
+  brokeBurstLow: boolean;
+  heldBodyMidpoint: boolean;
+  pullbackAmountRatio: number;
+  heavySelloff: boolean;
+  breakoutConfirmed: boolean;
+  brokeBurstDayLow: boolean;
+  weakDriftDays: number;
+};
+
+export type SurgePullbackEvidence = {
+  score: number;
+  daysSince: number;
+  surgePct: number;
+  surgeAmountRatio: number;
+  pullbackFromSurgeHigh: number;
+  pullbackAmountRatio: number;
+  heldCostArea: boolean;
+};
+
+export type BearishIntradayBurstEvidence = {
+  barTime: string;
+  tradeDate: string;
+  intradayAmountRatio: number;
+  bodyPct: number;
+};
+
 export type StockPick = {
   rank: number;
   code: string;
@@ -138,6 +178,9 @@ export type StockPick = {
   amount: number;
   turnover: number;
   volumeRatio: number;
+  amountRatio20?: number;
+  amountRatio5?: number;
+  priceVolumeScore?: number;
   marketCap?: number;
   pe?: number;
   pb?: number;
@@ -163,6 +206,9 @@ export type StockPick = {
     maxPerSector: number;
     demoted: boolean;
   };
+  intradayBurst?: IntradayBurstEvidence;
+  surgePullback?: SurgePullbackEvidence;
+  bearishIntradayBurst?: BearishIntradayBurstEvidence;
   reasons: string[];
   risks: string[];
   history: SparkPoint[];

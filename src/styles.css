@@ -1324,6 +1324,61 @@ a {
   color: #526057;
 }
 
+.evidence-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.evidence-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.evidence-state {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.evidence-grid div {
+  min-height: 82px;
+  padding: 10px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.evidence-grid span,
+.evidence-grid small {
+  display: block;
+  color: #657168;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.evidence-grid strong {
+  display: block;
+  margin: 7px 0 5px;
+  color: #14201a;
+  font-size: 17px;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
 .history-card {
   margin-top: 14px;
   padding: 14px 8px 8px;
@@ -1554,6 +1609,7 @@ a {
   }
 
   .detail-grid,
+  .evidence-grid,
   .trade-plan-grid,
   .review-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2164,6 +2220,7 @@ a {
   .chart-block,
   .kline-block,
   .history-card,
+  .evidence-panel,
   .trade-plan {
     margin-top: 10px;
   }
@@ -2184,6 +2241,15 @@ a {
   .kline-canvas {
     min-height: 320px;
   }
+
+  .evidence-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .evidence-state {
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 360px) {
@@ -2201,5 +2267,9 @@ a {
 
   .mobile-review-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .evidence-grid {
+    grid-template-columns: 1fr;
   }
 }

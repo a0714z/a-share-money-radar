@@ -26,7 +26,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { ColorType, CrosshairMode, createChart } from "lightweight-charts";
+import { ColorType, CrosshairMode, LineStyle, createChart } from "lightweight-charts";
 import { sampleReport } from "./data/sample-report";
 import { sampleReview } from "./data/sample-review";
 import type {
@@ -370,6 +370,18 @@ function chartVolumeLabel(points: StockPick["history"]) {
   return hasVolume ? "成交量" : "成交额";
 }
 
+function ratioText(value?: number) {
+  return Number.isFinite(value) ? `${Number(value).toFixed(2)}x` : "-";
+}
+
+function scoreText(value?: number) {
+  return Number.isFinite(value) ? `${Number(value).toFixed(0)}分` : "-";
+}
+
+function sameChartDate(left?: string, right?: string) {
+  return String(left ?? "").slice(0, 16) === String(right ?? "").slice(0, 16);
+}
+
 function KLineChart({ pick }: { pick: StockPick }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [frame, setFrame] = useState<ChartFrame>("daily");
@@ -490,6 +502,81 @@ function KLineChart({ pick }: { pick: StockPick }) {
     ma20Series.setData(ma20);
     ma60Series.setData(ma60);
 
+    const markers = [];
+    if (pick.intradayBurst) {
+      const burstIndex =
+        active.key === "30m"
+          ? sorted.findIndex((point) => sameChartDate(point.date, pick.intradayBurst?.barTime))
+          : sorted.findIndex((point) => point.date.slice(0, 10) === pick.intradayBurst?.tradeDate);
+      if (burstIndex >= 0 && candles[burstIndex]) {
+        markers.push({
+          time: candles[burstIndex].time,
+          position: "belowBar" as const,
+          color: "#0f766e",
+          shape: "arrowUp" as const,
+          text: active.key === "30m" ? `爆量 ${ratioText(pick.intradayBurst.intradayAmountRatio)}` : `日量 ${ratioText(pick.intradayBurst.dailyAmountRatio)}`
+        });
+      }
+      if (active.key === "30m" && pick.intradayBurst.breakoutConfirmed && burstIndex >= 0) {
+        const breakoutIndex = sorted.findIndex((point, index) => {
+          const close = Number(point.close);
+          const open = Number.isFinite(point.open) ? Number(point.open) : close;
+          return index > burstIndex && close > pick.intradayBurst!.burstHigh * 1.01 && close > open;
+        });
+        if (breakoutIndex >= 0 && candles[breakoutIndex]) {
+          markers.push({
+            time: candles[breakoutIndex].time,
+            position: "belowBar" as const,
+            color: "#2563eb",
+            shape: "circle" as const,
+            text: "二次突破"
+          });
+        }
+      }
+      if (active.key === "30m") {
+        candleSeries.createPriceLine({
+          price: pick.intradayBurst.burstLow,
+          color: "#bd3c3c",
+          lineStyle: LineStyle.Dashed,
+          lineWidth: 1,
+          axisLabelVisible: true,
+          title: "启动低点"
+        });
+        candleSeries.createPriceLine({
+          price: pick.intradayBurst.bodyMidpoint,
+          color: "#9a6a15",
+          lineStyle: LineStyle.Dotted,
+          lineWidth: 1,
+          axisLabelVisible: false,
+          title: "实体中位"
+        });
+        candleSeries.createPriceLine({
+          price: pick.intradayBurst.burstHigh,
+          color: "#0f766e",
+          lineStyle: LineStyle.Dashed,
+          lineWidth: 1,
+          axisLabelVisible: false,
+          title: "爆量高点"
+        });
+      }
+    }
+    if (pick.bearishIntradayBurst) {
+      const bearishIndex =
+        active.key === "30m"
+          ? sorted.findIndex((point) => sameChartDate(point.date, pick.bearishIntradayBurst?.barTime))
+          : sorted.findIndex((point) => point.date.slice(0, 10) === pick.bearishIntradayBurst?.tradeDate);
+      if (bearishIndex >= 0 && candles[bearishIndex]) {
+        markers.push({
+          time: candles[bearishIndex].time,
+          position: "aboveBar" as const,
+          color: "#bd3c3c",
+          shape: "arrowDown" as const,
+          text: `阴量 ${ratioText(pick.bearishIntradayBurst.intradayAmountRatio)}`
+        });
+      }
+    }
+    candleSeries.setMarkers(markers);
+
     const visibleBarCount = () => Math.min(candles.length, container.clientWidth < 520 ? 64 : active.key === "30m" ? 72 : 92);
     const applyVisibleRange = () => {
       const visibleBars = visibleBarCount();
@@ -514,7 +601,7 @@ function KLineChart({ pick }: { pick: StockPick }) {
       window.removeEventListener("resize", resize);
       chart.remove();
     };
-  }, [active]);
+  }, [active, pick.bearishIntradayBurst, pick.intradayBurst]);
 
   return (
     <div className="kline-block">
@@ -541,6 +628,61 @@ function KLineChart({ pick }: { pick: StockPick }) {
       <a className="chart-attribution" href="https://www.tradingview.com/" target="_blank" rel="noreferrer">
         图表技术支持 TradingView
       </a>
+    </div>
+  );
+}
+
+function VolumeEvidencePanel({ pick }: { pick: StockPick }) {
+  const burst = pick.intradayBurst;
+  const surge = pick.surgePullback;
+  const bearish = pick.bearishIntradayBurst;
+  if (!burst && !surge && !bearish && pick.amountRatio20 === undefined && pick.priceVolumeScore === undefined) return null;
+
+  const supportTone = burst?.brokeBurstLow || burst?.brokeBurstDayLow ? "down" : burst?.heldBodyMidpoint ? "up" : "";
+
+  return (
+    <div className="evidence-panel">
+      <div className="evidence-head">
+        <div className="chart-title">
+          <Activity size={16} />
+          <span>量价证据</span>
+        </div>
+        <span className={`evidence-state ${setupStateClass(pick.setupState)}`}>{pick.setupState}</span>
+      </div>
+      <div className="evidence-grid">
+        <div>
+          <span>30m爆量</span>
+          <strong>{burst ? `${ratioText(burst.intradayAmountRatio)} · ${formatPct(burst.intradayPct)}` : "未触发"}</strong>
+          <small>{burst ? `${burst.barTime} · ${burst.daysSince}天前` : "等待新的阳柱爆量"}</small>
+        </div>
+        <div>
+          <span>日K放量</span>
+          <strong>{burst ? `${ratioText(burst.dailyAmountRatio)} · ${formatPct(burst.dailyPct)}` : ratioText(pick.amountRatio20)}</strong>
+          <small>{burst ? `相对前日成交额` : "相对20日均额"}</small>
+        </div>
+        <div>
+          <span>承接质量</span>
+          <strong className={supportTone}>{burst ? scoreText(burst.supportScore) : scoreText(pick.priceVolumeScore)}</strong>
+          <small>{burst?.heldBodyMidpoint ? "守住启动实体中位" : burst ? "承接仍需确认" : "按当日量价评分"}</small>
+        </div>
+        <div>
+          <span>回调缩量</span>
+          <strong>{burst ? ratioText(burst.pullbackAmountRatio) : surge ? ratioText(surge.pullbackAmountRatio) : "-"}</strong>
+          <small>{burst?.pullbackAmountRatio && burst.pullbackAmountRatio <= 0.75 ? "抛压收敛" : "观察回踩量能"}</small>
+        </div>
+        <div>
+          <span>防守线</span>
+          <strong className={burst?.brokeBurstDayLow || burst?.brokeBurstLow ? "down" : ""}>
+            {burst ? `${burst.burstLow.toFixed(2)} / ${burst.bodyMidpoint.toFixed(2)}` : pick.tradePlan ? pick.tradePlan.invalidBelow.toFixed(2) : "-"}
+          </strong>
+          <small>{burst ? "启动低点 / 实体中位" : "交易计划失效位"}</small>
+        </div>
+        <div>
+          <span>阴量风险</span>
+          <strong className={bearish || burst?.heavySelloff ? "down" : "up"}>{bearish ? ratioText(bearish.intradayAmountRatio) : burst?.heavySelloff ? "放量回落" : "未触发"}</strong>
+          <small>{bearish ? `${bearish.tradeDate} · ${formatPct(bearish.bodyPct)}` : "阴柱爆量会减分"}</small>
+        </div>
+      </div>
     </div>
   );
 }
@@ -624,6 +766,7 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
       )}
 
       <KLineChart pick={pick} />
+      <VolumeEvidencePanel pick={pick} />
 
       <div className="detail-grid">
         <div>

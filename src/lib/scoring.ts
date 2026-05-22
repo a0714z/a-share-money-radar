@@ -77,6 +77,9 @@ type IntradayBurstSetup = {
   dailyAmountRatio: number;
   dailyPct: number;
   followBars: number;
+  burstLow: number;
+  burstHigh: number;
+  bodyMidpoint: number;
   brokeBurstLow: boolean;
   heldBodyMidpoint: boolean;
   pullbackAmountRatio: number;
@@ -193,6 +196,9 @@ function evaluateBurstSupport(bars: KLine[], burstIndex: number) {
   return {
     supportScore,
     followBars,
+    burstLow: round(burst.l, 2),
+    burstHigh: round(burst.h, 2),
+    bodyMidpoint: round(bodyMidpoint, 2),
     brokeBurstLow,
     heldBodyMidpoint,
     pullbackAmountRatio: round(pullbackAmountRatio, 2),
@@ -879,6 +885,9 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     amount: round(amount, 0),
     turnover: round(turnover, 2),
     volumeRatio: round(volumeRatio, 2),
+    amountRatio20: round(amountRatio20, 2),
+    amountRatio5: round(amountRatio5, 2),
+    priceVolumeScore: round(priceVolumeScore, 1),
     marketCap: marketCap ? round(marketCap, 0) : undefined,
     pe: pe ? round(pe, 2) : undefined,
     pb: pb ? round(pb, 2) : undefined,
@@ -894,6 +903,9 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     flowRatio5d: round(flowRatio5d * 100, 2),
     dddxAvg: round(dddxAvg, 2),
     tradePlan,
+    intradayBurst,
+    surgePullback,
+    bearishIntradayBurst,
     reasons: reasons.length ? reasons : ["资金和价格条件接近观察区"],
     risks,
     history: historyWithMa,
