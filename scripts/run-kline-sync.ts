@@ -111,6 +111,7 @@ async function run() {
     indexDaily: { requested: !intradayOnly ? MARKET_INDEXES.length : 0, ok: 0, failed: 0, bars: 0 },
     failures: []
   };
+  if (indexOnly) summary.universe = Math.max(summary.daily.requested, summary.intraday30m.requested);
 
   if (!intradayOnly) {
     const end = chinaDateTime().slice(0, 10).replace(/-/g, "");
