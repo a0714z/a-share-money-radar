@@ -174,6 +174,51 @@ export type DataQuality = {
   notes: string[];
 };
 
+export type IntradayPulseItem = {
+  rank: number;
+  code: string;
+  instrument: string;
+  name: string;
+  time: string;
+  price: number;
+  pct: number;
+  minutePct: number;
+  minuteAmount: number;
+  minuteVolume: number;
+  amountBurstRatio: number;
+  dayAmount: number;
+  turnover: number;
+  volumeRatio: number;
+  closeLocation: number;
+  score: number;
+  signal: "hot" | "watch" | "risk";
+  reasons: string[];
+  risks: string[];
+};
+
+export type IntradayPulseReport = {
+  meta: {
+    generatedAt: string;
+    tradeDate: string;
+    source: string;
+    mode: "live";
+    status: "ok" | "missing_license" | "closed" | "error";
+    intervalSeconds: number;
+    notes: string[];
+  };
+  summary: {
+    universe: number;
+    quoted: number;
+    compared: number;
+    hot: number;
+    watch: number;
+    risk: number;
+  };
+  hot: IntradayPulseItem[];
+  watch: IntradayPulseItem[];
+  risk: IntradayPulseItem[];
+};
+
 export type StockPick = {
   rank: number;
   code: string;

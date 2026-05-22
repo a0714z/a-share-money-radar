@@ -221,10 +221,16 @@
           </tr>`).join("")}</tbody>
         </table>`;
       };
+      const statusText = {
+        ok: "Live",
+        missing_license: "Missing license",
+        closed: "Market closed",
+        error: "Error"
+      };
       async function load() {
         const response = await fetch(`reports/intraday.json?t=${Date.now()}`);
         const report = await response.json();
-        document.getElementById("status").textContent = "Live";
+        document.getElementById("status").textContent = statusText[report.meta.status] || "Live";
         document.getElementById("tradeDate").textContent = report.meta.tradeDate;
         document.getElementById("universe").textContent = report.summary.universe.toLocaleString("zh-CN");
         document.getElementById("hot").textContent = report.summary.hot;

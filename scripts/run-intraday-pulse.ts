@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
 import { clamp, round } from "../src/lib/math";
-import type { Exchange, RealQuote, StockListItem } from "../src/lib/types";
+import type { Exchange, IntradayPulseItem, IntradayPulseReport, RealQuote, StockListItem } from "../src/lib/types";
 import { inferExchange, isMainBoardNonSt, plainCode, toInstrumentCode } from "../src/lib/universe";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -53,50 +53,6 @@ type PulseState = {
   stocks?: PulseStock[];
   previous: Record<string, PulseSnapshot>;
   bars: Record<string, PulseBar[]>;
-};
-
-type PulseItem = {
-  rank: number;
-  code: string;
-  instrument: string;
-  name: string;
-  time: string;
-  price: number;
-  pct: number;
-  minutePct: number;
-  minuteAmount: number;
-  minuteVolume: number;
-  amountBurstRatio: number;
-  dayAmount: number;
-  turnover: number;
-  volumeRatio: number;
-  closeLocation: number;
-  score: number;
-  signal: "hot" | "watch" | "risk";
-  reasons: string[];
-  risks: string[];
-};
-
-type PulseReport = {
-  meta: {
-    generatedAt: string;
-    tradeDate: string;
-    source: string;
-    mode: "live";
-    intervalSeconds: number;
-    notes: string[];
-  };
-  summary: {
-    universe: number;
-    quoted: number;
-    compared: number;
-    hot: number;
-    watch: number;
-    risk: number;
-  };
-  hot: PulseItem[];
-  watch: PulseItem[];
-  risk: PulseItem[];
 };
 
 function intEnv(name: string, fallback: number) {
@@ -182,6 +138,32 @@ async function writeJson(path: string, value: unknown) {
   await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
+async function writeStatusReport(status: IntradayPulseReport["meta"]["status"], notes: string[]) {
+  const report: IntradayPulseReport = {
+    meta: {
+      generatedAt: chinaDateTime(),
+      tradeDate: chinaTradeDate(),
+      source: "Biying all-realtime minute pulse",
+      mode: "live",
+      status,
+      intervalSeconds: intEnv("INTRADAY_INTERVAL_SECONDS", 60),
+      notes
+    },
+    summary: {
+      universe: 0,
+      quoted: 0,
+      compared: 0,
+      hot: 0,
+      watch: 0,
+      risk: 0
+    },
+    hot: [],
+    watch: [],
+    risk: []
+  };
+  await writeJson(outputPath, report);
+}
+
 function safeDivide(value: number, base: number, fallback = 0) {
   return Number.isFinite(value) && Number.isFinite(base) && base > 0 ? value / base : fallback;
 }
@@ -242,7 +224,7 @@ function buildItem(args: {
   volumeDelta: number;
   minutePct: number;
   topN: number;
-}): PulseItem | undefined {
+}): IntradayPulseItem | undefined {
   if (args.amountDelta <= 0 || args.current.tradeDate !== args.previous.tradeDate) return undefined;
 
   const previousBars = args.bars.slice(-20);
@@ -277,7 +259,7 @@ function buildItem(args: {
   if (args.current.pct > 8.5) risks.push("涨幅过高，追高性价比下降");
   if (args.current.turnover > 12) risks.push("换手过热");
 
-  const signal: PulseItem["signal"] = heavyBearish ? "risk" : score >= 72 && amountBurstRatio >= 4 ? "hot" : "watch";
+  const signal: IntradayPulseItem["signal"] = heavyBearish ? "risk" : score >= 72 && amountBurstRatio >= 4 ? "hot" : "watch";
   if (signal === "watch" && score < 58) return undefined;
 
   return {
@@ -319,11 +301,16 @@ async function loadUniverse(client: BiyingClient, state: PulseState, tradeDate: 
 async function run() {
   const license = process.env.BIYING_LICENSE;
   if (!license) {
+    await writeStatusReport("missing_license", [
+      "服务器尚未配置 BIYING_LICENSE，分钟级盘中扫描已安装但不会调用接口。",
+      "写入 /etc/a-share-money-radar.env 后，下一次 timer 会自动生成真实数据。"
+    ]);
     console.log(`[intraday] ${chinaDateTime()} BIYING_LICENSE is not configured, skipped`);
     return;
   }
 
   if (process.env.INTRADAY_FORCE !== "1" && process.env.INTRADAY_MARKET_HOURS_ONLY !== "false" && !isTradingWindow()) {
+    await writeStatusReport("closed", ["当前不在 A 股交易时间，分钟级扫描跳过。"]);
     console.log(`[intraday] ${chinaDateTime()} outside A-share trading window, skipped`);
     return;
   }
@@ -343,7 +330,7 @@ async function run() {
   }
   state.tradeDate = tradeDate;
 
-  const compared: PulseItem[] = [];
+  const compared: IntradayPulseItem[] = [];
   const nextPrevious: Record<string, PulseSnapshot> = {};
 
   for (const stock of stocks) {
@@ -380,12 +367,13 @@ async function run() {
   const watch = sorted.filter((item) => item.signal === "watch").slice(0, topN).map((item, index) => ({ ...item, rank: index + 1 }));
   const risk = sorted.filter((item) => item.signal === "risk").slice(0, topN).map((item, index) => ({ ...item, rank: index + 1 }));
 
-  const report: PulseReport = {
+  const report: IntradayPulseReport = {
     meta: {
       generatedAt: chinaDateTime(),
       tradeDate,
       source: "Biying all-realtime minute pulse",
       mode: "live",
+      status: "ok",
       intervalSeconds: intEnv("INTRADAY_INTERVAL_SECONDS", 60),
       notes: [
         "分钟级脉冲只使用全市场实时快照，适合高频盯盘；日线精筛仍由原扫描任务负责。",

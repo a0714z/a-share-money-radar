@@ -4,6 +4,7 @@
     "tradeDate": "待服务器生成",
     "source": "Biying all-realtime minute pulse",
     "mode": "live",
+    "status": "missing_license",
     "intervalSeconds": 60,
     "notes": [
       "分钟级脉冲只使用全市场实时快照，适合高频盯盘；日线精筛仍由原扫描任务负责。",
