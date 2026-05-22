@@ -317,13 +317,16 @@ async function loadUniverse(client: BiyingClient, state: PulseState, tradeDate: 
 }
 
 async function run() {
+  const license = process.env.BIYING_LICENSE;
+  if (!license) {
+    console.log(`[intraday] ${chinaDateTime()} BIYING_LICENSE is not configured, skipped`);
+    return;
+  }
+
   if (process.env.INTRADAY_FORCE !== "1" && process.env.INTRADAY_MARKET_HOURS_ONLY !== "false" && !isTradingWindow()) {
     console.log(`[intraday] ${chinaDateTime()} outside A-share trading window, skipped`);
     return;
   }
-
-  const license = process.env.BIYING_LICENSE;
-  if (!license) throw new Error("Missing BIYING_LICENSE. Set it in .env.local or the server environment.");
 
   const client = new BiyingClient(license);
   const state = await readJson<PulseState>(statePath, { previous: {}, bars: {} });
