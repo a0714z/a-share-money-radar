@@ -130,6 +130,32 @@ function chinaTradeDate(date = new Date()) {
     .replace(/\//g, "-");
 }
 
+function chinaTimeParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).formatToParts(date);
+  const part = (type: string) => parts.find((item) => item.type === type)?.value ?? "";
+  return {
+    weekday: part("weekday"),
+    hour: Number(part("hour")),
+    minute: Number(part("minute"))
+  };
+}
+
+function isTradingWindow(date = new Date()) {
+  const { weekday, hour, minute } = chinaTimeParts(date);
+  if (weekday.includes("六") || weekday.includes("日") || weekday.toLowerCase().includes("sat") || weekday.toLowerCase().includes("sun")) {
+    return false;
+  }
+
+  const current = hour * 60 + minute;
+  return (current >= 9 * 60 + 30 && current <= 11 * 60 + 30) || (current >= 13 * 60 && current <= 15 * 60);
+}
+
 function normalizeTime(value?: string) {
   return String(value ?? chinaDateTime()).replace("T", " ");
 }
@@ -291,6 +317,11 @@ async function loadUniverse(client: BiyingClient, state: PulseState, tradeDate: 
 }
 
 async function run() {
+  if (process.env.INTRADAY_FORCE !== "1" && process.env.INTRADAY_MARKET_HOURS_ONLY !== "false" && !isTradingWindow()) {
+    console.log(`[intraday] ${chinaDateTime()} outside A-share trading window, skipped`);
+    return;
+  }
+
   const license = process.env.BIYING_LICENSE;
   if (!license) throw new Error("Missing BIYING_LICENSE. Set it in .env.local or the server environment.");
 
