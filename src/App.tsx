@@ -365,6 +365,25 @@ function chartTimestamp(date: string) {
   return Math.floor(new Date(normalized).getTime() / 1000);
 }
 
+function chartDateLabel(value: string | number, frame: ChartFrame) {
+  if (typeof value === "string") return value.slice(0, 10);
+  const date = new Date(value * 1000);
+  const yyyyMmDd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+  if (frame === "daily") return yyyyMmDd;
+  const hhMm = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(date);
+  return `${yyyyMmDd} ${hhMm}`;
+}
+
 function chartVolumeLabel(points: StockPick["history"]) {
   const hasVolume = points.some((point) => Number.isFinite(point.volume) && Number(point.volume) > 0);
   return hasVolume ? "成交量" : "成交额";
@@ -423,13 +442,15 @@ function KLineChart({ pick }: { pick: StockPick }) {
         borderColor: "#dfe7e2",
         rightOffset: 2,
         timeVisible: active.key === "30m",
-        secondsVisible: false
+        secondsVisible: false,
+        tickMarkFormatter: (time: string | number) => chartDateLabel(time, active.key)
       },
       crosshair: {
         mode: CrosshairMode.Normal
       },
       localization: {
-        priceFormatter: (price: number) => price.toFixed(2)
+        priceFormatter: (price: number) => price.toFixed(2),
+        timeFormatter: (time: string | number) => chartDateLabel(time, active.key)
       }
     });
 
