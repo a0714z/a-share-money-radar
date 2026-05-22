@@ -10,6 +10,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "scan": "tsx scripts/run-scan.ts",
     "plan": "tsx scripts/run-plan.ts",
+    "kline:sync": "tsx scripts/run-kline-sync.ts",
     "intraday:pulse": "tsx scripts/run-intraday-pulse.ts",
     "scan:sample": "tsx scripts/run-scan.ts --sample",
     "review": "tsx scripts/run-review.ts",

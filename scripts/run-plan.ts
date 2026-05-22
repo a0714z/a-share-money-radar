@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
+import { dailyKLines, thirtyMinuteKLines } from "./kline-cache";
 import { average, clamp, last, movingAverage, pctChange, round } from "../src/lib/math";
 import { scoreCandidate } from "../src/lib/scoring";
 import type { KLine, PlanReport, RealQuote, StockListItem, StockPick } from "../src/lib/types";
@@ -271,7 +272,7 @@ async function runPlan() {
   console.log(`[plan] daily prefilter ${universe.length} stocks`);
   const dailySetups = await mapLimit(universe, 16, async (stock, index) => {
     try {
-      const history = await client.history(toInstrumentCode(stock.dm, inferExchange(stock.dm, stock.jys)), config.historyDays);
+      const history = await dailyKLines(client, toInstrumentCode(stock.dm, inferExchange(stock.dm, stock.jys)), config.historyDays);
       if ((index + 1) % 200 === 0) console.log(`[plan] daily ${index + 1}/${universe.length}`);
       return evaluateDailySetup(stock, history, config.minAmount, config.setupWindowDays);
     } catch (error) {
@@ -289,12 +290,10 @@ async function runPlan() {
   const refined = await mapLimit(dailyCandidates, 18, async (setup, index) => {
     try {
       const code = plainCode(setup.stock.dm);
-      const [history30m, latest30m, flows] = await Promise.all([
-        client.history30m(setup.instrument, config.intraday30mBars).catch(() => []),
-        client.latest30m(setup.instrument, Math.min(config.intraday30mBars, 96)).catch(() => []),
+      const [intraday30m, flows] = await Promise.all([
+        thirtyMinuteKLines(client, setup.instrument, config.intraday30mBars).catch(() => []),
         client.moneyFlow(code, 10)
       ]);
-      const intraday30m = mergeKLines(history30m, latest30m).slice(-config.intraday30mBars);
       const pick = scoreCandidate({ stock: setup.stock, quote: quoteFromHistory(setup), history: setup.history, intraday30m, flows });
       if ((index + 1) % 30 === 0) console.log(`[plan] refined ${index + 1}/${dailyCandidates.length}`);
       return pick ? enrichPlanPick(pick, setup) : undefined;

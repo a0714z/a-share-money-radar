@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
+import { dailyKLines, thirtyMinuteKLines } from "./kline-cache";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { round } from "../src/lib/math";
@@ -46,6 +47,7 @@ type RoughCandidate = {
   stock: StockListItem;
   quote: RealQuote;
   rough: number;
+  history?: KLine[];
 };
 
 function intEnv(name: string, fallback: number) {
@@ -116,6 +118,32 @@ function roughSetupScore(stock: StockListItem, quote: RealQuote, minAmount: numb
   const pullbackProxy = pct > -4.5 && pct < 3.5 && volumeRatio >= 0.45 && volumeRatio <= 1.45 ? 8 : 0;
   const capScore = marketCap >= 2_000_000_000 ? 6 : -8;
   return boardBonus + notChasing + mediumTermValue + liquidity + turnoverScore + volumeScore + closeStrength + healthyVolumePrice + burstProxy + pullbackProxy + badVolumePrice + capScore;
+}
+
+function quoteFromHistory(stock: StockListItem, history: KLine[]): RealQuote | undefined {
+  const bars = [...history].sort((a, b) => String(a.t).localeCompare(String(b.t)));
+  const latest = bars.at(-1);
+  const previous = bars.at(-2);
+  if (!latest || !previous || !Number.isFinite(latest.c) || latest.c <= 0) return undefined;
+  const previousAmount = bars.slice(-21, -1).map((bar) => bar.a).filter((value) => Number.isFinite(value) && value > 0);
+  const amountAverage = previousAmount.length ? previousAmount.reduce((sum, value) => sum + value, 0) / previousAmount.length : previous.a;
+  const sixtyAgo = bars.at(-61);
+  return {
+    dm: stock.dm,
+    o: latest.o,
+    h: latest.h,
+    l: latest.l,
+    p: latest.c,
+    yc: previous.c,
+    pc: previous.c ? ((latest.c - previous.c) / previous.c) * 100 : 0,
+    cje: latest.a,
+    v: latest.v,
+    hs: 1,
+    tr: 1,
+    lb: amountAverage ? latest.a / amountAverage : 1,
+    zdf60: sixtyAgo?.c ? ((latest.c - sixtyAgo.c) / sixtyAgo.c) * 100 : 0,
+    t: `${String(latest.t).slice(0, 10)} 15:00:00`
+  };
 }
 
 function attachRanks(items: StockPick[]) {
@@ -649,26 +677,56 @@ async function liveScan() {
   const listed = await client.stockList();
   const universe = listed.filter(isMainBoardNonSt);
   const stockByCode = new Map(universe.map((stock) => [plainCode(stock.dm), stock]));
+  const scanSource = (process.env.SCAN_SOURCE ?? "realtime").toLowerCase();
 
-  console.log("[scan] fetching all realtime quotes");
-  const quotes = await client.allRealtime();
-  const quoteByCode = new Map(quotes.map((quote) => [plainCode(quote.dm), quote]));
-  const dataQuality = buildDataQuality({ quotes, universe, quoteByCode });
+  let quotes: RealQuote[] = [];
+  let quoteByCode = new Map<string, RealQuote>();
+  let roughCandidates: RoughCandidate[] = [];
 
-  const roughCandidates = universe
-    .map((stock) => {
+  if (scanSource === "history") {
+    console.log("[scan] loading local daily K-line cache as quote source");
+    const cacheCandidates = await mapLimit(universe, 24, async (stock) => {
       const code = plainCode(stock.dm);
-      const quote = quoteByCode.get(code);
       const normalizedStock: StockListItem = { ...stock, dm: code, jys: inferExchange(stock.dm, stock.jys) };
+      const instrument = toInstrumentCode(code, inferExchange(stock.dm, stock.jys));
+      const history = await dailyKLines(client, instrument, config.historyDays);
+      const quote = quoteFromHistory(normalizedStock, history);
       return {
         stock: normalizedStock,
         quote,
-        rough: quote ? roughSetupScore(normalizedStock, quote, config.minAmount) : -Infinity
+        rough: quote ? roughSetupScore(normalizedStock, quote, config.minAmount) : -Infinity,
+        history
       };
-    })
-    .filter(hasUsableQuote)
-    .sort((a, b) => b.rough - a.rough)
-    .slice(0, config.flowCandidateLimit);
+    });
+    const usableCacheCandidates: RoughCandidate[] = cacheCandidates.flatMap((item) =>
+      item.quote && Number.isFinite(item.rough) ? [{ stock: item.stock, quote: item.quote, rough: item.rough, history: item.history }] : []
+    );
+    roughCandidates = usableCacheCandidates
+      .sort((a, b) => b.rough - a.rough)
+      .slice(0, config.flowCandidateLimit);
+    quotes = usableCacheCandidates.map((item) => item.quote);
+    quoteByCode = new Map(quotes.map((quote) => [plainCode(quote.dm), quote]));
+  } else {
+    console.log("[scan] fetching all realtime quotes");
+    quotes = await client.allRealtime();
+    quoteByCode = new Map(quotes.map((quote) => [plainCode(quote.dm), quote]));
+    roughCandidates = universe
+      .map((stock) => {
+        const code = plainCode(stock.dm);
+        const quote = quoteByCode.get(code);
+        const normalizedStock: StockListItem = { ...stock, dm: code, jys: inferExchange(stock.dm, stock.jys) };
+        return {
+          stock: normalizedStock,
+          quote,
+          rough: quote ? roughSetupScore(normalizedStock, quote, config.minAmount) : -Infinity
+        };
+      })
+      .filter(hasUsableQuote)
+      .sort((a, b) => b.rough - a.rough)
+      .slice(0, config.flowCandidateLimit);
+  }
+
+  const dataQuality = buildDataQuality({ quotes, universe, quoteByCode });
 
   if (!roughCandidates.length) {
     const quoteTime = quotes.find((quote) => quote.t)?.t ?? "unknown";
@@ -678,24 +736,19 @@ async function liveScan() {
   }
 
   console.log(`[scan] scoring ${roughCandidates.length} candidates with history + money flow`);
-  const scored = await mapLimit(roughCandidates, 24, async ({ stock, quote }, index) => {
+  const scored = await mapLimit(roughCandidates, 24, async ({ stock, quote, history: cachedHistory }, index) => {
     const exchange = inferExchange(stock.dm, stock.jys);
     const instrument = toInstrumentCode(stock.dm, exchange);
     try {
       const code = plainCode(stock.dm);
-      const [history, history30m, latest30m, flows] = await Promise.all([
-        client.history(instrument, config.historyDays),
-        client.history30m(instrument, config.intraday30mDays).catch((error) => {
-          console.warn(`[scan] 30m history ${instrument} skipped: ${(error as Error).message}`);
-          return [];
-        }),
-        client.latest30m(instrument, Math.min(config.intraday30mDays, 96)).catch((error) => {
-          console.warn(`[scan] 30m latest ${instrument} skipped: ${(error as Error).message}`);
+      const [history, intraday30m, flows] = await Promise.all([
+        cachedHistory?.length ? Promise.resolve(cachedHistory) : dailyKLines(client, instrument, config.historyDays),
+        thirtyMinuteKLines(client, instrument, config.intraday30mDays).catch((error) => {
+          console.warn(`[scan] 30m cache ${instrument} skipped: ${(error as Error).message}`);
           return [];
         }),
         client.moneyFlow(code, config.flowDays)
       ]);
-      const intraday30m = mergeKLines(history30m, latest30m).slice(-Math.max(config.intraday30mDays, latest30m.length));
       const pick = scoreCandidate({ stock, quote, history, intraday30m, flows });
       if ((index + 1) % 25 === 0) console.log(`[scan] processed ${index + 1}/${roughCandidates.length}`);
       return pick;
