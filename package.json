@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "scan": "tsx scripts/run-scan.ts",
+    "intraday:pulse": "tsx scripts/run-intraday-pulse.ts",
     "scan:sample": "tsx scripts/run-scan.ts --sample",
     "review": "tsx scripts/run-review.ts",
     "review:sample": "tsx scripts/run-review.ts --sample",

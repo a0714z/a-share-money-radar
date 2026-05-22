@@ -1,6 +1,7 @@
 node_modules
 dist
 *.tsbuildinfo
+.cache
 .env
 .env.*
 !.env.example

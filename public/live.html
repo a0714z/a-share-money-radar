@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>A股资金雷达 - 盘中脉冲</title>
+    <style>
+      :root {
+        color: #14201a;
+        background: #f6f4ef;
+        font-family: Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(246,244,239,.94));
+      }
+      main {
+        width: min(1280px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 24px 0 36px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-end;
+        margin-bottom: 18px;
+      }
+      h1, h2, p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(26px, 4vw, 42px);
+        letter-spacing: 0;
+      }
+      header p, .muted {
+        color: #657168;
+      }
+      .badge {
+        padding: 9px 12px;
+        border: 1px solid #d9dfda;
+        border-radius: 8px;
+        background: #fff;
+        font-weight: 800;
+      }
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
+        margin-bottom: 14px;
+      }
+      .metric, section {
+        border: 1px solid #dce3df;
+        border-radius: 8px;
+        background: rgba(255,255,255,.86);
+        box-shadow: 0 12px 28px rgba(20, 32, 26, .06);
+      }
+      .metric {
+        min-height: 84px;
+        padding: 14px;
+      }
+      .metric span {
+        display: block;
+        color: #657168;
+      }
+      .metric strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 24px;
+      }
+      section {
+        margin-top: 14px;
+        padding: 14px;
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .table-wrap {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 860px;
+      }
+      th, td {
+        padding: 10px 8px;
+        border-bottom: 1px solid #edf1ee;
+        text-align: left;
+        white-space: nowrap;
+      }
+      th {
+        color: #657168;
+        font-size: 13px;
+      }
+      .up {
+        color: #159a65;
+        font-weight: 800;
+      }
+      .down {
+        color: #bd3c3c;
+        font-weight: 800;
+      }
+      .pill {
+        display: inline-flex;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: #e9eee9;
+        font-weight: 800;
+      }
+      .hot {
+        color: #0f5132;
+        background: #dff5e8;
+      }
+      .risk {
+        color: #7f1d1d;
+        background: #fde2e2;
+      }
+      .empty {
+        padding: 22px;
+        color: #657168;
+        text-align: center;
+      }
+      @media (max-width: 720px) {
+        main {
+          width: min(100vw - 18px, 720px);
+          padding-top: 14px;
+        }
+        header {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+        .summary {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <h1>A股资金雷达</h1>
+          <p>盘中脉冲，分钟级监控全市场放量异动</p>
+        </div>
+        <div class="badge" id="status">Loading</div>
+      </header>
+
+      <div class="summary">
+        <div class="metric"><span>交易日</span><strong id="tradeDate">-</strong></div>
+        <div class="metric"><span>全市场</span><strong id="universe">-</strong></div>
+        <div class="metric"><span>强脉冲</span><strong id="hot">-</strong></div>
+        <div class="metric"><span>放量风险</span><strong id="risk">-</strong></div>
+      </div>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>强脉冲</h2>
+            <p class="muted">放量必须伴随价格走强，放量阴线会扣分</p>
+          </div>
+          <span class="muted" id="updatedAt">-</span>
+        </div>
+        <div class="table-wrap" id="hotTable"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>观察</h2>
+            <p class="muted">有异动但强度或位置还不够</p>
+          </div>
+        </div>
+        <div class="table-wrap" id="watchTable"></div>
+      </section>
+
+      <section>
+        <div class="section-head">
+          <div>
+            <h2>放量风险</h2>
+            <p class="muted">重点看放量阴线、低位放量和追高风险</p>
+          </div>
+        </div>
+        <div class="table-wrap" id="riskTable"></div>
+      </section>
+    </main>
+
+    <script>
+      const money = (value) => {
+        if (!Number.isFinite(value) || value === 0) return "-";
+        if (Math.abs(value) >= 100000000) return `${(value / 100000000).toFixed(2)}亿`;
+        if (Math.abs(value) >= 10000) return `${(value / 10000).toFixed(0)}万`;
+        return Math.round(value).toLocaleString("zh-CN");
+      };
+      const pct = (value) => Number.isFinite(value) ? `${value > 0 ? "+" : ""}${value.toFixed(2)}%` : "-";
+      const rows = (items, kind) => {
+        if (!items.length) return '<div class="empty">暂无信号</div>';
+        return `<table>
+          <thead><tr><th>#</th><th>代码</th><th>名称</th><th>时间</th><th>价格</th><th>涨跌</th><th>分钟</th><th>分钟成交</th><th>倍量</th><th>分数</th><th>证据</th><th>风险</th></tr></thead>
+          <tbody>${items.map((item) => `<tr>
+            <td>${item.rank}</td>
+            <td>${item.instrument}</td>
+            <td>${item.name}</td>
+            <td>${item.time}</td>
+            <td>${item.price.toFixed(2)}</td>
+            <td class="${item.pct >= 0 ? "up" : "down"}">${pct(item.pct)}</td>
+            <td class="${item.minutePct >= 0 ? "up" : "down"}">${pct(item.minutePct)}</td>
+            <td>${money(item.minuteAmount)}</td>
+            <td><span class="pill ${kind}">${item.amountBurstRatio.toFixed(2)}x</span></td>
+            <td>${item.score.toFixed(1)}</td>
+            <td>${(item.reasons || []).join(" / ") || "-"}</td>
+            <td>${(item.risks || []).join(" / ") || "-"}</td>
+          </tr>`).join("")}</tbody>
+        </table>`;
+      };
+      async function load() {
+        const response = await fetch(`reports/intraday.json?t=${Date.now()}`);
+        const report = await response.json();
+        document.getElementById("status").textContent = "Live";
+        document.getElementById("tradeDate").textContent = report.meta.tradeDate;
+        document.getElementById("universe").textContent = report.summary.universe.toLocaleString("zh-CN");
+        document.getElementById("hot").textContent = report.summary.hot;
+        document.getElementById("risk").textContent = report.summary.risk;
+        document.getElementById("updatedAt").textContent = report.meta.generatedAt;
+        document.getElementById("hotTable").innerHTML = rows(report.hot || [], "hot");
+        document.getElementById("watchTable").innerHTML = rows(report.watch || [], "");
+        document.getElementById("riskTable").innerHTML = rows(report.risk || [], "risk");
+      }
+      load().catch(() => {
+        document.getElementById("status").textContent = "No data";
+      });
+      setInterval(load, 60000);
+    </script>
+  </body>
+</html>
