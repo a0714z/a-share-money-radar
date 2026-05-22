@@ -1,6 +1,6 @@
 # A Share Money Radar 接入文档
 
-这份文档用于把项目交给新的 AI/开发窗口继续开发。当前目标是：服务器本地沉淀日K和30m K线，选股、交易预案、页面和邮件都优先基于本地历史K线运行，而不是每次完全依赖即时接口。
+这份文档用于把项目交给新的 AI/开发窗口继续开发。当前目标是：服务器本地沉淀日K和30m K线，选股、交易预案、复盘、页面和邮件涉及 K 线的部分都必须基于本地历史K线运行。除 `kline:sync` 定时任务外，策略脚本不应因为缓存缺失而自动回源调用 K 线接口，避免触发必盈 API 风控。
 
 ## 项目地址
 
@@ -38,12 +38,12 @@ npm run intraday:pulse
 
 含义：
 
-- `kline:sync`：拉取全市场主板非 ST 的日K和30m K线，写入本地缓存。
-- `scan`：生成选股报告 `latest.json`。现在支持 `SCAN_SOURCE=history`，盘前可以直接从本地日K构造收盘报价。
-- `plan`：生成交易预案 `plan.json`。日K和30m K线优先读本地缓存。
-- `review`：生成策略复盘 `performance.json`。
+- `kline:sync`：唯一允许批量拉取 K 线 API 的入口，拉取全市场主板非 ST 的日K、30m K线和市场指数日K，写入本地缓存。
+- `scan`：生成选股报告 `latest.json`。默认 `SCAN_SOURCE=history`，直接从本地日K构造收盘报价；日K/30m K 线只读缓存。
+- `plan`：生成交易预案 `plan.json`。日K和30m K线只读本地缓存。
+- `review`：生成策略复盘 `performance.json`，收益追踪 K 线只读本地缓存。
 - `notify`：发送邮件，读取 `latest.json` 和 `performance.json`。
-- `intraday:pulse`：盘中分钟级异动扫描，仍使用实时行情接口。
+- `intraday:pulse`：盘中分钟级异动扫描，仍使用实时行情接口；股票列表优先读本地缓存。
 
 ## 当前数据流
 
@@ -67,6 +67,7 @@ flowchart TD
 - 股票列表：`.cache/kline/stock-list.json`
 - 日K：`.cache/kline/daily/002226.SZ.json`
 - 30m：`.cache/kline/30m/002226.SZ.json`
+- 指数日K：`.cache/kline/index-daily/000001.SH.json`
 
 单条 K 线使用项目内 `KLine` 类型：
 
@@ -93,7 +94,7 @@ type KLine = {
 - `stockList(client)`
 - `mergeKLines(...groups)`
 
-策略脚本不要直接读写缓存 JSON，优先调用这些函数。`stockList(client)` 会先请求必盈，失败时回退到本地股票列表缓存。
+策略脚本不要直接读写缓存 JSON，优先调用这些函数。`dailyKLines()` 和 `thirtyMinuteKLines()` 当前只读缓存，不会自动调用必盈 K 线接口；缓存缺失时应跳过标的或提示先运行 `npm run kline:sync`。`stockList(client)` 只给同步脚本使用，普通策略脚本应读 `readStockListCache()`。
 
 ## 关键环境变量
 
@@ -233,7 +234,7 @@ curl -I http://112.126.57.131/
 
 1. 给 `kline:sync` 加“只补最新交易日”的增量模式，减少 18:00 全量拉取压力。
 2. 把资金流也缓存起来，当前资金流仍是 `scan`/`plan` 运行时实时取。
-3. 页面展示 K 线缓存状态，比如最后同步时间、失败数量、日K/30m 覆盖率。
+3. 页面展示 K 线缓存状态，比如最后同步时间、失败数量、日K/30m/指数覆盖率。
 4. 把 `scan` 和 `plan` 共用的“爆量阳线 + 缩量回调 + 30m 承接”逻辑收敛到一个策略模块，避免两套逻辑漂移。
 
 策略重点：

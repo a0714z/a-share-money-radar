@@ -8,7 +8,7 @@ import type { BiyingClient } from "./biying-client";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
 
-export type KLineFrame = "daily" | "30m";
+export type KLineFrame = "daily" | "30m" | "index-daily";
 
 function intEnv(name: string, fallback: number) {
   const value = Number(process.env[name]);
@@ -97,18 +97,11 @@ export async function stockList(client: BiyingClient) {
 }
 
 export async function dailyKLines(client: BiyingClient, instrument: string, limit: number) {
-  const cached = await readKLineCache("daily", instrument, limit);
-  if (cached.length >= Math.min(limit, 40)) return cached;
-  const fetched = await client.history(instrument, limit);
-  return (await writeKLineCache("daily", instrument, fetched, Math.max(limit, intEnv("KLINE_DAILY_MAX_BARS", 120)))).slice(-limit);
+  void client;
+  return readKLineCache("daily", instrument, limit);
 }
 
 export async function thirtyMinuteKLines(client: BiyingClient, instrument: string, limit: number) {
-  const cached = await readKLineCache("30m", instrument, limit);
-  if (cached.length >= Math.min(limit, 48)) return cached;
-  const [history30m, latest30m] = await Promise.all([
-    client.history30m(instrument, limit).catch(() => []),
-    client.latest30m(instrument, Math.min(limit, 96)).catch(() => [])
-  ]);
-  return (await writeKLineCache("30m", instrument, mergeKLines(history30m, latest30m), Math.max(limit, intEnv("KLINE_30M_MAX_BARS", 320)))).slice(-limit);
+  void client;
+  return readKLineCache("30m", instrument, limit);
 }

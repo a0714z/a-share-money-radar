@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
 import { klineCacheRoot, mergeKLines, stockList, writeKLineCache } from "./kline-cache";
 import { isMainBoardNonSt, inferExchange, plainCode, toInstrumentCode } from "../src/lib/universe";
+import { MARKET_INDEXES } from "../src/lib/market-regime";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -18,7 +19,8 @@ type SyncSummary = {
   universe: number;
   daily: { requested: number; ok: number; failed: number; bars: number };
   intraday30m: { requested: number; ok: number; failed: number; bars: number };
-  failures: Array<{ instrument: string; frame: "daily" | "30m"; message: string }>;
+  indexDaily: { requested: number; ok: number; failed: number; bars: number };
+  failures: Array<{ instrument: string; frame: "daily" | "30m" | "index-daily"; message: string }>;
 };
 
 function intEnv(name: string, fallback: number) {
@@ -87,8 +89,34 @@ async function run() {
     universe: universe.length,
     daily: { requested: dailyOnly || !intradayOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
     intraday30m: { requested: intradayOnly || !dailyOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
+    indexDaily: { requested: dailyOnly || !intradayOnly ? MARKET_INDEXES.length : 0, ok: 0, failed: 0, bars: 0 },
     failures: []
   };
+
+  if (!intradayOnly) {
+    const end = chinaDateTime().slice(0, 10).replace(/-/g, "");
+    const startDate = new Date(Date.now() - 520 * 24 * 60 * 60 * 1000);
+    const start = new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    })
+      .format(startDate)
+      .replace(/\//g, "");
+
+    await mapLimit([...MARKET_INDEXES], Math.min(concurrency, MARKET_INDEXES.length), async (index) => {
+      try {
+        const bars = await client.indexHistory(index.code, start, end);
+        const merged = await writeKLineCache("index-daily", index.code, bars, 260);
+        summary.indexDaily.ok += 1;
+        summary.indexDaily.bars += merged.length;
+      } catch (error) {
+        summary.indexDaily.failed += 1;
+        if (summary.failures.length < 30) summary.failures.push({ instrument: index.code, frame: "index-daily", message: (error as Error).message });
+      }
+    });
+  }
 
   await mapLimit(universe, concurrency, async ({ instrument }, index) => {
     if (!intradayOnly) {
@@ -123,7 +151,7 @@ async function run() {
 
   await writeSummary(summary);
   console.log(
-    `[kline-sync] done daily=${summary.daily.ok}/${summary.daily.requested} 30m=${summary.intraday30m.ok}/${summary.intraday30m.requested}`
+    `[kline-sync] done daily=${summary.daily.ok}/${summary.daily.requested} 30m=${summary.intraday30m.ok}/${summary.intraday30m.requested} index=${summary.indexDaily.ok}/${summary.indexDaily.requested}`
   );
 }
 

@@ -3,7 +3,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BiyingClient } from "./biying-client";
+import { readKLineCache } from "./kline-cache";
 import { pctChange, round } from "../src/lib/math";
 import type { KLine, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, StockPick, StrategyHealth } from "../src/lib/types";
 
@@ -326,25 +326,21 @@ async function sampleReview() {
 }
 
 async function liveReview() {
-  const license = process.env.BIYING_LICENSE;
-  if (!license) throw new Error("Missing BIYING_LICENSE. Run npm run review:sample for a local placeholder report.");
-
   const reports = await readReports();
-  const client = new BiyingClient(license);
   const targets = reports.flatMap((report) => report.picks.map((pick) => ({ report, pick })));
   const uniqueInstruments = [...new Set(targets.map(({ pick }) => pick.instrument))];
   const histories = new Map<string, KLine[]>();
 
-  console.log(`[review] loading ${uniqueInstruments.length} instrument histories for ${targets.length} core signals`);
+  console.log(`[review] loading ${uniqueInstruments.length} cached instrument histories for ${targets.length} core signals`);
   await mapLimit(uniqueInstruments, 12, async (instrument) => {
-    histories.set(instrument, await client.history(instrument, 260));
+    histories.set(instrument, await readKLineCache("daily", instrument, 260));
   });
 
   const records = targets.map(({ report, pick }) => buildRecord(report, pick, histories.get(pick.instrument) ?? []));
   const review: ReviewReport = {
     meta: {
       generatedAt: chinaDateTime(),
-      source: "Biying API + archived scan reports",
+      source: "Local K-line cache + archived scan reports",
       mode: "live",
       historyReports: reports.length,
       notes: [

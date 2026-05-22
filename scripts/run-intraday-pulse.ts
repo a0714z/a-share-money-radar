@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
+import { readStockListCache } from "./kline-cache";
 import { clamp, round } from "../src/lib/math";
 import type { Exchange, IntradayPulseItem, IntradayPulseReport, RealQuote, StockListItem } from "../src/lib/types";
 import { inferExchange, isMainBoardNonSt, plainCode, toInstrumentCode } from "../src/lib/universe";
@@ -287,7 +288,8 @@ function buildItem(args: {
 
 async function loadUniverse(client: BiyingClient, state: PulseState, tradeDate: string) {
   if (state.stockCacheDate === tradeDate && state.stocks?.length) return state.stocks;
-  const listed = await client.stockList();
+  let listed = await readStockListCache();
+  if (!listed.length) listed = await client.stockList();
   const stocks = listed.filter(isMainBoardNonSt).map((stock) => ({
     dm: plainCode(stock.dm),
     mc: stock.mc,

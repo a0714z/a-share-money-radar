@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
-import { dailyKLines, stockList, thirtyMinuteKLines } from "./kline-cache";
+import { dailyKLines, readKLineCache, readStockListCache, thirtyMinuteKLines } from "./kline-cache";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { round } from "../src/lib/math";
@@ -518,34 +518,16 @@ function mergeKLines(...groups: KLine[][]) {
   return [...byTime.values()].sort((a, b) => String(a.t).localeCompare(String(b.t)));
 }
 
-function chinaDateCompact(daysOffset = 0) {
-  const date = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000);
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  })
-    .format(date)
-    .replace(/\//g, "");
-}
-
 function hasUsableQuote(item: { stock: StockListItem; quote?: RealQuote; rough: number }): item is RoughCandidate {
   return Boolean(item.quote) && Number.isFinite(item.rough);
 }
 
-async function loadMarketRegime(client: BiyingClient) {
+async function loadMarketRegime() {
   const histories: Record<string, KLine[]> = {};
-  const start = chinaDateCompact(-520);
-  const end = chinaDateCompact(0);
-
   await Promise.all(
     MARKET_INDEXES.map(async (index) => {
-      try {
-        histories[index.code] = await client.indexHistory(index.code, start, end);
-      } catch (error) {
-        console.warn(`[scan] market index ${index.code} skipped: ${(error as Error).message}`);
-      }
+      histories[index.code] = await readKLineCache("index-daily", index.code, 260);
+      if (!histories[index.code].length) console.warn(`[scan] market index ${index.code} cache missing`);
     })
   );
 
@@ -673,13 +655,14 @@ async function liveScan() {
 
   const config = configFromEnv();
   const client = new BiyingClient(license);
-  const market = await loadMarketRegime(client);
+  const market = await loadMarketRegime();
 
-  console.log("[scan] fetching stock list");
-  const listed = await stockList(client);
+  console.log("[scan] loading cached stock list");
+  const listed = await readStockListCache();
+  if (!listed.length) throw new Error("Missing cached stock list. Run npm run kline:sync before scan.");
   const universe = listed.filter(isMainBoardNonSt);
   const stockByCode = new Map(universe.map((stock) => [plainCode(stock.dm), stock]));
-  const scanSource = (process.env.SCAN_SOURCE ?? "realtime").toLowerCase();
+  const scanSource = (process.env.SCAN_SOURCE ?? "history").toLowerCase();
 
   let quotes: RealQuote[] = [];
   let quoteByCode = new Map<string, RealQuote>();
