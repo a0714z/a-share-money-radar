@@ -28,10 +28,12 @@ import {
 } from "recharts";
 import { ColorType, CrosshairMode, LineStyle, createChart } from "lightweight-charts";
 import { sampleReport } from "./data/sample-report";
+import { samplePlan } from "./data/sample-plan";
 import { sampleReview } from "./data/sample-review";
 import type {
   DailyChangeItem,
   MarketRegime,
+  PlanReport,
   ReviewHorizon,
   ReviewRecord,
   ReviewReport,
@@ -148,6 +150,13 @@ async function loadReview() {
   const response = await fetch(`${base}reports/performance.json?t=${Date.now()}`);
   if (!response.ok) throw new Error("no review report");
   return (await response.json()) as ReviewReport;
+}
+
+async function loadPlan() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/plan.json?t=${Date.now()}`);
+  if (!response.ok) throw new Error("no plan report");
+  return (await response.json()) as PlanReport;
 }
 
 function Metric({
@@ -1296,6 +1305,42 @@ function ReviewPanel({ review }: { review: ReviewReport }) {
   );
 }
 
+function PlanPanel({ plan, reviewRecords }: { plan: PlanReport; reviewRecords: ReviewRecord[] }) {
+  const [selected, setSelected] = useState<StockPick | undefined>(() => plan.plans[0] ?? plan.watchlist[0] ?? plan.avoided[0]);
+  const rows = useMemo(() => [...plan.plans, ...plan.watchlist, ...plan.avoided].sort((a, b) => a.rank - b.rank), [plan]);
+
+  useEffect(() => {
+    if (!selected || !rows.some((pick) => pick.instrument === selected.instrument)) setSelected(rows[0]);
+  }, [rows, selected]);
+
+  return (
+    <section className="plan-panel">
+      <div className="summary-grid">
+        <Metric icon={CalendarClock} label="预案交易日" value={plan.meta.tradeDate} tone="blue" />
+        <Metric icon={ShieldCheck} label="日K样本" value={plan.summary.dailyScored.toLocaleString("zh-CN")} />
+        <Metric icon={BarChart3} label="30m精筛" value={plan.summary.intradayScored.toLocaleString("zh-CN")} tone="amber" />
+        <Metric icon={Target} label="重点预案" value={plan.summary.plans} tone="green" />
+        <Metric icon={AlertTriangle} label="风险跟踪" value={plan.summary.risk} tone="red" />
+      </div>
+
+      <section className="workspace">
+        <div className="list-panel">
+          <div className="panel-toolbar">
+            <div>
+              <h2>盘前交易预案</h2>
+              <span>
+                {plan.meta.generatedAt} · 日K {plan.meta.lookbackDays} 天 · 30m {plan.meta.intraday30mBars} 根
+              </span>
+            </div>
+          </div>
+          <PickTable picks={rows} selected={selected} onSelect={setSelected} onOpen={setSelected} />
+        </div>
+        {selected && <PickDetail pick={selected} reviewRecords={reviewRecords} />}
+      </section>
+    </section>
+  );
+}
+
 function StockDetailPage({
   pick,
   reviewRecords,
@@ -1331,8 +1376,9 @@ function StockDetailPage({
 
 export default function App() {
   const [report, setReport] = useState<ScanReport>(sampleReport);
+  const [plan, setPlan] = useState<PlanReport>(samplePlan);
   const [review, setReview] = useState<ReviewReport>(sampleReview);
-  const [view, setView] = useState<"radar" | "review">("radar");
+  const [view, setView] = useState<"radar" | "plan" | "review">("radar");
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
@@ -1363,6 +1409,12 @@ export default function App() {
     loadReview()
       .then(setReview)
       .catch(() => setReview(sampleReview));
+  }, []);
+
+  useEffect(() => {
+    loadPlan()
+      .then(setPlan)
+      .catch(() => setPlan(samplePlan));
   }, []);
 
   const rows = useMemo(() => {
@@ -1423,6 +1475,15 @@ export default function App() {
               }}
             >
               今日选股
+            </button>
+            <button
+              className={view === "plan" && !stockRoute ? "active" : ""}
+              onClick={() => {
+                clearRoute();
+                setView("plan");
+              }}
+            >
+              交易预案
             </button>
             <button
               className={view === "review" && !stockRoute ? "active" : ""}
@@ -1489,6 +1550,8 @@ export default function App() {
             <ConcentrationPanel concentration={report.concentration} />
           </div>
         </div>
+      ) : view === "plan" ? (
+        <PlanPanel plan={plan} reviewRecords={review.records} />
       ) : (
         <ReviewPanel review={review} />
       )}

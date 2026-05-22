@@ -306,6 +306,30 @@ export type ScanReport = {
   avoided: StockPick[];
 };
 
+export type PlanReport = {
+  meta: {
+    generatedAt: string;
+    tradeDate: string;
+    source: string;
+    mode: "live" | "sample";
+    lookbackDays: number;
+    intraday30mBars: number;
+    notes: string[];
+  };
+  summary: {
+    universe: number;
+    dailyScored: number;
+    dailyCandidates: number;
+    intradayScored: number;
+    plans: number;
+    watch: number;
+    risk: number;
+  };
+  plans: StockPick[];
+  watchlist: StockPick[];
+  avoided: StockPick[];
+};
+
 export type DailyChangeItem = {
   code: string;
   instrument: string;
