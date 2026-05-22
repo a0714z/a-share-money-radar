@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
@@ -61,6 +62,22 @@ async function writeSummary(summary: SyncSummary) {
   console.log(`[kline-sync] wrote ${outputPath}`);
 }
 
+async function cachedFrameStats(frame: "daily" | "30m") {
+  const dir = resolve(klineCacheRoot(), frame);
+  if (!existsSync(dir)) return { requested: 0, ok: 0, failed: 0, bars: 0 };
+  const files = (await readdir(dir)).filter((file) => file.endsWith(".json"));
+  let bars = 0;
+  for (const file of files) {
+    try {
+      const rows = JSON.parse(await readFile(resolve(dir, file), "utf8"));
+      if (Array.isArray(rows)) bars += rows.length;
+    } catch {
+      // Ignore corrupt cache files in the summary; strategy readers will skip them too.
+    }
+  }
+  return { requested: files.length, ok: files.length, failed: 0, bars };
+}
+
 async function run() {
   const license = process.env.BIYING_LICENSE;
   if (!license) throw new Error("Missing BIYING_LICENSE. Set it in .env.local or /etc/a-share-money-radar.env.");
@@ -89,8 +106,8 @@ async function run() {
     generatedAt: chinaDateTime(),
     cacheDir: klineCacheRoot(),
     universe: universe.length,
-    daily: { requested: !indexOnly && (dailyOnly || !intradayOnly) ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
-    intraday30m: { requested: !indexOnly && (intradayOnly || !dailyOnly) ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
+    daily: indexOnly ? await cachedFrameStats("daily") : { requested: dailyOnly || !intradayOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
+    intraday30m: indexOnly ? await cachedFrameStats("30m") : { requested: intradayOnly || !dailyOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
     indexDaily: { requested: !intradayOnly ? MARKET_INDEXES.length : 0, ok: 0, failed: 0, bars: 0 },
     failures: []
   };
