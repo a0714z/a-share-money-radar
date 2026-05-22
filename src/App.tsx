@@ -27,9 +27,6 @@ import {
   YAxis
 } from "recharts";
 import { ColorType, CrosshairMode, LineStyle, createChart } from "lightweight-charts";
-import { sampleReport } from "./data/sample-report";
-import { samplePlan } from "./data/sample-plan";
-import { sampleReview } from "./data/sample-review";
 import type {
   DailyChangeItem,
   MarketRegime,
@@ -1374,16 +1371,37 @@ function StockDetailPage({
   );
 }
 
+function LoadingScreen({ message, error, onRetry }: { message: string; error?: string; onRetry?: () => void }) {
+  return (
+    <section className={error ? "loading-panel loading-error" : "loading-panel"}>
+      <div className="loading-mark">
+        {error ? <AlertTriangle size={26} /> : <Radar size={26} />}
+      </div>
+      <div>
+        <h2>{error ? "数据加载失败" : "正在加载真实数据"}</h2>
+        <p>{error ?? message}</p>
+      </div>
+      {onRetry && (
+        <button className="mini-action" onClick={onRetry}>
+          重新加载
+        </button>
+      )}
+    </section>
+  );
+}
+
 export default function App() {
-  const [report, setReport] = useState<ScanReport>(sampleReport);
-  const [plan, setPlan] = useState<PlanReport>(samplePlan);
-  const [review, setReview] = useState<ReviewReport>(sampleReview);
+  const [report, setReport] = useState<ScanReport | null>(null);
+  const [plan, setPlan] = useState<PlanReport | null>(null);
+  const [review, setReview] = useState<ReviewReport | null>(null);
   const [view, setView] = useState<"radar" | "plan" | "review">("radar");
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
-  const [selected, setSelected] = useState<StockPick | undefined>(sampleReport.picks[0]);
+  const [selected, setSelected] = useState<StockPick | undefined>();
   const [status, setStatus] = useState<"loading" | "live" | "sample">("loading");
+  const [loadError, setLoadError] = useState<string | undefined>();
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const handleHash = () => setStockRoute(parseStockHash());
@@ -1392,34 +1410,35 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadReport()
-      .then((liveReport) => {
+    let cancelled = false;
+    setStatus("loading");
+    setLoadError(undefined);
+
+    Promise.all([loadReport(), loadPlan(), loadReview()])
+      .then(([liveReport, livePlan, liveReview]) => {
+        if (cancelled) return;
         setReport(liveReport);
+        setPlan(livePlan);
+        setReview(liveReview);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
         setSelected(findPick(liveReport, parseStockHash()) ?? allPicks(liveReport)[0]);
       })
-      .catch(() => {
-        setStatus("sample");
-        setReport(sampleReport);
-        setSelected(sampleReport.picks[0]);
+      .catch((error) => {
+        if (cancelled) return;
+        setStatus("loading");
+        setLoadError((error as Error).message || "无法读取服务器报告，请稍后重试。");
       });
-  }, []);
 
-  useEffect(() => {
-    loadReview()
-      .then(setReview)
-      .catch(() => setReview(sampleReview));
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
-  useEffect(() => {
-    loadPlan()
-      .then(setPlan)
-      .catch(() => setPlan(samplePlan));
-  }, []);
+  const liveBadge = status === "live" ? "Live" : status === "loading" ? "Loading" : "Sample";
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return allPicks(report).filter((pick) => {
+    return (report ? allPicks(report) : []).filter((pick) => {
       const matchesSignal = signal === "all" || pick.signal === signal;
       const matchesQuery =
         !needle ||
@@ -1436,6 +1455,33 @@ export default function App() {
     }
   }, [rows, selected]);
 
+  if (!report || !plan || !review) {
+    return (
+      <main className="app-shell">
+        <header className="topbar">
+          <div className="brand">
+            <div className="brand-mark">
+              <Radar size={24} />
+            </div>
+            <div>
+              <h1>A股资金雷达</h1>
+              <span>主板非 ST · 收盘后扫描</span>
+            </div>
+          </div>
+          <div className={`live-badge live-${loadError ? "sample" : "loading"}`}>
+            <span />
+            {loadError ? "Error" : liveBadge}
+          </div>
+        </header>
+        <LoadingScreen
+          message="正在读取服务器上的 latest、plan 和 performance 报告，不展示样例数据。"
+          error={loadError}
+          onRetry={loadError ? () => setReloadKey((key) => key + 1) : undefined}
+        />
+      </main>
+    );
+  }
+
   const clearRoute = () => {
     if (window.location.hash) {
       window.history.pushState(null, "", `${window.location.pathname}${window.location.search}`);
@@ -1450,8 +1496,6 @@ export default function App() {
   };
 
   const routedPick = findPick(report, stockRoute);
-
-  const liveBadge = status === "live" ? "Live" : status === "loading" ? "Loading" : "Sample";
 
   return (
     <main className="app-shell">

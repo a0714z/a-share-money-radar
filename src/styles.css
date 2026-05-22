@@ -122,8 +122,56 @@ a {
   background: #159a65;
 }
 
+.live-loading span {
+  background: #d99a26;
+}
+
 .live-sample span {
   background: #a16207;
+}
+
+.loading-panel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  width: min(760px, 100%);
+  min-height: 180px;
+  margin: 36px auto 0;
+  padding: 24px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 42px rgba(20, 32, 26, 0.08);
+}
+
+.loading-mark {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: #f8fff9;
+  background: #14201a;
+  border-radius: 8px;
+}
+
+.loading-panel h2 {
+  margin: 0 0 6px;
+  letter-spacing: 0;
+}
+
+.loading-panel p {
+  margin: 0;
+  color: #657168;
+  line-height: 1.6;
+}
+
+.loading-error {
+  border-color: #f0c9c9;
+}
+
+.loading-error .loading-mark {
+  background: #bd3c3c;
 }
 
 .view-switch {
