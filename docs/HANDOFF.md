@@ -45,6 +45,10 @@ npm run intraday:pulse
 - `notify`：发送邮件，读取 `latest.json` 和 `performance.json`。
 - `intraday:pulse`：盘中分钟级异动扫描，仍使用实时行情接口；股票列表优先读本地缓存。
 
+补充参数：
+
+- `npm run kline:sync -- --index-only`：只同步 4 个市场指数日K，不触发个股日K/30m K线批量接口。
+
 ## 当前数据流
 
 ```mermaid

@@ -68,28 +68,30 @@ async function run() {
   const args = new Set(process.argv.slice(2));
   const dailyOnly = args.has("--daily-only");
   const intradayOnly = args.has("--30m-only");
+  const indexOnly = args.has("--index-only");
   const dailyDays = intEnv("KLINE_SYNC_DAILY_DAYS", intEnv("PLAN_HISTORY_DAYS", 80));
   const intradayBars = intEnv("KLINE_SYNC_30M_BARS", intEnv("PLAN_30M_BARS", 160));
   const concurrency = intEnv("KLINE_SYNC_CONCURRENCY", 10);
   const client = new BiyingClient(license);
 
-  console.log("[kline-sync] fetching stock list");
-  const listed = await stockList(client);
-  const universe = listed
-    .filter(isMainBoardNonSt)
-    .map((stock) => {
-      const code = plainCode(stock.dm);
-      const exchange = inferExchange(stock.dm, stock.jys);
-      return { stock: { ...stock, dm: code, jys: exchange }, instrument: toInstrumentCode(code, exchange) };
-    });
+  const universe = indexOnly
+    ? []
+    : (await stockList(client))
+        .filter(isMainBoardNonSt)
+        .map((stock) => {
+          const code = plainCode(stock.dm);
+          const exchange = inferExchange(stock.dm, stock.jys);
+          return { stock: { ...stock, dm: code, jys: exchange }, instrument: toInstrumentCode(code, exchange) };
+        });
+  if (!indexOnly) console.log(`[kline-sync] loaded stock list ${universe.length}`);
 
   const summary: SyncSummary = {
     generatedAt: chinaDateTime(),
     cacheDir: klineCacheRoot(),
     universe: universe.length,
-    daily: { requested: dailyOnly || !intradayOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
-    intraday30m: { requested: intradayOnly || !dailyOnly ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
-    indexDaily: { requested: dailyOnly || !intradayOnly ? MARKET_INDEXES.length : 0, ok: 0, failed: 0, bars: 0 },
+    daily: { requested: !indexOnly && (dailyOnly || !intradayOnly) ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
+    intraday30m: { requested: !indexOnly && (intradayOnly || !dailyOnly) ? universe.length : 0, ok: 0, failed: 0, bars: 0 },
+    indexDaily: { requested: !intradayOnly ? MARKET_INDEXES.length : 0, ok: 0, failed: 0, bars: 0 },
     failures: []
   };
 
@@ -118,7 +120,7 @@ async function run() {
     });
   }
 
-  await mapLimit(universe, concurrency, async ({ instrument }, index) => {
+  if (!indexOnly) await mapLimit(universe, concurrency, async ({ instrument }, index) => {
     if (!intradayOnly) {
       try {
         const bars = await client.history(instrument, dailyDays);
