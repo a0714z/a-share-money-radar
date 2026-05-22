@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
-import { klineCacheRoot, mergeKLines, writeKLineCache } from "./kline-cache";
+import { klineCacheRoot, mergeKLines, stockList, writeKLineCache } from "./kline-cache";
 import { isMainBoardNonSt, inferExchange, plainCode, toInstrumentCode } from "../src/lib/universe";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,7 +72,7 @@ async function run() {
   const client = new BiyingClient(license);
 
   console.log("[kline-sync] fetching stock list");
-  const listed = await client.stockList();
+  const listed = await stockList(client);
   const universe = listed
     .filter(isMainBoardNonSt)
     .map((stock) => {
@@ -128,4 +128,3 @@ async function run() {
 }
 
 await run();
-

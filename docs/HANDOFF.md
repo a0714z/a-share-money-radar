@@ -64,6 +64,7 @@ flowchart TD
 
 缓存按股票和周期拆文件：
 
+- 股票列表：`.cache/kline/stock-list.json`
 - 日K：`.cache/kline/daily/002226.SZ.json`
 - 30m：`.cache/kline/30m/002226.SZ.json`
 
@@ -89,9 +90,10 @@ type KLine = {
 - `thirtyMinuteKLines(client, instrument, limit)`
 - `readKLineCache(frame, instrument, limit)`
 - `writeKLineCache(frame, instrument, bars, maxBars)`
+- `stockList(client)`
 - `mergeKLines(...groups)`
 
-策略脚本不要直接读写缓存 JSON，优先调用这些函数。
+策略脚本不要直接读写缓存 JSON，优先调用这些函数。`stockList(client)` 会先请求必盈，失败时回退到本地股票列表缓存。
 
 ## 关键环境变量
 

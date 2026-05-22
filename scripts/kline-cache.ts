@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { KLine } from "../src/lib/types";
+import type { KLine, StockListItem } from "../src/lib/types";
 import type { BiyingClient } from "./biying-client";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -21,6 +21,10 @@ export function klineCacheRoot() {
 
 function frameDir(frame: KLineFrame) {
   return resolve(klineCacheRoot(), frame);
+}
+
+function stockListCachePath() {
+  return resolve(klineCacheRoot(), "stock-list.json");
 }
 
 function cachePath(frame: KLineFrame, instrument: string) {
@@ -60,6 +64,38 @@ export async function writeKLineCache(frame: KLineFrame, instrument: string, bar
   return merged;
 }
 
+export async function readStockListCache() {
+  const path = stockListCachePath();
+  if (!existsSync(path)) return [];
+  try {
+    const stocks = JSON.parse(await readFile(path, "utf8")) as StockListItem[];
+    return Array.isArray(stocks) ? stocks : [];
+  } catch (error) {
+    console.warn(`[kline-cache] stock list cache skipped: ${(error as Error).message}`);
+    return [];
+  }
+}
+
+export async function writeStockListCache(stocks: StockListItem[]) {
+  await mkdir(dirname(stockListCachePath()), { recursive: true });
+  await writeFile(stockListCachePath(), `${JSON.stringify(stocks)}\n`, "utf8");
+}
+
+export async function stockList(client: BiyingClient) {
+  try {
+    const stocks = await client.stockList();
+    await writeStockListCache(stocks);
+    return stocks;
+  } catch (error) {
+    const cached = await readStockListCache();
+    if (cached.length) {
+      console.warn(`[kline-cache] using cached stock list after API failure: ${(error as Error).message}`);
+      return cached;
+    }
+    throw error;
+  }
+}
+
 export async function dailyKLines(client: BiyingClient, instrument: string, limit: number) {
   const cached = await readKLineCache("daily", instrument, limit);
   if (cached.length >= Math.min(limit, 40)) return cached;
@@ -76,4 +112,3 @@ export async function thirtyMinuteKLines(client: BiyingClient, instrument: strin
   ]);
   return (await writeKLineCache("30m", instrument, mergeKLines(history30m, latest30m), Math.max(limit, intEnv("KLINE_30M_MAX_BARS", 320)))).slice(-limit);
 }
-

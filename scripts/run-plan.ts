@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
-import { dailyKLines, thirtyMinuteKLines } from "./kline-cache";
+import { dailyKLines, stockList, thirtyMinuteKLines } from "./kline-cache";
 import { average, clamp, last, movingAverage, pctChange, round } from "../src/lib/math";
 import { scoreCandidate } from "../src/lib/scoring";
 import type { KLine, PlanReport, RealQuote, StockListItem, StockPick } from "../src/lib/types";
@@ -266,7 +266,7 @@ async function runPlan() {
   const config = configFromEnv();
   const client = new BiyingClient(license);
   console.log("[plan] fetching stock list");
-  const listed = await client.stockList();
+  const listed = await stockList(client);
   const universe = listed.filter(isMainBoardNonSt).map((stock) => ({ ...stock, dm: plainCode(stock.dm), jys: inferExchange(stock.dm, stock.jys) }));
 
   console.log(`[plan] daily prefilter ${universe.length} stocks`);

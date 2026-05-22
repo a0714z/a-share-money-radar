@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
-import { dailyKLines, thirtyMinuteKLines } from "./kline-cache";
+import { dailyKLines, stockList, thirtyMinuteKLines } from "./kline-cache";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
 import { round } from "../src/lib/math";
@@ -676,7 +676,7 @@ async function liveScan() {
   const market = await loadMarketRegime(client);
 
   console.log("[scan] fetching stock list");
-  const listed = await client.stockList();
+  const listed = await stockList(client);
   const universe = listed.filter(isMainBoardNonSt);
   const stockByCode = new Map(universe.map((stock) => [plainCode(stock.dm), stock]));
   const scanSource = (process.env.SCAN_SOURCE ?? "realtime").toLowerCase();
