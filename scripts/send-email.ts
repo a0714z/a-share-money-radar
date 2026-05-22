@@ -8,13 +8,15 @@ import type { ReviewReport, ScanReport, StockPick } from "../src/lib/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const latestPath = resolve(root, "public/reports/latest.json");
-const reviewPath = resolve(root, "public/reports/performance.json");
 const defaultRecipient = "zxl4418@163.com";
 const defaultSiteUrl = "https://a0714z.github.io/a-share-money-radar/";
 
 dotenv.config({ path: resolve(root, ".env.local"), override: false, quiet: true });
 dotenv.config({ path: resolve(root, ".env"), override: false, quiet: true });
+
+const reportsDir = resolve(root, process.env.REPORT_DIR ?? "public/reports");
+const latestPath = resolve(root, process.env.SCAN_REPORT_PATH ?? resolve(reportsDir, "latest.json"));
+const reviewPath = resolve(root, process.env.REVIEW_REPORT_PATH ?? resolve(reportsDir, "performance.json"));
 
 async function readJson<T>(path: string) {
   return JSON.parse(await readFile(path, "utf8")) as T;

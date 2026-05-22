@@ -27,11 +27,13 @@ import { isMainBoardNonSt, toInstrumentCode, inferExchange, plainCode } from "..
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const outputPath = resolve(root, "public/reports/latest.json");
-const historyDir = resolve(root, "public/reports/history");
 
 dotenv.config({ path: resolve(root, ".env.local"), override: false });
 dotenv.config({ path: resolve(root, ".env"), override: false });
+
+const reportsDir = resolve(root, process.env.REPORT_DIR ?? "public/reports");
+const outputPath = resolve(root, process.env.SCAN_REPORT_PATH ?? resolve(reportsDir, "latest.json"));
+const historyDir = resolve(root, process.env.SCAN_HISTORY_DIR ?? resolve(reportsDir, "history"));
 
 type ScanConfig = {
   topN: number;

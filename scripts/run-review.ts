@@ -9,9 +9,6 @@ import type { KLine, ReviewHorizon, ReviewRecord, ReviewReport, ScanReport, Stoc
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const historyDir = resolve(root, "public/reports/history");
-const latestPath = resolve(root, "public/reports/latest.json");
-const outputPath = resolve(root, "public/reports/performance.json");
 const horizons: Array<{ key: ReviewHorizon; days: number }> = [
   { key: "1d", days: 1 },
   { key: "3d", days: 3 },
@@ -21,6 +18,11 @@ const horizons: Array<{ key: ReviewHorizon; days: number }> = [
 
 dotenv.config({ path: resolve(root, ".env.local"), override: false });
 dotenv.config({ path: resolve(root, ".env"), override: false });
+
+const reportsDir = resolve(root, process.env.REPORT_DIR ?? "public/reports");
+const historyDir = resolve(root, process.env.SCAN_HISTORY_DIR ?? resolve(reportsDir, "history"));
+const latestPath = resolve(root, process.env.SCAN_REPORT_PATH ?? resolve(reportsDir, "latest.json"));
+const outputPath = resolve(root, process.env.REVIEW_REPORT_PATH ?? resolve(reportsDir, "performance.json"));
 
 function chinaDateTime(date = new Date()) {
   return new Intl.DateTimeFormat("zh-CN", {

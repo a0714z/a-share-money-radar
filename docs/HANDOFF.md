@@ -108,6 +108,9 @@ KLINE_30M_MAX_BARS=320
 KLINE_SYNC_CONCURRENCY=10
 KLINE_SYNC_REPORT_PATH=/var/www/a-share-money-radar/reports/kline-cache.json
 
+REPORT_DIR=/var/www/a-share-money-radar/reports
+SCAN_REPORT_PATH=/var/www/a-share-money-radar/reports/latest.json
+SCAN_HISTORY_DIR=/var/www/a-share-money-radar/reports/history
 SCAN_SOURCE=history
 SCAN_HISTORY_DAYS=80
 SCAN_30M_BARS=160
@@ -124,6 +127,8 @@ PLAN_30M_BARS=160
 PLAN_DAILY_CANDIDATE_LIMIT=260
 PLAN_TOP_N=40
 PLAN_MIN_AMOUNT=30000000
+
+REVIEW_REPORT_PATH=/var/www/a-share-money-radar/reports/performance.json
 
 INTRADAY_TOP_N=30
 INTRADAY_INTERVAL_SECONDS=60
@@ -236,4 +241,3 @@ curl -I http://112.126.57.131/
 - 日K爆量当前要求大于前日 3x。
 - 30m 爆量当前要求大于近似基准 5x。
 - 形态窗口现在是最近 20 个交易日，日K背景默认保留 80 根。
-
