@@ -3,8 +3,6 @@ name: Daily scan
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: "15 14 * * 1-5"
   workflow_dispatch:
 
 permissions:
@@ -32,34 +30,17 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Generate or keep report
-        env:
-          BIYING_LICENSE: ${{ secrets.BIYING_LICENSE }}
-          SCAN_TOP_N: 8
-          SCAN_HISTORY_DAYS: 120
-          SCAN_30M_BARS: 96
-          SCAN_FLOW_DAYS: 10
-          SCAN_FLOW_CANDIDATE_LIMIT: 420
-          SCAN_MIN_AMOUNT: 30000000
-          SCAN_MAX_PER_SECTOR: 2
+      - name: Keep committed report
         run: |
-          if [ "${{ github.event_name }}" = "schedule" ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ -n "$BIYING_LICENSE" ]; then
-              npm run scan
-              npm run review
-            else
-              npm run scan:sample
-              npm run review:sample
-            fi
-          elif [ ! -f public/reports/latest.json ]; then
+          if [ ! -f public/reports/latest.json ]; then
             npm run scan:sample
             npm run review:sample
           else
-            echo "Using committed latest report for push build"
+            echo "Using committed latest report for Pages build"
           fi
 
       - name: Commit latest report
-        if: ${{ github.event_name != 'push' }}
+        if: ${{ false }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -72,7 +53,7 @@ jobs:
           fi
 
       - name: Send email notification
-        if: ${{ github.event_name != 'push' }}
+        if: ${{ false }}
         env:
           NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
