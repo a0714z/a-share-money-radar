@@ -398,6 +398,13 @@ function chinaDateTime(date = new Date()) {
     .replace(/\//g, "-");
 }
 
+function keepPreviousReport(reason: string) {
+  if (!existsSync(outputPath)) return false;
+  console.warn(`[scan] ${reason}`);
+  console.warn(`[scan] keeping existing report at ${outputPath}`);
+  return true;
+}
+
 function chinaDateCompact(daysOffset = 0) {
   const date = new Date(Date.now() + daysOffset * 24 * 60 * 60 * 1000);
   return new Intl.DateTimeFormat("zh-CN", {
@@ -581,9 +588,9 @@ async function liveScan() {
 
   if (!roughCandidates.length) {
     const quoteTime = quotes.find((quote) => quote.t)?.t ?? "unknown";
-    throw new Error(
-      `No scan candidates found at ${quoteTime}. The market data may be pre-open, stale, or missing turnover; keeping the previous report.`
-    );
+    const message = `No scan candidates found at ${quoteTime}. The market data may be pre-open, stale, or missing turnover.`;
+    if (keepPreviousReport(message)) return;
+    throw new Error(`${message} No previous report exists.`);
   }
 
   console.log(`[scan] scoring ${roughCandidates.length} candidates with history + money flow`);
@@ -617,7 +624,9 @@ async function liveScan() {
   const ranked = attachRanks(annotateSetupTracking(await enrichSectors(client, sorted), historyReports, currentTradeDate));
 
   if (!ranked.length) {
-    throw new Error("No candidates could be scored; keeping the previous report.");
+    const message = "No candidates could be scored.";
+    if (keepPreviousReport(message)) return;
+    throw new Error(`${message} No previous report exists.`);
   }
 
   const { picks, watchlist, avoided, concentration } = selectPicksByMarket(ranked, market, config.topN, config.maxPerSector);
