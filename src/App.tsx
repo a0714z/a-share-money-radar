@@ -1630,7 +1630,9 @@ function ReviewPanel({ review }: { review: ReviewReport }) {
 
 function PlanPanel({ plan, reviewRecords }: { plan: PlanReport; reviewRecords: ReviewRecord[] }) {
   const [selected, setSelected] = useState<StockPick | undefined>(() => plan.plans[0] ?? plan.watchlist[0] ?? plan.avoided[0]);
-  const rows = useMemo(() => [...plan.plans, ...plan.watchlist, ...plan.avoided].sort((a, b) => a.rank - b.rank), [plan]);
+  const [tier, setTier] = useState<DecisionTier>("ready");
+  const allRows = useMemo(() => [...plan.plans, ...plan.watchlist, ...plan.avoided].sort((a, b) => a.rank - b.rank), [plan]);
+  const rows = useMemo(() => allRows.filter((pick) => matchesDecisionTier(pick, tier)), [allRows, tier]);
 
   useEffect(() => {
     if (!selected || !rows.some((pick) => pick.instrument === selected.instrument)) setSelected(rows[0]);
@@ -1652,10 +1654,11 @@ function PlanPanel({ plan, reviewRecords }: { plan: PlanReport; reviewRecords: R
             <div>
               <h2>盘前交易预案</h2>
               <span>
-                {plan.meta.generatedAt} · 形态近 {plan.meta.setupWindowDays ?? plan.meta.lookbackDays} 天 · 背景K {plan.meta.lookbackDays} 天 · 30m {plan.meta.intraday30mBars} 根
+                {plan.meta.generatedAt} · 当前 {rows.length} / 全部 {allRows.length} · 形态近 {plan.meta.setupWindowDays ?? plan.meta.lookbackDays} 天
               </span>
             </div>
           </div>
+          <DecisionTierPanel picks={allRows} active={tier} onChange={setTier} />
           <PickTable picks={rows} selected={selected} onSelect={setSelected} onOpen={setSelected} />
         </div>
         {selected && <PickDetail pick={selected} reviewRecords={reviewRecords} />}
