@@ -98,6 +98,41 @@ type SystemHealthReport = {
   notes: string[];
 };
 
+type StockDetailIndexItem = {
+  code: string;
+  instrument: string;
+  name: string;
+  sector?: string;
+  latestRank?: number;
+  latestSignal?: Signal;
+  latestScore?: number;
+  latestTradeDate?: string;
+  planRank?: number;
+  reviewSignals: number;
+};
+
+type StockDetailIndex = {
+  generatedAt: string;
+  total: number;
+  items: StockDetailIndexItem[];
+};
+
+type StockDetailReport = {
+  meta: {
+    generatedAt: string;
+    tradeDate?: string;
+    source: string;
+    notes: string[];
+  };
+  code: string;
+  instrument: string;
+  name: string;
+  sector?: string;
+  latestPick?: StockPick;
+  planPick?: StockPick;
+  reviewRecords: ReviewRecord[];
+};
+
 function formatMoney(value?: number) {
   if (!value) return "-";
   if (Math.abs(value) >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}亿`;
@@ -293,6 +328,21 @@ async function loadSystemHealth() {
   const response = await fetch(`${base}reports/system-health.json?t=${Date.now()}`);
   if (!response.ok) return undefined;
   return (await response.json()) as SystemHealthReport;
+}
+
+async function loadStockIndex() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/stocks/index.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as StockDetailIndex;
+}
+
+async function loadStockDetail(instrument: string) {
+  const base = import.meta.env.BASE_URL || "/";
+  const file = instrument.replace(/[^0-9A-Z.]/gi, "_");
+  const response = await fetch(`${base}reports/stocks/${file}.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as StockDetailReport;
 }
 
 function Metric({
@@ -504,6 +554,55 @@ function DecisionTierPanel({
           <small>{tier.hint}</small>
         </button>
       ))}
+    </section>
+  );
+}
+
+function StockSearchPanel({
+  query,
+  index,
+  currentRows,
+  onOpen
+}: {
+  query: string;
+  index?: StockDetailIndex;
+  currentRows: StockPick[];
+  onOpen: (instrument: string) => void;
+}) {
+  const needle = query.trim().toLowerCase();
+  const current = new Set(currentRows.map((pick) => pick.instrument));
+  const matches = useMemo(() => {
+    if (!needle || needle.length < 2 || !index) return [];
+    return index.items
+      .filter((item) => {
+        const text = `${item.code} ${item.instrument} ${item.name} ${item.sector ?? ""}`.toLowerCase();
+        return text.includes(needle) && !current.has(item.instrument);
+      })
+      .slice(0, 8);
+  }, [currentRows, index, needle]);
+
+  if (!matches.length) return null;
+
+  return (
+    <section className="stock-search-panel">
+      <div className="stock-search-head">
+        <span>详情库匹配</span>
+        <strong>{matches.length}</strong>
+      </div>
+      <div className="stock-search-list">
+        {matches.map((item) => (
+          <button key={item.instrument} onClick={() => onOpen(item.instrument)}>
+            <div>
+              <strong>{item.name}</strong>
+              <span>{item.instrument}</span>
+            </div>
+            <div>
+              <span>{item.sector ?? "未分组"}</span>
+              <strong>{item.latestScore !== undefined ? item.latestScore.toFixed(1) : item.reviewSignals ? `${item.reviewSignals} 信号` : "详情"}</strong>
+            </div>
+          </button>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1529,14 +1628,56 @@ function PlanPanel({ plan, reviewRecords }: { plan: PlanReport; reviewRecords: R
 
 function StockDetailPage({
   pick,
+  detail,
   reviewRecords,
   onBack
 }: {
   pick?: StockPick;
+  detail?: StockDetailReport;
   reviewRecords: ReviewRecord[];
   onBack: () => void;
 }) {
-  if (!pick) {
+  const detailPick = pick ?? detail?.latestPick ?? detail?.planPick;
+  const records = detail?.reviewRecords?.length ? detail.reviewRecords : reviewRecords;
+
+  if (!detailPick && detail) {
+    return (
+      <section className="stock-page">
+        <aside className="detail-panel">
+          <DetailActions pick={{ instrument: detail.instrument } as StockPick} onBack={onBack} />
+          <div className="detail-head">
+            <div>
+              <span className="signal signal-wait">历史详情</span>
+              <h2>{detail.name}</h2>
+              <p>{detail.instrument}</p>
+            </div>
+          </div>
+          <div className="history-card">
+            <div className="chart-title">
+              <History size={16} />
+              <span>历史信号</span>
+            </div>
+            <div className="signal-history">
+              {records.slice(0, 8).map((record) => (
+                <div key={`${record.signalDate}-${record.instrument}`} className="signal-history-row">
+                  <div>
+                    <strong>{record.signalDate}</strong>
+                    <span>Rank {record.rank} · 评分 {record.score.toFixed(1)}</span>
+                  </div>
+                  <div className="history-values">
+                    <span>5日 <ReviewReturn value={record.horizons["5d"].returnPct} /></span>
+                    <span>浮盈 <ReviewReturn value={record.maxRunup10d} /></span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </section>
+    );
+  }
+
+  if (!detailPick) {
     return (
       <section className="list-panel standalone-empty">
         <div className="panel-toolbar">
@@ -1555,7 +1696,7 @@ function StockDetailPage({
 
   return (
     <section className="stock-page">
-      <PickDetail pick={pick} reviewRecords={reviewRecords} onBack={onBack} />
+      <PickDetail pick={detailPick} reviewRecords={records} onBack={onBack} />
     </section>
   );
 }
@@ -1584,6 +1725,8 @@ export default function App() {
   const [plan, setPlan] = useState<PlanReport | null>(null);
   const [review, setReview] = useState<ReviewReport | null>(null);
   const [health, setHealth] = useState<SystemHealthReport | undefined>();
+  const [stockIndex, setStockIndex] = useState<StockDetailIndex | undefined>();
+  const [stockDetail, setStockDetail] = useState<StockDetailReport | undefined>();
   const [view, setView] = useState<"radar" | "plan" | "review">("radar");
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
@@ -1605,13 +1748,14 @@ export default function App() {
     setStatus("loading");
     setLoadError(undefined);
 
-    Promise.all([loadReport(), loadPlan(), loadReview(), loadSystemHealth().catch(() => undefined)])
-      .then(([liveReport, livePlan, liveReview, liveHealth]) => {
+    Promise.all([loadReport(), loadPlan(), loadReview(), loadSystemHealth().catch(() => undefined), loadStockIndex().catch(() => undefined)])
+      .then(([liveReport, livePlan, liveReview, liveHealth, liveStockIndex]) => {
         if (cancelled) return;
         setReport(liveReport);
         setPlan(livePlan);
         setReview(liveReview);
         setHealth(liveHealth);
+        setStockIndex(liveStockIndex);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
         setSelected(findPick(liveReport, parseStockHash()) ?? allPicks(liveReport)[0]);
       })
@@ -1625,6 +1769,22 @@ export default function App() {
       cancelled = true;
     };
   }, [reloadKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setStockDetail(undefined);
+    if (!stockRoute) return;
+    loadStockDetail(stockRoute)
+      .then((detail) => {
+        if (!cancelled) setStockDetail(detail);
+      })
+      .catch(() => {
+        if (!cancelled) setStockDetail(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [stockRoute]);
 
   const liveBadge = status === "live" ? "Live" : status === "loading" ? "Loading" : "Sample";
   const allRows = useMemo(() => (report ? allPicks(report) : []), [report]);
@@ -1689,7 +1849,12 @@ export default function App() {
     setStockRoute(pick.instrument);
   };
 
-  const routedPick = findPick(report, stockRoute);
+  const openInstrument = (instrument: string) => {
+    window.location.hash = stockHash(instrument);
+    setStockRoute(instrument);
+  };
+
+  const routedPick = findPick(report, stockRoute) ?? stockDetail?.latestPick ?? stockDetail?.planPick;
 
   return (
     <main className="app-shell">
@@ -1741,7 +1906,7 @@ export default function App() {
       </header>
 
       {stockRoute ? (
-        <StockDetailPage pick={routedPick} reviewRecords={review.records} onBack={clearRoute} />
+        <StockDetailPage pick={routedPick} detail={stockDetail} reviewRecords={review.records} onBack={clearRoute} />
       ) : view === "radar" ? (
         <div className="radar-view">
           <section className="summary-grid">
@@ -1777,6 +1942,7 @@ export default function App() {
                 </div>
               </div>
               <DecisionTierPanel picks={allRows} active={tier} onChange={setTier} />
+              <StockSearchPanel query={query} index={stockIndex} currentRows={allRows} onOpen={openInstrument} />
               <PickTable picks={rows} selected={selected} onSelect={setSelected} onOpen={openStock} />
             </div>
             {selected && <PickDetail pick={selected} reviewRecords={review.records} />}

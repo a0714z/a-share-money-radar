@@ -3,6 +3,7 @@ dist
 *.tsbuildinfo
 .cache
 public/reports/system-health.json
+public/reports/stocks
 .env
 .env.*
 !.env.example

@@ -803,6 +803,64 @@ a {
   box-shadow: inset 0 0 0 1px rgba(21, 154, 101, 0.24);
 }
 
+.stock-search-panel {
+  margin: 0 0 12px;
+  padding: 10px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.stock-search-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.stock-search-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stock-search-list button {
+  display: flex;
+  min-width: 0;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  color: #14201a;
+  background: #fbfcfa;
+  text-align: left;
+}
+
+.stock-search-list div {
+  min-width: 0;
+}
+
+.stock-search-list strong,
+.stock-search-list span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-search-list span {
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .table-wrap {
   overflow: auto;
   max-height: calc(100vh - 260px);
@@ -1769,6 +1827,7 @@ a {
   .status-grid,
   .system-health-grid,
   .decision-panel,
+  .stock-search-list,
   .change-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2202,6 +2261,7 @@ a {
   .status-grid,
   .system-health-grid,
   .decision-panel,
+  .stock-search-list,
   .health-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
