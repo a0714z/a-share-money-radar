@@ -42,6 +42,17 @@ import type {
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
+const decisionTiers = [
+  { key: "value", label: "高性价比", hint: "位置不高、资金为正、盈亏比够" },
+  { key: "actionable", label: "今日可关注", hint: "强关注或承接较好" },
+  { key: "pullback", label: "等回踩", hint: "资金还在，但价格没到关注区" },
+  { key: "extended", label: "位置偏高", hint: "资金异动但追高性价比低" },
+  { key: "weak", label: "承接转弱", hint: "资金或形态转弱" },
+  { key: "invalid", label: "已失效", hint: "跌破计划防守线" },
+  { key: "all", label: "全部", hint: "完整候选池" }
+] as const;
+
+type DecisionTier = (typeof decisionTiers)[number]["key"];
 
 type SystemHealthReport = {
   generatedAt: string;
@@ -128,6 +139,83 @@ function marketActionText(market?: MarketRegime) {
 
 function allPicks(report: ScanReport) {
   return [...report.picks, ...report.watchlist, ...report.avoided].sort((a, b) => a.rank - b.rank);
+}
+
+function isInvalidPick(pick: StockPick) {
+  return pick.setupState === "跌破失效" || Boolean(pick.tradePlan && pick.price < pick.tradePlan.invalidBelow);
+}
+
+function isWeakPick(pick: StockPick) {
+  return (
+    pick.setupState === "承接转弱" ||
+    pick.setupState === "放量派发风险" ||
+    pick.flowRatio5d < 0 ||
+    pick.risks.some((risk) => /跌破|派发|转弱|追高/.test(risk))
+  );
+}
+
+function isExtendedPick(pick: StockPick) {
+  const plan = pick.tradePlan;
+  return (
+    !isInvalidPick(pick) &&
+    !isWeakPick(pick) &&
+    pick.flowRatio5d >= 0.018 &&
+    (pick.valuePosition > 62 || pick.pctChange > 3.5 || Boolean(plan && pick.price > plan.chaseAbove))
+  );
+}
+
+function isHighValuePick(pick: StockPick) {
+  const plan = pick.tradePlan;
+  return (
+    !isInvalidPick(pick) &&
+    !isWeakPick(pick) &&
+    Boolean(plan) &&
+    pick.valuePosition <= 62 &&
+    pick.pctChange <= 3.5 &&
+    pick.flowRatio5d >= 0.025 &&
+    Number(plan?.riskReward ?? 0) >= 1.15
+  );
+}
+
+function isPullbackPick(pick: StockPick) {
+  const plan = pick.tradePlan;
+  return (
+    !isInvalidPick(pick) &&
+    !isWeakPick(pick) &&
+    !isHighValuePick(pick) &&
+    Boolean(plan) &&
+    pick.flowRatio5d >= 0.012 &&
+    (pick.price > Number(plan?.entryHigh ?? Infinity) || pick.distanceToMa20 > 4 || pick.valuePosition > 48)
+  );
+}
+
+function isActionablePick(pick: StockPick) {
+  return (
+    !isInvalidPick(pick) &&
+    !isWeakPick(pick) &&
+    !isExtendedPick(pick) &&
+    (isHighValuePick(pick) || pick.signal === "strong" || pick.setupState === "承接确认" || pick.setupState === "缩量回踩")
+  );
+}
+
+function decisionTierOf(pick: StockPick): DecisionTier {
+  if (isInvalidPick(pick)) return "invalid";
+  if (isWeakPick(pick)) return "weak";
+  if (isHighValuePick(pick)) return "value";
+  if (isExtendedPick(pick)) return "extended";
+  if (isPullbackPick(pick)) return "pullback";
+  if (isActionablePick(pick)) return "actionable";
+  return "all";
+}
+
+function matchesDecisionTier(pick: StockPick, tier: DecisionTier) {
+  if (tier === "all") return true;
+  if (tier === "actionable") return isActionablePick(pick);
+  return decisionTierOf(pick) === tier;
+}
+
+function decisionTierCounts(picks: StockPick[]) {
+  return Object.fromEntries(decisionTiers.map((tier) => [tier.key, picks.filter((pick) => matchesDecisionTier(pick, tier.key)).length])) as Record<DecisionTier, number>;
 }
 
 function parseStockHash() {
@@ -393,6 +481,30 @@ function PickTable({
       </table>
       {!picks.length && <div className="empty">当前过滤条件下没有标的</div>}
     </div>
+  );
+}
+
+function DecisionTierPanel({
+  picks,
+  active,
+  onChange
+}: {
+  picks: StockPick[];
+  active: DecisionTier;
+  onChange: (tier: DecisionTier) => void;
+}) {
+  const counts = useMemo(() => decisionTierCounts(picks), [picks]);
+
+  return (
+    <section className="decision-panel">
+      {decisionTiers.map((tier) => (
+        <button key={tier.key} className={active === tier.key ? "decision-card active" : "decision-card"} onClick={() => onChange(tier.key)}>
+          <span>{tier.label}</span>
+          <strong>{counts[tier.key]}</strong>
+          <small>{tier.hint}</small>
+        </button>
+      ))}
+    </section>
   );
 }
 
@@ -1476,6 +1588,7 @@ export default function App() {
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
+  const [tier, setTier] = useState<DecisionTier>("value");
   const [selected, setSelected] = useState<StockPick | undefined>();
   const [status, setStatus] = useState<"loading" | "live" | "sample">("loading");
   const [loadError, setLoadError] = useState<string | undefined>();
@@ -1514,19 +1627,21 @@ export default function App() {
   }, [reloadKey]);
 
   const liveBadge = status === "live" ? "Live" : status === "loading" ? "Loading" : "Sample";
+  const allRows = useMemo(() => (report ? allPicks(report) : []), [report]);
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (report ? allPicks(report) : []).filter((pick) => {
+    return allRows.filter((pick) => {
+      const matchesTier = matchesDecisionTier(pick, tier);
       const matchesSignal = signal === "all" || pick.signal === signal;
       const matchesQuery =
         !needle ||
         pick.name.toLowerCase().includes(needle) ||
         pick.code.toLowerCase().includes(needle) ||
         pick.instrument.toLowerCase().includes(needle);
-      return matchesSignal && matchesQuery;
+      return matchesTier && matchesSignal && matchesQuery;
     });
-  }, [query, report, signal]);
+  }, [allRows, query, signal, tier]);
 
   useEffect(() => {
     if (!selected || !rows.some((pick) => pick.instrument === selected.instrument)) {
@@ -1642,7 +1757,7 @@ export default function App() {
               <div className="panel-toolbar">
                 <div>
                   <h2>资金进场候选</h2>
-                  <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</span>
+                  <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)} · 当前 {rows.length} / 全部 {allRows.length}</span>
                 </div>
                 <div className="controls">
                   <label className="search-box">
@@ -1661,6 +1776,7 @@ export default function App() {
                   </div>
                 </div>
               </div>
+              <DecisionTierPanel picks={allRows} active={tier} onChange={setTier} />
               <PickTable picks={rows} selected={selected} onSelect={setSelected} onOpen={openStock} />
             </div>
             {selected && <PickDetail pick={selected} reviewRecords={review.records} />}
