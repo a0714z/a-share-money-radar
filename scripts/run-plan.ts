@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
+import { cachedMoneyFlow } from "./api-cache";
 import { dailyKLines, readStockListCache, thirtyMinuteKLines } from "./kline-cache";
 import { average, clamp, last, movingAverage, pctChange, round } from "../src/lib/math";
 import { scoreCandidate } from "../src/lib/scoring";
@@ -293,7 +294,7 @@ async function runPlan() {
       const code = plainCode(setup.stock.dm);
       const [intraday30m, flows] = await Promise.all([
         thirtyMinuteKLines(client, setup.instrument, config.intraday30mBars).catch(() => []),
-        client.moneyFlow(code, 10)
+        cachedMoneyFlow(client, code, 10)
       ]);
       const pick = scoreCandidate({ stock: setup.stock, quote: quoteFromHistory(setup), history: setup.history, intraday30m, flows });
       if ((index + 1) % 30 === 0) console.log(`[plan] refined ${index + 1}/${dailyCandidates.length}`);

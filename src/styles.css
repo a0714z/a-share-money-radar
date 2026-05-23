@@ -367,6 +367,55 @@ a {
   font-weight: 800;
 }
 
+.system-health-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.system-health-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.system-health-card span,
+.system-health-card small {
+  display: block;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.system-health-card strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.system-health-card small {
+  margin-top: 6px;
+}
+
+.health-ok {
+  border-color: #b9e6c9;
+  background: #f1fbf5;
+}
+
+.health-warn {
+  border-color: #ead493;
+  background: #fffaf0;
+}
+
+.health-risk {
+  border-color: #edb8b5;
+  background: #fff5f4;
+}
+
 .change-head {
   display: flex;
   align-items: flex-start;
@@ -1674,6 +1723,7 @@ a {
   .market-index-grid,
   .sector-bars,
   .status-grid,
+  .system-health-grid,
   .change-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2105,6 +2155,7 @@ a {
   .market-index-grid,
   .sector-bars,
   .status-grid,
+  .system-health-grid,
   .health-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;

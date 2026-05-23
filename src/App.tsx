@@ -43,6 +43,50 @@ import type {
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
 
+type SystemHealthReport = {
+  generatedAt: string;
+  tradeDate?: string;
+  status: "ok" | "warn" | "risk";
+  schedule: {
+    closeRun: string;
+    mailNotify: string;
+  };
+  reports: {
+    tone: "ok" | "warn" | "risk";
+    latestGeneratedAt?: string;
+    planGeneratedAt?: string;
+    reviewGeneratedAt?: string;
+    latestPicks: number;
+    latestWatchlist: number;
+    planCount: number;
+    reviewSignals: number;
+  };
+  klineCache: {
+    tone: "ok" | "warn" | "risk";
+    generatedAt?: string;
+    universe: number;
+    dailyFiles: number;
+    minute30Files: number;
+    indexFiles: number;
+    dailyBars: number;
+    minute30Bars: number;
+  };
+  apiCache: {
+    tone: "ok" | "warn" | "risk";
+    moneyFlowFiles: number;
+    profileFiles: number;
+    refreshEnabledOnlyWhen: string;
+  };
+  intraday?: {
+    status?: string;
+    generatedAt?: string;
+    hot: number;
+    watch: number;
+    risk: number;
+  };
+  notes: string[];
+};
+
 function formatMoney(value?: number) {
   if (!value) return "-";
   if (Math.abs(value) >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}亿`;
@@ -154,6 +198,13 @@ async function loadPlan() {
   const response = await fetch(`${base}reports/plan.json?t=${Date.now()}`);
   if (!response.ok) throw new Error("no plan report");
   return (await response.json()) as PlanReport;
+}
+
+async function loadSystemHealth() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/system-health.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as SystemHealthReport;
 }
 
 function Metric({
@@ -884,10 +935,12 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
 function SystemStatusPanel({
   report,
   review,
+  health,
   status
 }: {
   report: ScanReport;
   review: ReviewReport;
+  health?: SystemHealthReport;
   status: "loading" | "live" | "sample";
 }) {
   const reportFresh = report.meta.tradeDate === review.records[0]?.signalDate || review.meta.historyReports > 0;
@@ -937,6 +990,30 @@ function SystemStatusPanel({
         )}
       </div>
       {quality?.notes.length ? <p className="data-quality-note">{quality.notes.join("；")}</p> : null}
+      {health && (
+        <div className="system-health-grid">
+          <div className={`system-health-card health-${health.klineCache.tone}`}>
+            <span>K线缓存</span>
+            <strong>{health.klineCache.dailyFiles.toLocaleString("zh-CN")} / {health.klineCache.minute30Files.toLocaleString("zh-CN")}</strong>
+            <small>日K / 30m · {health.klineCache.generatedAt ?? "未生成"}</small>
+          </div>
+          <div className={`system-health-card health-${health.apiCache.tone}`}>
+            <span>API缓存</span>
+            <strong>{health.apiCache.moneyFlowFiles.toLocaleString("zh-CN")} / {health.apiCache.profileFiles.toLocaleString("zh-CN")}</strong>
+            <small>资金流 / 公司资料</small>
+          </div>
+          <div className={`system-health-card health-${health.reports.tone}`}>
+            <span>报告产出</span>
+            <strong>{health.reports.latestWatchlist} 观察 · {health.reports.planCount} 预案</strong>
+            <small>{health.generatedAt}</small>
+          </div>
+          <div className={`system-health-card health-${health.status}`}>
+            <span>定时任务</span>
+            <strong>{health.schedule.closeRun}</strong>
+            <small>邮件 {health.schedule.mailNotify}</small>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -1394,6 +1471,7 @@ export default function App() {
   const [report, setReport] = useState<ScanReport | null>(null);
   const [plan, setPlan] = useState<PlanReport | null>(null);
   const [review, setReview] = useState<ReviewReport | null>(null);
+  const [health, setHealth] = useState<SystemHealthReport | undefined>();
   const [view, setView] = useState<"radar" | "plan" | "review">("radar");
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
@@ -1414,12 +1492,13 @@ export default function App() {
     setStatus("loading");
     setLoadError(undefined);
 
-    Promise.all([loadReport(), loadPlan(), loadReview()])
-      .then(([liveReport, livePlan, liveReview]) => {
+    Promise.all([loadReport(), loadPlan(), loadReview(), loadSystemHealth().catch(() => undefined)])
+      .then(([liveReport, livePlan, liveReview, liveHealth]) => {
         if (cancelled) return;
         setReport(liveReport);
         setPlan(livePlan);
         setReview(liveReview);
+        setHealth(liveHealth);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
         setSelected(findPick(liveReport, parseStockHash()) ?? allPicks(liveReport)[0]);
       })
@@ -1588,7 +1667,7 @@ export default function App() {
           </section>
 
           <div className="insight-stack">
-            <SystemStatusPanel report={report} review={review} status={status} />
+            <SystemStatusPanel report={report} review={review} health={health} status={status} />
             <ChangeSummaryPanel report={report} />
             <MarketPanel market={report.market} />
             <ConcentrationPanel concentration={report.concentration} />

@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { BiyingClient } from "./biying-client";
+import { cachedCompanyProfile, cachedMoneyFlow } from "./api-cache";
 import { dailyKLines, readKLineCache, readStockListCache, thirtyMinuteKLines } from "./kline-cache";
 import { sampleReport } from "../src/data/sample-report";
 import { evaluateMarketRegime, MARKET_INDEXES } from "../src/lib/market-regime";
@@ -549,7 +550,7 @@ async function enrichSectors(client: BiyingClient, ranked: StockPick[]) {
 
   await mapLimit(targets, 24, async (pick) => {
     try {
-      const profile = await client.companyProfile(pick.code);
+      const profile = await cachedCompanyProfile(client, pick.code);
       enriched.set(pick.instrument, attachSector(pick, profile));
     } catch (error) {
       console.warn(`[scan] profile ${pick.instrument} skipped: ${(error as Error).message}`);
@@ -732,7 +733,7 @@ async function liveScan() {
           console.warn(`[scan] 30m cache ${instrument} skipped: ${(error as Error).message}`);
           return [];
         }),
-        client.moneyFlow(code, config.flowDays)
+        cachedMoneyFlow(client, code, config.flowDays)
       ]);
       const pick = scoreCandidate({ stock, quote, history, intraday30m, flows });
       if ((index + 1) % 25 === 0) console.log(`[scan] processed ${index + 1}/${roughCandidates.length}`);

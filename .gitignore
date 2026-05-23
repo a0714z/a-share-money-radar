@@ -2,6 +2,7 @@ node_modules
 dist
 *.tsbuildinfo
 .cache
+public/reports/system-health.json
 .env
 .env.*
 !.env.example
