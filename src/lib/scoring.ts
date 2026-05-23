@@ -1,5 +1,5 @@
 import { average, clamp, last, movingAverage, pctChange, round, sum } from "./math";
-import type { KLine, MoneyFlow, RealQuote, SetupState, StockListItem, StockPick } from "./types";
+import type { KLine, MoneyFlow, RealQuote, SetupState, StockActionPlan, StockListItem, StockPick } from "./types";
 import { inferExchange, toInstrumentCode } from "./universe";
 
 export type ScoreInput = {
@@ -632,6 +632,106 @@ export function buildTradePlan(args: {
   };
 }
 
+function priceRange(low?: number, high?: number) {
+  return Number.isFinite(low) && Number.isFinite(high) ? `${Number(low).toFixed(2)}-${Number(high).toFixed(2)}` : undefined;
+}
+
+export function buildStockActionPlan(pick: Pick<StockPick, "signal" | "price" | "pctChange" | "valuePosition" | "flowRatio5d" | "setupState" | "risks" | "tradePlan">): StockActionPlan {
+  const plan = pick.tradePlan;
+  const range = priceRange(plan?.entryLow, plan?.entryHigh);
+  const invalidBelow = plan?.invalidBelow;
+  const stopLoss = plan?.stopLoss;
+  const hasInvalidRisk = pick.risks.some((risk) => /跌破|失效/.test(risk));
+  const hasWeakRisk = pick.risks.some((risk) => /派发|转弱|放量回落|阴跌|追高/.test(risk));
+
+  if (plan && (pick.setupState === "跌破失效" || pick.price < plan.invalidBelow || hasInvalidRisk)) {
+    return {
+      state: "invalid",
+      label: "已失效",
+      priority: 90,
+      summary: `跌破 ${plan.invalidBelow.toFixed(2)} 后放弃这轮异动`,
+      reason: "价格或形态已经破坏资金进场逻辑",
+      invalidBelow,
+      stopLoss
+    };
+  }
+
+  if (pick.setupState === "承接转弱" || pick.setupState === "放量派发风险" || hasWeakRisk || pick.flowRatio5d < 0) {
+    return {
+      state: "risk",
+      label: "风控提醒",
+      priority: 80,
+      summary: plan ? `承接转弱，已有仓位按 ${plan.stopLoss.toFixed(2)} 控风险` : "承接转弱，先不新增仓位",
+      reason: pick.flowRatio5d < 0 ? "近5日资金转负，异动连续性不足" : "量价或形态出现转弱信号",
+      nextPrice: range,
+      invalidBelow,
+      stopLoss,
+      positionPct: 0
+    };
+  }
+
+  if (
+    plan &&
+    pick.signal !== "wait" &&
+    pick.price >= plan.entryLow &&
+    pick.price <= plan.entryHigh &&
+    pick.flowRatio5d >= 2.5 &&
+    pick.valuePosition <= 62 &&
+    pick.pctChange <= 3.5 &&
+    plan.riskReward >= 1.15
+  ) {
+    return {
+      state: "ready",
+      label: "可操作",
+      priority: 10,
+      summary: `关注区 ${range}，跌破 ${plan.invalidBelow.toFixed(2)} 放弃`,
+      reason: "价格进入关注区，资金仍为正，风险收益比达标",
+      nextPrice: range,
+      invalidBelow,
+      stopLoss,
+      positionPct: plan.positionPct
+    };
+  }
+
+  if (plan && pick.price > plan.entryHigh && pick.price <= plan.chaseAbove && pick.flowRatio5d >= 1.2) {
+    return {
+      state: "pullback",
+      label: "等回踩",
+      priority: 30,
+      summary: `等回踩 ${range}，不追高`,
+      reason: "异动仍在，但当前位置高于关注区",
+      nextPrice: range,
+      invalidBelow,
+      stopLoss,
+      positionPct: 0
+    };
+  }
+
+  return {
+    state: "track",
+    label: "继续跟踪",
+    priority: 50,
+    summary: plan ? `继续观察承接，关注 ${range}` : "继续观察承接和资金连续性",
+    reason: "异动条件尚未同时满足操作要求",
+    nextPrice: range,
+    invalidBelow,
+    stopLoss,
+    positionPct: 0
+  };
+}
+
+export function attachActionPlan<T extends StockPick>(pick: T): T {
+  const actionPlan = buildStockActionPlan(pick);
+  return {
+    ...pick,
+    actionState: actionPlan.state,
+    actionLabel: actionPlan.label,
+    actionReason: actionPlan.reason,
+    nextPrice: actionPlan.nextPrice,
+    actionPlan
+  };
+}
+
 export function scoreCandidate({ stock, quote, history, intraday30m, flows }: ScoreInput): StockPick | null {
   const cleanHistory = byDateAsc(history).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && bar.sf !== 1);
   if (cleanHistory.length < 40) return null;
@@ -868,7 +968,7 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
   );
   const intraday30mWithMa = cleanIntraday30m.length ? buildChartBars(cleanIntraday30m, 160) : undefined;
 
-  return {
+  const pick: StockPick = {
     rank: 0,
     code: stock.dm,
     instrument: toInstrumentCode(stock.dm, exchange),
@@ -913,4 +1013,5 @@ export function scoreCandidate({ stock, quote, history, intraday30m, flows }: Sc
     flowBars,
     updatedAt: quote.t
   };
+  return attachActionPlan(pick);
 }

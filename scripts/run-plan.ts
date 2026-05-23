@@ -6,7 +6,7 @@ import { BiyingClient } from "./biying-client";
 import { cachedMoneyFlow } from "./api-cache";
 import { dailyKLines, readStockListCache, thirtyMinuteKLines } from "./kline-cache";
 import { average, clamp, last, movingAverage, pctChange, round } from "../src/lib/math";
-import { scoreCandidate } from "../src/lib/scoring";
+import { attachActionPlan, scoreCandidate } from "../src/lib/scoring";
 import type { KLine, PlanReport, RealQuote, StockListItem, StockPick } from "../src/lib/types";
 import { inferExchange, isMainBoardNonSt, plainCode, toInstrumentCode } from "../src/lib/universe";
 
@@ -250,14 +250,14 @@ function enrichPlanPick(pick: StockPick, setup: DailySetup): StockPick {
   const risks = [...new Set([...setup.risks, ...pick.risks])];
   const reasons = [...new Set([...setup.reasons, ...pick.reasons])].slice(0, 7);
   const signal = score >= 76 && risks.length <= 3 ? "strong" : score >= 64 ? "watch" : "wait";
-  return {
+  return attachActionPlan({
     ...pick,
     score,
     signal,
     rating: signal === "strong" ? "预案重点" : signal === "watch" ? "预案观察" : "风险跟踪",
     reasons,
     risks
-  };
+  });
 }
 
 async function runPlan() {

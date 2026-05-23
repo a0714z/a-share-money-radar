@@ -803,6 +803,41 @@ a {
   box-shadow: inset 0 0 0 1px rgba(21, 154, 101, 0.24);
 }
 
+.action-chip {
+  display: inline-flex;
+  min-width: 64px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: #526057;
+  background: #eef2ef;
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.action-ready {
+  color: #075535;
+  background: #dff6e9;
+}
+
+.action-pullback {
+  color: #74510f;
+  background: #fff2c7;
+}
+
+.action-track {
+  color: #35546f;
+  background: #e5f0fb;
+}
+
+.action-risk,
+.action-invalid {
+  color: #8b2d2c;
+  background: #f8dedc;
+}
+
 .stock-search-panel {
   margin: 0 0 12px;
   padding: 10px;
@@ -1362,6 +1397,66 @@ a {
   color: #657168;
 }
 
+.action-conclusion {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(220px, 0.75fr);
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid #dce7e1;
+  border-radius: 8px;
+  background: #f8fbf8;
+}
+
+.action-eyebrow {
+  color: #657168;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.action-conclusion h3 {
+  margin: 6px 0;
+  font-size: 22px;
+}
+
+.action-conclusion p {
+  margin: 0;
+  color: #31443a;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.action-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.action-facts div {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid rgba(20, 32, 26, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.64);
+}
+
+.action-facts span,
+.action-facts strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.action-facts span {
+  color: #657168;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.action-facts strong {
+  margin-top: 6px;
+  font-size: 16px;
+}
+
 .theme-line {
   display: flex;
   flex-wrap: wrap;
@@ -1847,10 +1942,15 @@ a {
   }
 
   .detail-grid,
+  .action-conclusion,
   .evidence-grid,
   .trade-plan-grid,
   .review-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .action-conclusion {
+    grid-template-columns: 1fr;
   }
 
   .table-wrap,

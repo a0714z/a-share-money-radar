@@ -37,17 +37,17 @@ import type {
   ScanReport,
   SectorConcentrationReport,
   Signal,
+  StockActionState,
   StockPick
 } from "./lib/types";
 
 const signalOrder: Signal[] = ["strong", "watch", "wait"];
 const reviewHorizons: ReviewHorizon[] = ["1d", "3d", "5d", "10d"];
 const decisionTiers = [
-  { key: "value", label: "高性价比", hint: "位置不高、资金为正、盈亏比够" },
-  { key: "actionable", label: "今日可关注", hint: "强关注或承接较好" },
-  { key: "pullback", label: "等回踩", hint: "资金还在，但价格没到关注区" },
-  { key: "extended", label: "位置偏高", hint: "资金异动但追高性价比低" },
-  { key: "weak", label: "承接转弱", hint: "资金或形态转弱" },
+  { key: "ready", label: "可操作", hint: "到关注区，资金仍在" },
+  { key: "pullback", label: "等回踩", hint: "异动成立，价格偏高" },
+  { key: "track", label: "继续跟踪", hint: "承接未坏，条件未齐" },
+  { key: "risk", label: "风控提醒", hint: "承接或资金转弱" },
   { key: "invalid", label: "已失效", hint: "跌破计划防守线" },
   { key: "all", label: "全部", hint: "完整候选池" }
 ] as const;
@@ -234,23 +234,25 @@ function isActionablePick(pick: StockPick) {
 }
 
 function decisionTierOf(pick: StockPick): DecisionTier {
+  if (pick.actionState) return pick.actionState;
   if (isInvalidPick(pick)) return "invalid";
-  if (isWeakPick(pick)) return "weak";
-  if (isHighValuePick(pick)) return "value";
-  if (isExtendedPick(pick)) return "extended";
-  if (isPullbackPick(pick)) return "pullback";
-  if (isActionablePick(pick)) return "actionable";
-  return "all";
+  if (isWeakPick(pick)) return "risk";
+  if (isExtendedPick(pick) || isPullbackPick(pick)) return "pullback";
+  if (isHighValuePick(pick) || isActionablePick(pick)) return "ready";
+  return "track";
 }
 
 function matchesDecisionTier(pick: StockPick, tier: DecisionTier) {
   if (tier === "all") return true;
-  if (tier === "actionable") return isActionablePick(pick);
   return decisionTierOf(pick) === tier;
 }
 
 function decisionTierCounts(picks: StockPick[]) {
   return Object.fromEntries(decisionTiers.map((tier) => [tier.key, picks.filter((pick) => matchesDecisionTier(pick, tier.key)).length])) as Record<DecisionTier, number>;
+}
+
+function actionLabel(pick: StockPick) {
+  return pick.actionLabel ?? decisionTiers.find((tier) => tier.key === decisionTierOf(pick))?.label ?? "继续跟踪";
 }
 
 function parseStockHash() {
@@ -410,6 +412,7 @@ function MobilePickCard({
           <p>{pick.instrument}</p>
         </div>
         <div className="mobile-card-badges">
+          <span className={`action-chip action-${decisionTierOf(pick)}`}>{actionLabel(pick)}</span>
           <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
           <strong>{pick.score.toFixed(1)}</strong>
         </div>
@@ -479,6 +482,7 @@ function PickTable({
             <th>代码</th>
             <th>名称</th>
             <th>主题</th>
+            <th>操作</th>
             <th>信号</th>
             <th>阶段</th>
             <th>分数</th>
@@ -500,6 +504,9 @@ function PickTable({
               <td data-label="代码" className="code">{pick.instrument}</td>
               <td data-label="名称">{pick.name}</td>
               <td data-label="主题">{pick.sector ?? "-"}</td>
+              <td data-label="操作">
+                <span className={`action-chip action-${decisionTierOf(pick)}`}>{actionLabel(pick)}</span>
+              </td>
               <td data-label="信号">
                 <span className={`signal signal-${pick.signal}`}>{pick.rating}</span>
               </td>
@@ -976,6 +983,35 @@ function VolumeEvidencePanel({ pick }: { pick: StockPick }) {
   );
 }
 
+function ActionConclusion({ pick }: { pick: StockPick }) {
+  const state = decisionTierOf(pick);
+  const plan = pick.actionPlan;
+
+  return (
+    <section className={`action-conclusion action-${state}`}>
+      <div>
+        <span className="action-eyebrow">当前结论</span>
+        <h3>{actionLabel(pick)}</h3>
+        <p>{plan?.summary ?? pick.actionReason ?? "继续观察承接和资金连续性"}</p>
+      </div>
+      <div className="action-facts">
+        <div>
+          <span>下一价格</span>
+          <strong>{pick.nextPrice ?? plan?.nextPrice ?? "-"}</strong>
+        </div>
+        <div>
+          <span>失效位</span>
+          <strong>{plan?.invalidBelow !== undefined ? plan.invalidBelow.toFixed(2) : pick.tradePlan?.invalidBelow.toFixed(2) ?? "-"}</strong>
+        </div>
+        <div>
+          <span>仓位</span>
+          <strong>{plan?.positionPct !== undefined ? `${plan.positionPct}%` : pick.tradePlan ? `${pick.tradePlan.positionPct}%` : "-"}</strong>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRecords: ReviewRecord[]; onBack?: () => void }) {
   const plan = pick.tradePlan;
   const historySignals = reviewRecords
@@ -1002,6 +1038,8 @@ function PickDetail({ pick, reviewRecords, onBack }: { pick: StockPick; reviewRe
         <span className={pick.pctChange >= 0 ? "up" : "down"}>{formatPct(pick.pctChange)}</span>
         <span>信心 {pick.confidence}%</span>
       </div>
+
+      <ActionConclusion pick={pick} />
 
       <div className="theme-line">
         <span className="theme-primary">{pick.sector ?? "未分组"}</span>
@@ -1731,7 +1769,7 @@ export default function App() {
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
-  const [tier, setTier] = useState<DecisionTier>("value");
+  const [tier, setTier] = useState<DecisionTier>("ready");
   const [selected, setSelected] = useState<StockPick | undefined>();
   const [status, setStatus] = useState<"loading" | "live" | "sample">("loading");
   const [loadError, setLoadError] = useState<string | undefined>();

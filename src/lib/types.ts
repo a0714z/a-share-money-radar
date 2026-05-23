@@ -118,6 +118,20 @@ export type TradePlan = {
   notes: string[];
 };
 
+export type StockActionState = "ready" | "pullback" | "track" | "risk" | "invalid";
+
+export type StockActionPlan = {
+  state: StockActionState;
+  label: "可操作" | "等回踩" | "继续跟踪" | "风控提醒" | "已失效";
+  priority: number;
+  summary: string;
+  reason: string;
+  nextPrice?: string;
+  invalidBelow?: number;
+  stopLoss?: number;
+  positionPct?: number;
+};
+
 export type IntradayBurstEvidence = {
   score: number;
   supportScore: number;
@@ -260,6 +274,11 @@ export type StockPick = {
   themes?: string[];
   sectorSource?: "biying" | "fallback";
   tradePlan?: TradePlan;
+  actionState?: StockActionState;
+  actionLabel?: StockActionPlan["label"];
+  actionReason?: string;
+  nextPrice?: string;
+  actionPlan?: StockActionPlan;
   concentration?: {
     sector: string;
     groupRank: number;
