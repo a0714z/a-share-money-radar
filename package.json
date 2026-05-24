@@ -21,7 +21,8 @@
     "review:sample": "tsx scripts/run-review.ts --sample",
     "notify": "tsx scripts/send-email.ts",
     "notify:dry": "tsx scripts/send-email.ts --dry-run",
-    "backtest:strategy": "tsx scripts/run-strategy-backtest.ts"
+    "backtest:strategy": "tsx scripts/run-strategy-backtest.ts",
+    "cache:plan": "tsx scripts/run-cache-coverage.ts"
   },
   "keywords": [
     "a-share",

@@ -118,6 +118,7 @@ npm run daily:close
 - `notify:dry`：预览邮件内容，不发送。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：只读本地缓存的策略回测实验脚本。
+- `cache:plan`：只扫描本地缓存并生成补数请求计划，不调用 API。
 
 ## 策略回测
 
@@ -133,6 +134,19 @@ npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 
 - `public/reports/backtests/summary.md`
 
 数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求预算保护。
+
+补数前先生成计划：
+
+```bash
+npm run cache:plan -- --universe signals --daily-bars 180 --30m-bars 320 --flow-rows 120
+```
+
+输出：
+
+- `public/reports/backtests/cache-plan.json`
+- `public/reports/backtests/cache-plan.md`
+
+计划器只读本地缓存和已生成报告，估算需要的串行请求数并按预算分批，不会请求必盈 API。
 
 ## GitHub Actions
 

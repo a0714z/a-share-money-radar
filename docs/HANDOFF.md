@@ -96,6 +96,7 @@ npm run daily:close
 - `health`：生成 `system-health.json`。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
+- `cache:plan`：缓存覆盖/补数计划器，只扫描本地缓存和报告，不调用必盈 API。
 - `daily:close`：18:00 收盘生产总入口。
 
 当前 `daily:close`：
@@ -158,16 +159,20 @@ flowchart TD
 第一版脚本：
 
 ```bash
+npm run cache:plan -- --universe signals --daily-bars 180 --30m-bars 320 --flow-rows 120
 npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
 ```
 
 输出：
 
+- `public/reports/backtests/cache-plan.json`
+- `public/reports/backtests/cache-plan.md`
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
 
 约束：
 
+- `cache:plan` 只估算缺口和请求批次，不请求 API。真实补数必须按计划串行执行。
 - 回测脚本只读 `.cache/kline` 和 `.cache/biying`，不导入 `BiyingClient`，不调用必盈 API。
 - 每个交易日只使用当日及以前的日 K/资金流缓存。
 - 第一版主要使用日 K 回放；30m K 用于后续更精细的入场/止损增强。
