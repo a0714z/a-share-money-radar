@@ -9,7 +9,6 @@ import type { PlanReport, ReviewReport, ScanReport, StockActionState, StockPick 
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const defaultRecipient = "zxl4418@163.com";
 const defaultSiteUrl = "http://112.126.57.131/";
 
 dotenv.config({ path: resolve(root, ".env.local"), override: false, quiet: true });
@@ -160,14 +159,23 @@ function actionBucket(items: ActionItem[], state: StockActionState, limit = 5) {
   return items.filter((item) => actionState(item.pick) === state).slice(0, limit);
 }
 
+function positionText(state: StockActionState, position: number | undefined) {
+  if (state === "invalid") return "放弃/不新增";
+  if (state === "risk") return "不新增，已有按止损控";
+  if (state === "pullback" || state === "track") return "暂不新增";
+  if (position !== undefined && position > 0) return `${position}%`;
+  return "小仓观察，等确认";
+}
+
 function sourceText(source: ActionItem["source"]) {
   return source === "plan" ? "交易预案" : "今日选股";
 }
 
 function actionLine(item: ActionItem) {
   const pick = item.pick;
+  const state = actionState(pick);
   const action = pick.actionPlan;
-  const label = pick.actionLabel ?? actionLabels[actionState(pick)];
+  const label = pick.actionLabel ?? actionLabels[state];
   const summary = action?.summary ?? pick.actionReason ?? tradePlanText(pick);
   const nextPrice = pick.nextPrice ?? action?.nextPrice ?? (pick.tradePlan ? `${price(pick.tradePlan.entryLow)}-${price(pick.tradePlan.entryHigh)}` : "-");
   const invalid = action?.invalidBelow ?? pick.tradePlan?.invalidBelow;
@@ -176,7 +184,7 @@ function actionLine(item: ActionItem) {
     `${pick.name} ${pick.instrument}（${sourceText(item.source)} / ${label}）`,
     `现价 ${price(pick.price)}，涨跌 ${pct(pick.pctChange)}，评分 ${round(pick.score, 1)}，阶段 ${pick.setupState}`,
     `结论：${summary}`,
-    `关注价 ${nextPrice}，失效 ${price(invalid)}，仓位 ${position !== undefined ? `${position}%` : "-"}`,
+    `关注价 ${nextPrice}，失效 ${price(invalid)}，处理 ${positionText(state, position)}`,
     `详情：${stockUrl(pick.instrument)}`
   ].join("\n   ");
 }
@@ -186,15 +194,19 @@ function operationText(report: ScanReport, plan?: PlanReport) {
   const counts = actionCounts(items);
   const ready = actionBucket(items, "ready", 8);
   const pullback = actionBucket(items, "pullback", 6);
+  const track = actionBucket(items, "track", 5);
   const risk = [...actionBucket(items, "risk", 4), ...actionBucket(items, "invalid", 4)];
   const lines = [
-    `今日操作清单：可操作 ${counts.ready}，等回踩 ${counts.pullback}，风控 ${counts.risk}，已失效 ${counts.invalid}`,
+    `今日操作清单：可操作 ${counts.ready}，等回踩 ${counts.pullback}，继续跟踪 ${counts.track}，风控 ${counts.risk}，已失效 ${counts.invalid}`,
     "",
     "可操作：",
     ready.length ? ready.map(actionLine).join("\n\n") : "今日无可操作票，等待回踩/继续观察。",
     "",
     "等回踩：",
     pullback.length ? pullback.map(actionLine).join("\n\n") : "暂无需要等待回踩的重点票。",
+    "",
+    "继续跟踪：",
+    track.length ? track.map(actionLine).join("\n\n") : "暂无需要继续跟踪的重点票。",
     "",
     "风控/失效：",
     risk.length ? risk.map(actionLine).join("\n\n") : "暂无新的风控或失效提醒。"
@@ -340,7 +352,7 @@ function actionCard(item: ActionItem) {
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px;">
         <div style="padding:8px;border-radius:8px;background:#f9fafb;"><div style="color:#6b7280;font-size:12px;font-weight:800;">关注价</div><div style="margin-top:4px;font-weight:900;">${escapeHtml(nextPrice)}</div></div>
         <div style="padding:8px;border-radius:8px;background:#f9fafb;"><div style="color:#6b7280;font-size:12px;font-weight:800;">失效位</div><div style="margin-top:4px;font-weight:900;">${price(invalid)}</div></div>
-        <div style="padding:8px;border-radius:8px;background:#f9fafb;"><div style="color:#6b7280;font-size:12px;font-weight:800;">仓位</div><div style="margin-top:4px;font-weight:900;">${position !== undefined ? `${position}%` : "-"}</div></div>
+        <div style="padding:8px;border-radius:8px;background:#f9fafb;"><div style="color:#6b7280;font-size:12px;font-weight:800;">处理</div><div style="margin-top:4px;font-weight:900;">${escapeHtml(positionText(state, position))}</div></div>
       </div>
       <div style="margin-top:10px;"><a href="${escapeHtml(stockUrl(pick.instrument))}" style="color:#0f766e;font-weight:900;text-decoration:none;">打开详情</a></div>
     </div>`;
@@ -362,18 +374,21 @@ function operationHtml(report: ScanReport, plan?: PlanReport) {
   const counts = actionCounts(items);
   const ready = actionBucket(items, "ready", 8);
   const pullback = actionBucket(items, "pullback", 6);
+  const track = actionBucket(items, "track", 5);
   const risk = [...actionBucket(items, "risk", 4), ...actionBucket(items, "invalid", 4)];
   return `
     <div style="padding:16px 22px;border-bottom:1px solid #e5e7eb;background:#f9fafb;">
       <div style="font-size:17px;font-weight:900;">今日操作清单</div>
-      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px;">
+      <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-top:12px;">
         <div style="padding:10px;border-radius:8px;background:${actionColors.ready.bg};color:${actionColors.ready.fg};font-weight:900;">可操作 ${counts.ready}</div>
         <div style="padding:10px;border-radius:8px;background:${actionColors.pullback.bg};color:${actionColors.pullback.fg};font-weight:900;">等回踩 ${counts.pullback}</div>
+        <div style="padding:10px;border-radius:8px;background:${actionColors.track.bg};color:${actionColors.track.fg};font-weight:900;">跟踪 ${counts.track}</div>
         <div style="padding:10px;border-radius:8px;background:${actionColors.risk.bg};color:${actionColors.risk.fg};font-weight:900;">风控 ${counts.risk}</div>
         <div style="padding:10px;border-radius:8px;background:${actionColors.invalid.bg};color:${actionColors.invalid.fg};font-weight:900;">失效 ${counts.invalid}</div>
       </div>
       ${actionSection("可操作", ready, "今日无可操作票，等待回踩/继续观察。")}
       ${actionSection("等回踩", pullback, "暂无需要等待回踩的重点票。")}
+      ${actionSection("继续跟踪", track, "暂无需要继续跟踪的重点票。")}
       ${actionSection("风控/失效", risk, "暂无新的风控或失效提醒。")}
     </div>`;
 }
@@ -492,7 +507,7 @@ function buildSubject(report: ScanReport, review?: ReviewReport, plan?: PlanRepo
   const counts = actionCounts(items);
   const market = report.market?.label ?? "未计算";
   const health = review?.summary.health ? ` 健康${review.summary.health.label}` : "";
-  return `A股资金雷达 ${report.meta.tradeDate}：可操作${counts.ready} 等回踩${counts.pullback} 风控${counts.risk} 失效${counts.invalid} 市场${market}${health}`;
+  return `A股资金雷达 ${report.meta.tradeDate}：可操作${counts.ready} 等回踩${counts.pullback} 跟踪${counts.track} 风控${counts.risk} 失效${counts.invalid} 市场${market}${health}`;
 }
 
 async function loadReports() {
@@ -507,14 +522,14 @@ async function main() {
   const args = new Set(process.argv.slice(2));
   const dryRun = args.has("--dry-run");
   const { report, plan, review } = await loadReports();
-  const to = process.env.NOTIFY_EMAIL_TO || defaultRecipient;
+  const to = process.env.NOTIFY_EMAIL_TO;
   const subject = buildSubject(report, review, plan);
   const text = buildText(report, review, plan);
   const html = buildHtml(report, review, plan);
 
   if (dryRun) {
     console.log(`[notify] dry run`);
-    console.log(`To: ${to}`);
+    console.log(`To: ${to ?? "(NOTIFY_EMAIL_TO not configured)"}`);
     console.log(`Subject: ${subject}`);
     console.log("");
     console.log(text);

@@ -1,4 +1,4 @@
-name: Daily scan
+name: Static Pages build
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  scan-build:
+  pages-build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -30,16 +30,16 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Keep committed report
+      - name: Keep committed report for static preview
         run: |
           if [ ! -f public/reports/latest.json ]; then
             npm run scan:sample
             npm run review:sample
           else
-            echo "Using committed latest report for Pages build"
+            echo "Using committed report JSON for static Pages preview"
           fi
 
-      - name: Commit latest report
+      - name: Commit generated report disabled
         if: ${{ false }}
         run: |
           git config user.name "github-actions[bot]"
@@ -52,7 +52,7 @@ jobs:
             git push
           fi
 
-      - name: Send email notification
+      - name: Send email notification disabled
         if: ${{ false }}
         env:
           NOTIFY_EMAIL_TO: ${{ secrets.NOTIFY_EMAIL_TO }}

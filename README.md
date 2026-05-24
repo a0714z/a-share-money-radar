@@ -1,86 +1,138 @@
 # A股资金雷达
 
-基于必盈 API 的主板非 ST 量化选股平台。项目每天收盘后运行一次扫描，寻找“资金开始进场，同时价格仍处在有性价比区域”的候选标的。
+基于必盈 API 的主板非 ST 异动票雷达。项目目标不是做全市场股票查询，而是在每天收盘后筛出“已经出现资金/量价异动、可能需要操作或继续跟踪”的股票，并生成页面、交易预案、复盘、健康检查和邮件提醒。
 
-## 核心逻辑
+生产页面：`http://112.126.57.131/`
 
-- 股票池：只保留 `000/001/002/003/600/601/603/605` 主板代码，剔除名称包含 `ST`、`*ST`、`退` 的标的。
-- 粗筛：用全市场实时行情过滤成交额、量比、涨跌幅、60 日涨幅和流动性。
-- 精筛：对候选池补 120 日 K 线和 10 日资金流向。
-- 打分：资金流入 40%，价格分位与回撤 30%，趋势成本区 20%，流动性 10%，再扣除追高、过热、破位、流动性不足等风险。
-- 市场过滤：用上证指数、深证成指、沪深300、创业板指的 20/60 日线和短期收益判断强势、震荡、弱势；震荡时收紧核心池，弱势时暂停强关注。
-- 行业集中度：用公司简介里的概念及主营范围做主题归类，同一主题核心池默认最多 2 只，超出的高分票降为观察。
-- 交易计划：为每只候选生成关注区间、追高线、失效位、止损参考、目标位和仓位建议。
-- 输出：`public/reports/latest.json`，前端读取这份报告展示核心强关注、观察和等待名单。默认核心池控制在个位数，避免候选过多。
-- 复盘：每天归档 `public/reports/history/YYYY-MM-DD.json`，并生成 `public/reports/performance.json` 追踪核心池 1/3/5/10 日表现。
-- 邮件通知：收盘扫描完成后可把核心池、交易计划和复盘摘要发送到 `zxl4418@163.com`。
+更完整的接手说明见 `docs/HANDOFF.md`。开发前请先阅读该文档，尤其是 API 风控边界和服务器部署事实。
 
-## 本地运行
+## 当前生产方式
+
+- 生产代码目录：`/opt/a-share-money-radar`
+- 静态页面目录：`/var/www/a-share-money-radar`
+- 运行报告目录：`/var/www/a-share-money-radar/reports`
+- 生产 Node：`/opt/node-v24/bin/node`
+- 服务器环境变量：`/etc/a-share-money-radar.env`
+- 收盘生产：交易日 18:00 由 `a-share-kline-close.timer` 触发
+- 邮件通知：交易日 09:00 由 `a-share-morning-notify.timer` 触发
+
+服务器上的 `/opt/a-share-money-radar` 是 rsync 部署目录，不是 Git 工作区。推荐流程是本地开发、提交 GitHub、再打包同步到服务器。
+
+## 数据流
+
+每天收盘生产入口：
 
 ```bash
-cp .env.example .env.local
-# 把 BIYING_LICENSE 改成你的必盈 API 证书
+npm run daily:close
+```
+
+该脚本会依次执行：
+
+```bash
+npm run kline:sync &&
+API_CACHE_REFRESH=1 npm run scan &&
+API_CACHE_REFRESH=1 npm run plan &&
+npm run action:refresh &&
+npm run review &&
+npm run stock:details &&
+npm run health
+```
+
+主要输出：
+
+- `public/reports/latest.json`：今日异动票和观察名单
+- `public/reports/plan.json`：交易预案
+- `public/reports/performance.json`：历史复盘
+- `public/reports/system-health.json`：系统健康
+- `public/reports/stocks/index.json`：异动票详情索引
+- `public/reports/stocks/{instrument}.json`：单票详情
+
+生产环境中这些文件写入 `/var/www/a-share-money-radar/reports`。
+
+## API 风控边界
+
+必须遵守：
+
+- 页面只读取 `/reports/*.json` 和 `/reports/stocks/*.json`。
+- 邮件只读取本地报告 JSON。
+- 普通 `scan`/`plan` 的 K 线读取必须走本地 K 线缓存。
+- 资金流和公司资料默认只读 `.cache/biying`。
+- 只有 `API_CACHE_REFRESH=1` 时才允许刷新资金流/公司资料缓存。
+- GitHub Actions 不承担定时扫描职责，不要恢复会调用必盈 API 的 schedule。
+
+当前允许调用必盈 API 的入口主要是 `kline:sync`，以及带 `API_CACHE_REFRESH=1` 的收盘生产任务。
+
+## 本地开发
+
+安装依赖并构建：
+
+```bash
 npm install
-npm run scan
-npm run review
+npm run build
+```
+
+启动开发页面：
+
+```bash
 npm run dev
 ```
 
-只看界面可以先生成样例报告：
+本地只看界面时，可以使用仓库内已有 `public/reports` 数据。需要生成样例数据时：
 
 ```bash
 npm run scan:sample
 npm run review:sample
-npm run dev
 ```
+
+需要跑真实数据时，复制环境变量模板并填入本地密钥：
+
+```bash
+cp .env.example .env.local
+```
+
+不要把必盈 license、SMTP 授权码或服务器 root 密码写入仓库。
+
+## 常用脚本
+
+```bash
+npm run build
+npm run kline:sync
+npm run scan
+npm run plan
+npm run action:refresh
+npm run review
+npm run stock:details
+npm run health
+npm run notify:dry
+npm run notify
+npm run daily:close
+```
+
+- `kline:sync`：批量同步日 K、30m K 和指数 K 线。
+- `scan`：生成 `latest.json`，默认从本地缓存读 K 线。
+- `plan`：生成 `plan.json`，默认从本地缓存读 K 线。
+- `action:refresh`：给现有报告补操作状态，不调用 API。
+- `review`：生成 `performance.json`，只读本地 K 线缓存。
+- `stock:details`：生成异动票详情 JSON 和搜索索引。
+- `health`：生成 `system-health.json`。
+- `notify:dry`：预览邮件内容，不发送。
+- `notify`：发送邮件，只读本地 JSON。
 
 ## GitHub Actions
 
-`.github/workflows/daily-scan-pages.yml` 会在交易日北京时间 22:15 运行：
+`.github/workflows/daily-scan-pages.yml` 现在只在 push 到 `main` 或手动触发时构建静态页面并部署旧 GitHub Pages，不做定时扫描、不提交报告、不发送邮件。真实生产页面以服务器 `http://112.126.57.131/` 为准。
 
-1. 如果仓库 secret `BIYING_LICENSE` 存在，拉取必盈数据并生成真实报告。
-2. 如果 secret 不存在，生成样例报告，保证页面仍可构建。
-3. 提交 `public/reports/latest.json`、历史归档和 `public/reports/performance.json`，构建静态前端，并上传构建产物 artifact。
-4. 如果配置了 SMTP secrets，发送邮件提醒到 `zxl4418@163.com`；没有配置时自动跳过，不影响扫描。
-5. 如果仓库是公开仓库，额外部署到 GitHub Pages；私有仓库会保留在 Actions artifact 中。
+`.github/workflows/ci.yml` 用于 PR 或手动触发的构建校验，会生成样例报告后执行 `npm run build`。
 
-## 邮件通知
+## 部署摘要
 
-通知脚本默认收件人为 `zxl4418@163.com`，本地可先预览邮件内容：
+部署细节见 `docs/HANDOFF.md`。核心原则：
 
-```bash
-npm run notify:dry
-```
-
-要让 GitHub Actions 真正发邮件，需要在仓库 `Settings -> Secrets and variables -> Actions` 增加这些 secrets：
-
-| Secret | 示例 | 说明 |
-| --- | --- | --- |
-| `SMTP_HOST` | `smtp.163.com` | 发件邮箱 SMTP 服务器 |
-| `SMTP_PORT` | `465` | SMTP 端口 |
-| `SMTP_SECURE` | `true` | 465 端口通常为 `true` |
-| `SMTP_USER` | `your_sender@163.com` | 发件邮箱账号 |
-| `SMTP_PASS` | `授权码` | 163 邮箱需开启 SMTP 并使用授权码，不是登录密码 |
-| `SMTP_FROM` | `A股资金雷达 <your_sender@163.com>` | 邮件发件人显示 |
-
-## 配置项
-
-| 环境变量 | 默认值 | 说明 |
-| --- | ---: | --- |
-| `BIYING_LICENSE` | 必填 | 必盈 API 证书 |
-| `SCAN_TOP_N` | `8` | 核心强关注最多展示数量 |
-| `SCAN_HISTORY_DAYS` | `120` | 历史 K 线窗口 |
-| `SCAN_FLOW_DAYS` | `10` | 资金流向窗口 |
-| `SCAN_FLOW_CANDIDATE_LIMIT` | `180` | 进入精筛的候选数量 |
-| `SCAN_MIN_AMOUNT` | `30000000` | 最低成交额 |
-| `SCAN_MAX_PER_SECTOR` | `2` | 同一主题最多进入核心池数量 |
-| `NOTIFY_EMAIL_TO` | `zxl4418@163.com` | 邮件收件人 |
-| `SMTP_HOST` | - | 发件邮箱 SMTP 服务器 |
-| `SMTP_PORT` | `465` | SMTP 端口 |
-| `SMTP_SECURE` | `true` | 是否使用 TLS |
-| `SMTP_USER` | - | 发件邮箱账号 |
-| `SMTP_PASS` | - | 发件邮箱授权码或 SMTP 密码 |
-| `SMTP_FROM` | `SMTP_USER` | 发件人显示 |
+- 本地打包并同步源码到 `/opt/a-share-money-radar`。
+- 服务器使用 `/opt/node-v24/bin/npm` 安装依赖和构建。
+- 将 `dist/` 同步到 `/var/www/a-share-money-radar/`。
+- 同步静态页面时必须保留 `/var/www/a-share-money-radar/reports`。
+- 不要覆盖 `/opt/a-share-money-radar/.cache`。
 
 ## 风险说明
 

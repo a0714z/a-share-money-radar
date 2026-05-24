@@ -199,19 +199,22 @@ actionPlan?: {
 - `plan.json`
 - `performance.json`
 
+当前服务器 `/etc/a-share-money-radar.env` 已配置 `NOTIFY_EMAIL_TO` 和 SMTP 相关变量。2026-05-23 已用 `npm run notify` 发送过测试邮件并返回 message id。
+
 邮件标题格式类似：
 
 ```text
-A股资金雷达 2026-05-22：可操作2 等回踩13 风控62 失效20 市场震荡 健康收缩
+A股资金雷达 2026-05-22：可操作2 等回踩13 跟踪6 风控62 失效20 市场震荡 健康收缩
 ```
 
 正文顶部是“今日操作清单”，优先展示：
 
 1. 可操作
 2. 等回踩
-3. 风控/失效
+3. 继续跟踪
+4. 风控/失效
 
-每只票展示现价、涨跌、评分、阶段、结论、关注价、失效位、仓位和详情链接。`notify` 只读本地 JSON，不调用必盈 API。
+每只票展示现价、涨跌、评分、阶段、结论、关注价、失效位、处理建议和详情链接。`notify` 只读本地 JSON，不调用必盈 API。
 
 本地预览：
 
@@ -294,7 +297,7 @@ SMTP_PORT=465
 SMTP_SECURE=true
 SMTP_USER=邮箱账号
 SMTP_PASS=邮箱授权码
-SMTP_FROM=A股资金雷达 <邮箱账号>
+SMTP_FROM="A股资金雷达 <邮箱账号>"
 ```
 
 ## 部署流程
@@ -362,7 +365,7 @@ curl -I http://112.126.57.131/
 
 邮件验：
 
-- `npm run notify:dry` 标题里有 `可操作X 等回踩Y 风控Z 失效N`。
+- `npm run notify:dry` 标题里有 `可操作X 等回踩Y 跟踪Z 风控N 失效M`。
 - 详情链接指向 `http://112.126.57.131/#/stock/...`。
 
 ## 最近关键提交
