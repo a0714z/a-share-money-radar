@@ -97,6 +97,7 @@ npm run daily:close
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
 - `cache:plan`：缓存覆盖/补数计划器，只扫描本地缓存和报告，不调用必盈 API。
+- `data:bootstrap`：一次性串行补齐研究用日 K/30m K 缓存。
 - `daily:close`：18:00 收盘生产总入口。
 
 当前 `daily:close`：
@@ -142,7 +143,7 @@ flowchart TD
 - 默认只读 `.cache/biying`；只有 `API_CACHE_REFRESH=1` 时才刷新资金流/公司资料 API 缓存。
 - GitHub Actions 定时扫描已关闭，不要重新开启会调用必盈 API 的 schedule。
 
-当前 `scripts/biying-client.ts` 通过 `scripts/biying-request-guard.ts` 做全局串行请求队列、请求间隔和请求预算保护。`scripts/run-kline-sync.ts` 强制 `KLINE_SYNC_CONCURRENCY=1`，30m 历史和 latest 接口也按顺序请求。不要绕过 `BiyingClient` 直接 `fetch` 必盈接口。
+当前 `scripts/biying-client.ts` 通过 `scripts/biying-request-guard.ts` 做全局串行请求队列和请求间隔保护。`scripts/run-kline-sync.ts` 强制 `KLINE_SYNC_CONCURRENCY=1`，30m 历史和 latest 接口也按顺序请求。不要绕过 `BiyingClient` 直接 `fetch` 必盈接口。
 
 当前仍会调用必盈 API 的地方：
 
@@ -159,20 +160,21 @@ flowchart TD
 第一版脚本：
 
 ```bash
-npm run cache:plan -- --universe signals --daily-bars 180 --30m-bars 320 --flow-rows 120
+npm run data:bootstrap
 npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
 ```
 
 输出：
 
-- `public/reports/backtests/cache-plan.json`
-- `public/reports/backtests/cache-plan.md`
+- `public/reports/backtests/research-data-bootstrap.json`
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
 
 约束：
 
-- `cache:plan` 只估算缺口和请求批次，不请求 API。真实补数必须按计划串行执行。
+- `data:bootstrap` 是研究数据集的一次性补齐入口，默认拉取全部主板非 ST 股票 `620` 根日 K、`1200` 根 30m K、主要指数约 `1100` 个自然日范围日 K。
+- `data:bootstrap` 全程串行请求，已满足数量要求的缓存会跳过；`--force` 才强制重拉。
+- `cache:plan` 只作为诊断工具，估算缺口和请求批次，不请求 API。
 - 回测脚本只读 `.cache/kline` 和 `.cache/biying`，不导入 `BiyingClient`，不调用必盈 API。
 - 每个交易日只使用当日及以前的日 K/资金流缓存。
 - 第一版主要使用日 K 回放；30m K 用于后续更精细的入场/止损增强。
@@ -298,8 +300,11 @@ KLINE_30M_MAX_BARS=320
 KLINE_SYNC_CONCURRENCY=1
 KLINE_SYNC_REPORT_PATH=/var/www/a-share-money-radar/reports/kline-cache.json
 
-BIYING_MAX_REQUESTS=5500
+BIYING_MAX_REQUESTS=0
 BIYING_REQUEST_INTERVAL_MS=250
+RESEARCH_DAILY_BARS=620
+RESEARCH_30M_BARS=1200
+RESEARCH_INDEX_CALENDAR_DAYS=1100
 
 API_CACHE_DIR=/opt/a-share-money-radar/.cache/biying
 

@@ -22,7 +22,8 @@
     "notify": "tsx scripts/send-email.ts",
     "notify:dry": "tsx scripts/send-email.ts --dry-run",
     "backtest:strategy": "tsx scripts/run-strategy-backtest.ts",
-    "cache:plan": "tsx scripts/run-cache-coverage.ts"
+    "cache:plan": "tsx scripts/run-cache-coverage.ts",
+    "data:bootstrap": "tsx scripts/run-research-data-bootstrap.ts"
   },
   "keywords": [
     "a-share",

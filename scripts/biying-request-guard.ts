@@ -15,7 +15,7 @@ let lastRequestAt = 0;
 const stats: RequestStats = {
   startedAt: new Date().toISOString(),
   requests: 0,
-  maxRequests: intEnv("BIYING_MAX_REQUESTS", 5500),
+  maxRequests: intEnv("BIYING_MAX_REQUESTS", 0),
   minIntervalMs: intEnv("BIYING_REQUEST_INTERVAL_MS", 250)
 };
 
@@ -45,7 +45,7 @@ export function biyingRequestStats() {
 export async function guardedBiyingFetch({ label, run }: GuardOptions) {
   const release = await waitTurn();
   try {
-    if (stats.requests >= stats.maxRequests) {
+    if (stats.maxRequests > 0 && stats.requests >= stats.maxRequests) {
       throw new Error(`Biying request budget exhausted: ${stats.requests}/${stats.maxRequests}`);
     }
 
@@ -57,7 +57,8 @@ export async function guardedBiyingFetch({ label, run }: GuardOptions) {
     stats.requests += 1;
     lastRequestAt = Date.now();
     if (stats.requests === 1 || stats.requests % 100 === 0) {
-      console.log(`[biying-api] serial request ${stats.requests}/${stats.maxRequests}: ${label}`);
+      const budget = stats.maxRequests > 0 ? `/${stats.maxRequests}` : "";
+      console.log(`[biying-api] serial request ${stats.requests}${budget}: ${label}`);
     }
     return await run();
   } finally {
