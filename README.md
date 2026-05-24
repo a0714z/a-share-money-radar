@@ -117,6 +117,22 @@ npm run daily:close
 - `health`：生成 `system-health.json`。
 - `notify:dry`：预览邮件内容，不发送。
 - `notify`：发送邮件，只读本地 JSON。
+- `backtest:strategy`：只读本地缓存的策略回测实验脚本。
+
+## 策略回测
+
+当前实验方向是在历史日期上模拟“当日选股”，再用后续 10/20 个交易日验证表现。回测脚本只读本地缓存，不调用必盈 API：
+
+```bash
+npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
+```
+
+输出：
+
+- `public/reports/backtests/latest.json`
+- `public/reports/backtests/summary.md`
+
+数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求预算保护。
 
 ## GitHub Actions
 

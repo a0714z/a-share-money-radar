@@ -44,15 +44,10 @@ function chinaDateTime(date = new Date()) {
     .replace(/\//g, "-");
 }
 
-async function mapLimit<T>(items: T[], limit: number, mapper: (item: T, index: number) => Promise<void>) {
-  let cursor = 0;
-  async function worker() {
-    while (cursor < items.length) {
-      const index = cursor++;
-      await mapper(items[index], index);
-    }
+async function mapSerial<T>(items: T[], mapper: (item: T, index: number) => Promise<void>) {
+  for (let index = 0; index < items.length; index += 1) {
+    await mapper(items[index], index);
   }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 async function writeSummary(summary: SyncSummary) {
@@ -88,7 +83,10 @@ async function run() {
   const indexOnly = args.has("--index-only");
   const dailyDays = intEnv("KLINE_SYNC_DAILY_DAYS", intEnv("PLAN_HISTORY_DAYS", 80));
   const intradayBars = intEnv("KLINE_SYNC_30M_BARS", intEnv("PLAN_30M_BARS", 160));
-  const concurrency = intEnv("KLINE_SYNC_CONCURRENCY", 10);
+  const requestedConcurrency = intEnv("KLINE_SYNC_CONCURRENCY", 1);
+  if (requestedConcurrency !== 1) {
+    console.warn("[kline-sync] KLINE_SYNC_CONCURRENCY is forced to 1 because Biying API requests must be serial.");
+  }
   const client = new BiyingClient(license);
 
   const universe = indexOnly
@@ -125,7 +123,7 @@ async function run() {
       .format(startDate)
       .replace(/\//g, "");
 
-    await mapLimit([...MARKET_INDEXES], Math.min(concurrency, MARKET_INDEXES.length), async (index) => {
+    await mapSerial([...MARKET_INDEXES], async (index) => {
       try {
         const bars = await client.indexHistory(index.code, start, end);
         const merged = await writeKLineCache("index-daily", index.code, bars, 260);
@@ -138,7 +136,7 @@ async function run() {
     });
   }
 
-  if (!indexOnly) await mapLimit(universe, concurrency, async ({ instrument }, index) => {
+  if (!indexOnly) await mapSerial(universe, async ({ instrument }, index) => {
     if (!intradayOnly) {
       try {
         const bars = await client.history(instrument, dailyDays);
@@ -153,10 +151,8 @@ async function run() {
 
     if (!dailyOnly) {
       try {
-        const [history30m, latest30m] = await Promise.all([
-          client.history30m(instrument, intradayBars).catch(() => []),
-          client.latest30m(instrument, Math.min(intradayBars, 96)).catch(() => [])
-        ]);
+        const history30m = await client.history30m(instrument, intradayBars).catch(() => []);
+        const latest30m = await client.latest30m(instrument, Math.min(intradayBars, 96)).catch(() => []);
         const merged = await writeKLineCache("30m", instrument, mergeKLines(history30m, latest30m), Math.max(intradayBars, intEnv("KLINE_30M_MAX_BARS", 320)));
         summary.intraday30m.ok += 1;
         summary.intraday30m.bars += merged.length;

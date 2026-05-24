@@ -95,6 +95,7 @@ npm run daily:close
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
 - `health`：生成 `system-health.json`。
 - `notify`：发送邮件，只读本地 JSON。
+- `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
 - `daily:close`：18:00 收盘生产总入口。
 
 当前 `daily:close`：
@@ -132,6 +133,7 @@ flowchart TD
 
 必须遵守：
 
+- 必盈 API 请求必须串行，不能并发；即使没有 IP 限制，也要遵守证书请求频率限制。
 - 页面只 fetch `/reports/*.json` 和 `/reports/stocks/*.json`，不直接调用必盈 API。
 - 普通 `scan`/`plan` 的 K 线读取必须走 `scripts/kline-cache.ts`，不自动回源。
 - `dailyKLines()` 和 `thirtyMinuteKLines()` 当前只读缓存。
@@ -139,11 +141,38 @@ flowchart TD
 - 默认只读 `.cache/biying`；只有 `API_CACHE_REFRESH=1` 时才刷新资金流/公司资料 API 缓存。
 - GitHub Actions 定时扫描已关闭，不要重新开启会调用必盈 API 的 schedule。
 
+当前 `scripts/biying-client.ts` 通过 `scripts/biying-request-guard.ts` 做全局串行请求队列、请求间隔和请求预算保护。`scripts/run-kline-sync.ts` 强制 `KLINE_SYNC_CONCURRENCY=1`，30m 历史和 latest 接口也按顺序请求。不要绕过 `BiyingClient` 直接 `fetch` 必盈接口。
+
 当前仍会调用必盈 API 的地方：
 
 - `scripts/run-kline-sync.ts`：stockList、indexHistory、history、history30m、latest30m。
 - `scripts/api-cache.ts`：在 `API_CACHE_REFRESH=1` 时调用 moneyFlow、companyProfile。
 - `scripts/run-intraday-pulse.ts` 仍有实时行情逻辑，但对应 timer 当前不启用。
+
+## 策略回测实验
+
+当前实验分支：`strategy-backtest-lab`。
+
+目标是把某个历史日期当作“今天”，只用该日期及以前的缓存数据选股，再用后续 10/20 个交易日验证策略表现，避免未来函数。
+
+第一版脚本：
+
+```bash
+npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
+```
+
+输出：
+
+- `public/reports/backtests/latest.json`
+- `public/reports/backtests/summary.md`
+
+约束：
+
+- 回测脚本只读 `.cache/kline` 和 `.cache/biying`，不导入 `BiyingClient`，不调用必盈 API。
+- 每个交易日只使用当日及以前的日 K/资金流缓存。
+- 第一版主要使用日 K 回放；30m K 用于后续更精细的入场/止损增强。
+- 同一根日 K 同时触发目标价和止损时，按保守口径算止损先触发。
+- 当前本地报价字段由日 K 近似构造，换手率/量比没有实时行情完整，回测结果用于策略迭代参考，不直接视为实盘收益。
 
 ## 关键报告文件
 
@@ -261,8 +290,11 @@ KLINE_SYNC_DAILY_DAYS=80
 KLINE_SYNC_30M_BARS=160
 KLINE_DAILY_MAX_BARS=120
 KLINE_30M_MAX_BARS=320
-KLINE_SYNC_CONCURRENCY=10
+KLINE_SYNC_CONCURRENCY=1
 KLINE_SYNC_REPORT_PATH=/var/www/a-share-money-radar/reports/kline-cache.json
+
+BIYING_MAX_REQUESTS=5500
+BIYING_REQUEST_INTERVAL_MS=250
 
 API_CACHE_DIR=/opt/a-share-money-radar/.cache/biying
 

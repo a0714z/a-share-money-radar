@@ -1,4 +1,5 @@
 import type { CompanyProfile, KLine, MoneyFlow, RealQuote, StockListItem } from "../src/lib/types";
+import { guardedBiyingFetch } from "./biying-request-guard";
 
 const API_BASE = "https://api.biyingapi.com";
 const ALL_BASE = "https://all.biyingapi.com";
@@ -20,10 +21,14 @@ function toUrl(path: string, options: FetchOptions = {}) {
 async function fetchJson<T>(path: string, options: FetchOptions = {}): Promise<T> {
   const url = toUrl(path, options);
   const safePath = url.pathname.replace(/\/[^/]+$/, "/[redacted]");
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/json"
-    }
+  const response = await guardedBiyingFetch({
+    label: safePath,
+    run: () =>
+      fetch(url, {
+        headers: {
+          Accept: "application/json"
+        }
+      })
   });
 
   if (!response.ok) {

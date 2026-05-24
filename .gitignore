@@ -4,6 +4,7 @@ dist
 .cache
 public/reports/system-health.json
 public/reports/stocks
+public/reports/backtests
 .env
 .env.*
 !.env.example
