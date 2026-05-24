@@ -123,10 +123,28 @@ npm run daily:close
 
 ## 策略回测
 
-当前实验方向是在历史日期上模拟“当日选股”，再用后续 10/20 个交易日验证表现。回测脚本只读本地缓存，不调用必盈 API：
+当前实验方向是在历史日期上模拟“当日收盘选股”，再直接观察后续 5/10 个交易日表现。回测脚本只读本地缓存，不调用必盈 API，不模拟复杂买卖点：
 
 ```bash
-npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
+npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --top 10
+```
+
+波段策略 preset 会先用日 K/资金流做候选池，再用本地 30m K 线按交易日切片精修“爆量后缩量回踩不破”的质量。当前默认组合：`缩量回踩`、操作状态 `pullback/risk`、5 日大单净流入占比 `1.5%-12%`、120 日分位 `62%-75%`、回撤 `8%-24%`、30m 回踩质量分 `>=80` 且 30m 缩量比 `<=0.95`：
+
+```bash
+npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --top=10
+```
+
+输出会统计 5/10 日收盘涨跌、未来最高涨幅、最高涨幅日期/第几天、最大回撤，以及未来最高涨幅是否触达 `5%/8%/10%`。如果需要更宽的候选池，可放宽操作状态、分位和 30m 过滤：
+
+```bash
+npm run backtest:strategy -- --preset=swing --states=ready,pullback,track,risk,invalid --setups=缩量回踩 --min-value=50 --max-value=78 --min-30m-pullback-score=0.01 --max-30m-shrink-ratio=99
+```
+
+按最新一个交易日只做选股、不要求未来数据：
+
+```bash
+npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10
 ```
 
 输出：

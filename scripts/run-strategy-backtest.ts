@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { scoreCandidate } from "../src/lib/scoring";
 import { average, pctChange, round } from "../src/lib/math";
-import type { KLine, MoneyFlow, RealQuote, StockActionState, StockListItem, StockPick } from "../src/lib/types";
+import type { KLine, MoneyFlow, RealQuote, SetupState, StockActionState, StockListItem, StockPick } from "../src/lib/types";
 import { inferExchange, isMainBoardNonSt, plainCode, toInstrumentCode } from "../src/lib/universe";
 import { klineCacheRoot, readKLineCache, readStockListCache } from "./kline-cache";
 
@@ -15,27 +15,72 @@ const root = resolve(__dirname, "..");
 dotenv.config({ path: resolve(root, ".env.local"), override: false, quiet: true });
 dotenv.config({ path: resolve(root, ".env"), override: false, quiet: true });
 
-type Horizon = 10 | 20;
+type Horizon = 5 | 10;
+type StrategyPreset = "baseline" | "swing";
+type EvidenceMode = "any" | "intraday" | "daily" | "both";
+
+const ACTION_STATES = ["ready", "pullback", "track", "risk", "invalid"] as const satisfies readonly StockActionState[];
+const SETUP_STATES = ["二次突破", "承接确认", "缩量回踩", "爆量启动", "承接转弱", "放量派发风险", "跌破失效", "常规观察"] as const satisfies readonly SetupState[];
+
+type SwingFilterConfig = {
+  minFlowRatio: number;
+  maxFlowRatio: number;
+  minValuePosition: number;
+  maxValuePosition: number;
+  minScore: number;
+  maxScore: number;
+  minPullbackFromHigh: number;
+  maxPullbackFromHigh: number;
+  states: StockActionState[];
+  setups: SetupState[];
+  allowHardRisks: boolean;
+  evidence: EvidenceMode;
+  minIntradayScore: number;
+  minIntradaySupportScore: number;
+  maxIntradayDaysSince: number;
+  maxIntradayPullbackAmountRatio: number;
+  requireIntradayHeldMidpoint: boolean;
+  minThirtyMinutePullbackScore: number;
+  maxThirtyMinuteShrinkRatio: number;
+};
 
 type BacktestConfig = {
   from?: string;
   to?: string;
+  selectDate?: string;
   horizons: Horizon[];
   top: number;
   historyDays: number;
   flowDays: number;
   targetPct: number;
+  strongTargetPct: number;
+  stretchTargetPct: number;
   maxDates: number;
   outputDir: string;
+  preset: StrategyPreset;
+  useIntraday30m: boolean;
+  intraday30mBars: number;
+  refineCandidates: number;
+  swing: SwingFilterConfig;
 };
 
 type ReplayResult = {
   horizon: Horizon;
-  status: "target" | "stop" | "expired" | "pending";
+  status: "complete" | "pending";
+  entryPrice: number;
   closeReturnPct?: number;
   maxRunupPct?: number;
+  maxRunupDate?: string;
+  maxRunupDay?: number;
   maxDrawdownPct?: number;
-  firstTriggerDate?: string;
+  maxDrawdownDate?: string;
+  maxDrawdownDay?: number;
+  targetHit?: boolean;
+  strongTargetHit?: boolean;
+  stretchTargetHit?: boolean;
+  firstTargetDate?: string;
+  firstStrongTargetDate?: string;
+  firstStretchTargetDate?: string;
 };
 
 type BacktestPick = {
@@ -44,6 +89,7 @@ type BacktestPick = {
   instrument: string;
   name: string;
   score: number;
+  strategyScore: number;
   signal: StockPick["signal"];
   actionState: StockActionState;
   actionLabel?: string;
@@ -51,6 +97,25 @@ type BacktestPick = {
   setupState: StockPick["setupState"];
   flowRatio5d: number;
   valuePosition: number;
+  pullbackFromHigh: number;
+  actionReason?: string;
+  intradayScore?: number;
+  intradaySupportScore?: number;
+  intradayDaysSince?: number;
+  intradayPullbackAmountRatio?: number;
+  intradayHeldMidpoint?: boolean;
+  surgeScore?: number;
+  surgeDaysSince?: number;
+  surgePullbackAmountRatio?: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
+  thirtyMinuteDrawdownFromHigh?: number;
+  thirtyMinuteDistanceFromLow?: number;
+  thirtyMinuteHeldRecentLow?: boolean;
+  thirtyMinuteCloseAboveMa20?: boolean;
+  thirtyMinuteCloseAboveMa60?: boolean;
+  reasons: string[];
+  risks: string[];
   replay: Record<string, ReplayResult>;
 };
 
@@ -58,12 +123,16 @@ type Stats = {
   samples: number;
   completed: number;
   targetHits: number;
-  stopHits: number;
+  strongTargetHits: number;
+  stretchTargetHits: number;
   winRate?: number;
-  stopRate?: number;
+  positiveCloseRate?: number;
+  strongTargetRate?: number;
+  stretchTargetRate?: number;
   avgCloseReturnPct?: number;
   avgMaxRunupPct?: number;
   avgMaxDrawdownPct?: number;
+  avgPeakDay?: number;
 };
 
 type BacktestReport = {
@@ -72,11 +141,20 @@ type BacktestReport = {
     mode: "cache-only";
     from?: string;
     to?: string;
+    selectDate?: string;
     horizons: Horizon[];
     top: number;
     historyDays: number;
     flowDays: number;
     targetPct: number;
+    strongTargetPct: number;
+    stretchTargetPct: number;
+    preset: StrategyPreset;
+    useIntraday30m: boolean;
+    intraday30mBars: number;
+    refineCandidates: number;
+    swing?: SwingFilterConfig;
+    rejected: Record<string, number>;
     evaluatedDates: number;
     universe: number;
     notes: string[];
@@ -84,10 +162,13 @@ type BacktestReport = {
   cache: {
     stocksWithDaily: number;
     stocksWithMoneyFlow: number;
+    stocksWithIntraday30m: number;
+    intraday30mRefinedCandidates: number;
     skippedNoDaily: number;
   };
   summary: Record<string, Stats>;
   byActionState: Record<string, Record<string, Stats>>;
+  bySetupState: Record<string, Record<string, Stats>>;
   picks: BacktestPick[];
 };
 
@@ -100,6 +181,37 @@ type StockIndex = {
   items?: Array<{ code: string; instrument: string; name: string }>;
 };
 
+type StockData = {
+  stock: StockListItem;
+  instrument: string;
+  daily: KLine[];
+  flows: MoneyFlow[];
+};
+
+type ScoredCandidate = {
+  item: StockData;
+  pick: StockPick;
+  tradeIndex: number;
+  history: KLine[];
+  flows: MoneyFlow[];
+  future: KLine[];
+  thirtyMinuteSignal?: ThirtyMinuteSignal;
+};
+
+type SelectedCandidate = ScoredCandidate & {
+  strategyScore: number;
+};
+
+type ThirtyMinuteSignal = {
+  score: number;
+  shrinkRatio: number;
+  drawdownFromHigh: number;
+  distanceFromLow: number;
+  heldRecentLow: boolean;
+  closeAboveMa20: boolean;
+  closeAboveMa60: boolean;
+};
+
 function argValue(name: string) {
   const prefix = `--${name}=`;
   const inline = process.argv.find((arg) => arg.startsWith(prefix));
@@ -108,18 +220,87 @@ function argValue(name: string) {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
+function hasFlag(name: string) {
+  return process.argv.includes(`--${name}`);
+}
+
 function numberArg(name: string, fallback: number) {
   const value = Number(argValue(name));
   return Number.isFinite(value) && value > 0 ? value : fallback;
 }
 
+function boolArg(name: string, fallback: boolean) {
+  const raw = argValue(name);
+  if (raw === undefined) return hasFlag(name) ? true : fallback;
+  if (/^(1|true|yes|y)$/i.test(raw)) return true;
+  if (/^(0|false|no|n)$/i.test(raw)) return false;
+  return fallback;
+}
+
+function csvArg(name: string) {
+  return (argValue(name) ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function presetArg(): StrategyPreset {
+  const raw = argValue("preset");
+  return raw === "swing" ? "swing" : "baseline";
+}
+
+function evidenceArg(fallback: EvidenceMode): EvidenceMode {
+  const raw = argValue("evidence");
+  return raw === "intraday" || raw === "daily" || raw === "both" || raw === "any" ? raw : fallback;
+}
+
+function actionStatesArg(fallback: StockActionState[]) {
+  const raw = csvArg("states");
+  if (raw.includes("all")) return [...ACTION_STATES];
+  const allowed = new Set<StockActionState>(ACTION_STATES);
+  const parsed = raw.filter((item): item is StockActionState => allowed.has(item as StockActionState));
+  return parsed.length ? [...new Set(parsed)] : fallback;
+}
+
+function setupStatesArg(fallback: SetupState[]) {
+  const raw = csvArg("setups");
+  if (raw.includes("all")) return [...SETUP_STATES];
+  const allowed = new Set<SetupState>(SETUP_STATES);
+  const parsed = raw.filter((item): item is SetupState => allowed.has(item as SetupState));
+  return parsed.length ? [...new Set(parsed)] : fallback;
+}
+
+function swingFilterConfig(): SwingFilterConfig {
+  return {
+    minFlowRatio: numberArg("min-flow", 1.5),
+    maxFlowRatio: numberArg("max-flow", 12),
+    minValuePosition: numberArg("min-value", 62),
+    maxValuePosition: numberArg("max-value", 75),
+    minScore: numberArg("min-score", 64),
+    maxScore: numberArg("max-score", 100),
+    minPullbackFromHigh: numberArg("min-pullback", 8),
+    maxPullbackFromHigh: numberArg("max-pullback", 24),
+    states: actionStatesArg(["pullback", "risk"]),
+    setups: setupStatesArg(["缩量回踩"]),
+    allowHardRisks: boolArg("allow-hard-risks", false),
+    evidence: evidenceArg("any"),
+    minIntradayScore: numberArg("min-30m-score", 0),
+    minIntradaySupportScore: numberArg("min-30m-support", 0),
+    maxIntradayDaysSince: numberArg("max-30m-days", 99),
+    maxIntradayPullbackAmountRatio: numberArg("max-30m-pullback-ratio", 99),
+    requireIntradayHeldMidpoint: boolArg("require-30m-held-midpoint", false),
+    minThirtyMinutePullbackScore: numberArg("min-30m-pullback-score", 80),
+    maxThirtyMinuteShrinkRatio: numberArg("max-30m-shrink-ratio", 0.95)
+  };
+}
+
 function horizonsArg(): Horizon[] {
-  const raw = argValue("horizons") ?? argValue("horizon") ?? "10,20";
+  const raw = argValue("horizons") ?? argValue("horizon") ?? "5,10";
   const values = raw
     .split(",")
     .map((item) => Number(item.trim()))
-    .filter((item): item is Horizon => item === 10 || item === 20);
-  return values.length ? [...new Set(values)] : [10, 20];
+    .filter((item): item is Horizon => item === 5 || item === 10);
+  return values.length ? [...new Set(values)] : [5, 10];
 }
 
 function dateKey(value?: string) {
@@ -214,75 +395,249 @@ function quoteFromBar(stock: StockListItem, bars: KLine[], index: number): RealQ
   };
 }
 
-function replayPick(pick: StockPick, futureBars: KLine[], horizon: Horizon, targetPct: number): ReplayResult {
+function evaluateThirtyMinuteSignal(bars: KLine[]): ThirtyMinuteSignal | undefined {
+  const clean = byDateAsc(bars).filter((bar) => Number.isFinite(bar.c) && bar.c > 0 && Number.isFinite(bar.a) && bar.a > 0);
+  if (clean.length < 48) return undefined;
+
+  const recent = clean.slice(-48);
+  const last8 = recent.slice(-8);
+  const previous32 = recent.slice(8, 40);
+  const close = recent[recent.length - 1]?.c ?? 0;
+  const high = Math.max(...recent.map((bar) => bar.h));
+  const low = Math.min(...recent.map((bar) => bar.l));
+  const previousLow = Math.min(...previous32.map((bar) => bar.l));
+  const last8Low = Math.min(...last8.map((bar) => bar.l));
+  const shrinkRatio = average(last8.map((bar) => bar.a)) / Math.max(1, average(previous32.map((bar) => bar.a)));
+  const ma20 = average(clean.slice(-20).map((bar) => bar.c));
+  const ma60 = average(clean.slice(-60).map((bar) => bar.c));
+  const drawdownFromHigh = high > 0 ? ((high - close) / high) * 100 : 0;
+  const distanceFromLow = low > 0 ? ((close - low) / low) * 100 : 0;
+  const heldRecentLow = last8Low >= previousLow * 0.985;
+  const closeAboveMa20 = close >= ma20;
+  const closeAboveMa60 = clean.length >= 60 ? close >= ma60 : close >= ma20 * 0.98;
+
+  const shrinkScore = shrinkRatio <= 0.55 ? 22 : shrinkRatio <= 0.75 ? 16 : shrinkRatio <= 0.95 ? 8 : shrinkRatio <= 1.2 ? 0 : -10;
+  const drawdownScore = drawdownFromHigh >= 4 && drawdownFromHigh <= 15 ? 18 : drawdownFromHigh > 15 && drawdownFromHigh <= 24 ? 8 : drawdownFromHigh < 2 ? -8 : 0;
+  const lowScore = heldRecentLow ? 18 : -18;
+  const maScore = (closeAboveMa20 ? 10 : -6) + (closeAboveMa60 ? 8 : -6);
+  const locationScore = distanceFromLow >= 3 && distanceFromLow <= 22 ? 8 : distanceFromLow > 35 ? -5 : 0;
+
+  return {
+    score: round(50 + shrinkScore + drawdownScore + lowScore + maScore + locationScore, 1),
+    shrinkRatio: round(shrinkRatio, 2),
+    drawdownFromHigh: round(drawdownFromHigh, 2),
+    distanceFromLow: round(distanceFromLow, 2),
+    heldRecentLow,
+    closeAboveMa20,
+    closeAboveMa60
+  };
+}
+
+function replayPick(pick: StockPick, futureBars: KLine[], horizon: Horizon, config: BacktestConfig): ReplayResult {
   const window = futureBars.slice(0, horizon);
-  if (window.length < horizon) return { horizon, status: "pending" };
-
   const entry = pick.price;
-  const target = entry * (1 + targetPct / 100);
-  const stop = pick.actionPlan?.stopLoss ?? pick.tradePlan?.stopLoss ?? entry * 0.94;
-  let maxHigh = entry;
-  let minLow = entry;
-  let status: ReplayResult["status"] = "expired";
-  let firstTriggerDate: string | undefined;
+  if (window.length < horizon) return { horizon, status: "pending", entryPrice: entry };
 
-  for (const bar of window) {
-    maxHigh = Math.max(maxHigh, bar.h);
-    minLow = Math.min(minLow, bar.l);
-    if (bar.l <= stop) {
-      status = "stop";
-      firstTriggerDate = dateKey(bar.t);
-      break;
+  let maxHigh = entry;
+  let maxRunupDate: string | undefined;
+  let maxRunupDay: number | undefined;
+  let minLow = entry;
+  let maxDrawdownDate: string | undefined;
+  let maxDrawdownDay: number | undefined;
+  let firstTargetDate: string | undefined;
+  let firstStrongTargetDate: string | undefined;
+  let firstStretchTargetDate: string | undefined;
+
+  for (let index = 0; index < window.length; index += 1) {
+    const bar = window[index];
+    const day = index + 1;
+    if (bar.h > maxHigh) {
+      maxHigh = bar.h;
+      maxRunupDate = dateKey(bar.t);
+      maxRunupDay = day;
     }
-    if (bar.h >= target) {
-      status = "target";
-      firstTriggerDate = dateKey(bar.t);
-      break;
+    if (bar.l < minLow) {
+      minLow = bar.l;
+      maxDrawdownDate = dateKey(bar.t);
+      maxDrawdownDay = day;
     }
+
+    const runup = pctChange(bar.h, entry);
+    if (!firstTargetDate && runup >= config.targetPct) firstTargetDate = dateKey(bar.t);
+    if (!firstStrongTargetDate && runup >= config.strongTargetPct) firstStrongTargetDate = dateKey(bar.t);
+    if (!firstStretchTargetDate && runup >= config.stretchTargetPct) firstStretchTargetDate = dateKey(bar.t);
   }
 
   const close = window[window.length - 1]?.c ?? entry;
+  const maxRunupPct = round(pctChange(maxHigh, entry), 2);
   return {
     horizon,
-    status,
+    status: "complete",
+    entryPrice: entry,
     closeReturnPct: round(pctChange(close, entry), 2),
-    maxRunupPct: round(pctChange(maxHigh, entry), 2),
+    maxRunupPct,
+    maxRunupDate,
+    maxRunupDay,
     maxDrawdownPct: round(pctChange(minLow, entry), 2),
-    firstTriggerDate
+    maxDrawdownDate,
+    maxDrawdownDay,
+    targetHit: maxRunupPct >= config.targetPct,
+    strongTargetHit: maxRunupPct >= config.strongTargetPct,
+    stretchTargetHit: maxRunupPct >= config.stretchTargetPct,
+    firstTargetDate,
+    firstStrongTargetDate,
+    firstStretchTargetDate
   };
 }
 
 function summarize(results: ReplayResult[]): Stats {
-  const completed = results.filter((item) => item.status !== "pending");
-  const targetHits = completed.filter((item) => item.status === "target").length;
-  const stopHits = completed.filter((item) => item.status === "stop").length;
+  const completed = results.filter((item) => item.status === "complete");
+  const targetHits = completed.filter((item) => item.targetHit).length;
+  const strongTargetHits = completed.filter((item) => item.strongTargetHit).length;
+  const stretchTargetHits = completed.filter((item) => item.stretchTargetHit).length;
+  const positiveClose = completed.filter((item) => (item.closeReturnPct ?? 0) > 0).length;
   return {
     samples: results.length,
     completed: completed.length,
     targetHits,
-    stopHits,
+    strongTargetHits,
+    stretchTargetHits,
     winRate: completed.length ? round((targetHits / completed.length) * 100, 1) : undefined,
-    stopRate: completed.length ? round((stopHits / completed.length) * 100, 1) : undefined,
+    positiveCloseRate: completed.length ? round((positiveClose / completed.length) * 100, 1) : undefined,
+    strongTargetRate: completed.length ? round((strongTargetHits / completed.length) * 100, 1) : undefined,
+    stretchTargetRate: completed.length ? round((stretchTargetHits / completed.length) * 100, 1) : undefined,
     avgCloseReturnPct: completed.length ? round(average(completed.map((item) => item.closeReturnPct)), 2) : undefined,
     avgMaxRunupPct: completed.length ? round(average(completed.map((item) => item.maxRunupPct)), 2) : undefined,
-    avgMaxDrawdownPct: completed.length ? round(average(completed.map((item) => item.maxDrawdownPct)), 2) : undefined
+    avgMaxDrawdownPct: completed.length ? round(average(completed.map((item) => item.maxDrawdownPct)), 2) : undefined,
+    avgPeakDay: completed.length ? round(average(completed.map((item) => item.maxRunupDay)), 1) : undefined
   };
 }
 
 function buildStats(picks: BacktestPick[], horizons: Horizon[]) {
   const summary: Record<string, Stats> = {};
   const byActionState: Record<string, Record<string, Stats>> = {};
+  const bySetupState: Record<string, Record<string, Stats>> = {};
   for (const horizon of horizons) {
     summary[`${horizon}d`] = summarize(picks.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
   }
-  for (const state of ["ready", "pullback", "track", "risk", "invalid"] satisfies StockActionState[]) {
+  for (const state of ACTION_STATES) {
     const group = picks.filter((pick) => pick.actionState === state);
     byActionState[state] = {};
     for (const horizon of horizons) {
       byActionState[state][`${horizon}d`] = summarize(group.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
     }
   }
-  return { summary, byActionState };
+  for (const state of SETUP_STATES) {
+    const group = picks.filter((pick) => pick.setupState === state);
+    bySetupState[state] = {};
+    for (const horizon of horizons) {
+      bySetupState[state][`${horizon}d`] = summarize(group.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
+    }
+  }
+  return { summary, byActionState, bySetupState };
+}
+
+function hardRiskReason(pick: StockPick) {
+  const hardRisk = pick.risks.find((risk) => /跌破|失效|派发|阴柱|放量回落|追高|换手过热|量比异常/.test(risk));
+  return hardRisk ? `hard-risk:${hardRisk}` : undefined;
+}
+
+function swingRankScore(pick: StockPick, thirtyMinuteSignal?: ThirtyMinuteSignal) {
+  const actionState = pick.actionState ?? "track";
+  const setupBonus =
+    pick.setupState === "缩量回踩"
+      ? 10
+      : pick.setupState === "承接确认"
+        ? 5
+        : pick.setupState === "二次突破"
+          ? 2
+          : pick.setupState === "爆量启动"
+            ? -3
+            : -8;
+  const actionBonus = actionState === "pullback" ? 7 : actionState === "ready" ? 5 : actionState === "track" ? -5 : -14;
+  const flowBonus = pick.flowRatio5d >= 3 && pick.flowRatio5d <= 6 ? 10 : pick.flowRatio5d >= 1.5 && pick.flowRatio5d < 3 ? 7 : pick.flowRatio5d > 6 && pick.flowRatio5d <= 8 ? 4 : -8;
+  const valueBonus =
+    pick.valuePosition >= 62 && pick.valuePosition <= 75
+      ? 12
+      : pick.valuePosition >= 50 && pick.valuePosition < 62
+        ? 6
+        : pick.valuePosition > 75 && pick.valuePosition <= 78
+          ? 1
+          : -8;
+  const pullbackBonus =
+    pick.pullbackFromHigh >= 8 && pick.pullbackFromHigh <= 24
+      ? 6
+      : pick.pullbackFromHigh >= 5 && pick.pullbackFromHigh <= 32
+        ? 3
+        : -6;
+  const thirtyMinuteBonus = thirtyMinuteSignal ? Math.max(-8, Math.min(10, (thirtyMinuteSignal.score - 64) * 0.35)) : 0;
+  return round(pick.score + setupBonus + actionBonus + flowBonus + valueBonus + pullbackBonus + thirtyMinuteBonus - pick.risks.length * 1.8, 2);
+}
+
+function evaluateStrategyPick(candidate: ScoredCandidate, config: BacktestConfig): { eligible: boolean; strategyScore: number; rejectReason?: string } {
+  const pick = candidate.pick;
+  if (config.preset === "baseline") return { eligible: true, strategyScore: pick.score };
+
+  const swing = config.swing;
+  const actionState = pick.actionState ?? "track";
+  if (!swing.states.includes(actionState)) return { eligible: false, strategyScore: pick.score, rejectReason: `state:${actionState}` };
+  if (!swing.setups.includes(pick.setupState)) return { eligible: false, strategyScore: pick.score, rejectReason: `setup:${pick.setupState}` };
+  if (pick.flowRatio5d < swing.minFlowRatio) return { eligible: false, strategyScore: pick.score, rejectReason: "flow:low" };
+  if (pick.flowRatio5d > swing.maxFlowRatio) return { eligible: false, strategyScore: pick.score, rejectReason: "flow:high" };
+  if (pick.valuePosition < swing.minValuePosition) return { eligible: false, strategyScore: pick.score, rejectReason: "value:low" };
+  if (pick.valuePosition > swing.maxValuePosition) return { eligible: false, strategyScore: pick.score, rejectReason: "value:high" };
+  if (pick.score < swing.minScore) return { eligible: false, strategyScore: pick.score, rejectReason: "score:low" };
+  if (pick.score > swing.maxScore) return { eligible: false, strategyScore: pick.score, rejectReason: "score:high" };
+  if (pick.pullbackFromHigh < swing.minPullbackFromHigh) return { eligible: false, strategyScore: pick.score, rejectReason: "pullback:low" };
+  if (pick.pullbackFromHigh > swing.maxPullbackFromHigh) return { eligible: false, strategyScore: pick.score, rejectReason: "pullback:high" };
+
+  const hasIntradayEvidence = Boolean(pick.intradayBurst);
+  const hasDailySurgeEvidence = Boolean(pick.surgePullback);
+  if (swing.evidence === "intraday" && !hasIntradayEvidence) return { eligible: false, strategyScore: pick.score, rejectReason: "evidence:no-30m" };
+  if (swing.evidence === "daily" && !hasDailySurgeEvidence) return { eligible: false, strategyScore: pick.score, rejectReason: "evidence:no-daily-surge" };
+  if (swing.evidence === "both" && (!hasIntradayEvidence || !hasDailySurgeEvidence)) {
+    return { eligible: false, strategyScore: pick.score, rejectReason: "evidence:not-both" };
+  }
+  if (pick.intradayBurst) {
+    if (pick.intradayBurst.score < swing.minIntradayScore) return { eligible: false, strategyScore: pick.score, rejectReason: "30m:score-low" };
+    if (pick.intradayBurst.supportScore < swing.minIntradaySupportScore) return { eligible: false, strategyScore: pick.score, rejectReason: "30m:support-low" };
+    if (pick.intradayBurst.daysSince > swing.maxIntradayDaysSince) return { eligible: false, strategyScore: pick.score, rejectReason: "30m:too-old" };
+    if (pick.intradayBurst.pullbackAmountRatio > swing.maxIntradayPullbackAmountRatio) {
+      return { eligible: false, strategyScore: pick.score, rejectReason: "30m:pullback-volume-high" };
+    }
+    if (swing.requireIntradayHeldMidpoint && !pick.intradayBurst.heldBodyMidpoint) {
+      return { eligible: false, strategyScore: pick.score, rejectReason: "30m:midpoint-lost" };
+    }
+  }
+  if (swing.minThirtyMinutePullbackScore > 0 && (!candidate.thirtyMinuteSignal || candidate.thirtyMinuteSignal.score < swing.minThirtyMinutePullbackScore)) {
+    return { eligible: false, strategyScore: pick.score, rejectReason: "30m-pullback:score-low" };
+  }
+  if (swing.maxThirtyMinuteShrinkRatio < 99 && (!candidate.thirtyMinuteSignal || candidate.thirtyMinuteSignal.shrinkRatio > swing.maxThirtyMinuteShrinkRatio)) {
+    return { eligible: false, strategyScore: pick.score, rejectReason: "30m-pullback:not-shrunk" };
+  }
+
+  const hardRisk = hardRiskReason(pick);
+  if (hardRisk && !swing.allowHardRisks) return { eligible: false, strategyScore: pick.score, rejectReason: hardRisk };
+
+  return { eligible: true, strategyScore: swingRankScore(pick, candidate.thirtyMinuteSignal) };
+}
+
+function selectStrategyCandidates(candidates: ScoredCandidate[], config: BacktestConfig, rejected: Map<string, number>): SelectedCandidate[] {
+  const selected: SelectedCandidate[] = [];
+  for (const candidate of candidates) {
+    const decision = evaluateStrategyPick(candidate, config);
+    if (!decision.eligible) {
+      const reason = decision.rejectReason ?? "unknown";
+      rejected.set(reason, (rejected.get(reason) ?? 0) + 1);
+      continue;
+    }
+    selected.push({ ...candidate, strategyScore: decision.strategyScore });
+  }
+  return selected.sort((a, b) => b.strategyScore - a.strategyScore || b.pick.score - a.pick.score);
+}
+
+function intradayUpToDate(bars: KLine[], tradeDate: string, limit: number) {
+  return bars.filter((bar) => dateKey(bar.t) <= tradeDate).slice(-limit);
 }
 
 function markdownReport(report: BacktestReport) {
@@ -292,14 +647,16 @@ function markdownReport(report: BacktestReport) {
     `Generated: ${report.meta.generatedAt}`,
     `Range: ${report.meta.from ?? "-"} to ${report.meta.to ?? "-"}`,
     `Mode: ${report.meta.mode}`,
+    `Preset: ${report.meta.preset}; 30m refine: ${report.meta.useIntraday30m ? `${report.meta.refineCandidates} candidates/date, ${report.meta.intraday30mBars} bars` : "off"}`,
+    `Signal replay: close-to-future; hit thresholds: ${report.meta.targetPct}% / ${report.meta.strongTargetPct}% / ${report.meta.stretchTargetPct}%`,
     `Universe: ${report.meta.universe}; evaluated dates: ${report.meta.evaluatedDates}; top per day: ${report.meta.top}`,
     "",
     "## Summary",
     "",
-    "| Horizon | Samples | Completed | Win | Stop | Avg Close | Avg Runup | Avg Drawdown |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    "| Horizon | Signals | Complete | Hit Target | Positive Close | Hit Strong | Hit Stretch | Avg Close | Avg Runup | Avg Drawdown | Avg Peak Day |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
     ...Object.entries(report.summary).map(([horizon, stats]) =>
-      `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.stopRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% |`
+      `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.positiveCloseRate ?? "-"}% | ${stats.strongTargetRate ?? "-"}% | ${stats.stretchTargetRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% | ${stats.avgPeakDay ?? "-"} |`
     ),
     "",
     "## By Action State",
@@ -308,11 +665,58 @@ function markdownReport(report: BacktestReport) {
 
   for (const [state, horizons] of Object.entries(report.byActionState)) {
     lines.push(`### ${state}`, "");
-    lines.push("| Horizon | Samples | Completed | Win | Stop | Avg Close | Avg Runup | Avg Drawdown |");
-    lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    lines.push("| Horizon | Signals | Complete | Hit Target | Positive Close | Hit Strong | Hit Stretch | Avg Close | Avg Runup | Avg Drawdown | Avg Peak Day |");
+    lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
     for (const [horizon, stats] of Object.entries(horizons)) {
       lines.push(
-        `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.stopRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% |`
+        `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.positiveCloseRate ?? "-"}% | ${stats.strongTargetRate ?? "-"}% | ${stats.stretchTargetRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% | ${stats.avgPeakDay ?? "-"} |`
+      );
+    }
+    lines.push("");
+  }
+
+  lines.push("## By Setup State", "");
+  for (const [state, horizons] of Object.entries(report.bySetupState)) {
+    const samples = Object.values(horizons).reduce((total, stats) => total + stats.samples, 0);
+    if (!samples) continue;
+    lines.push(`### ${state}`, "");
+    lines.push("| Horizon | Signals | Complete | Hit Target | Positive Close | Hit Strong | Hit Stretch | Avg Close | Avg Runup | Avg Drawdown | Avg Peak Day |");
+    lines.push("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
+    for (const [horizon, stats] of Object.entries(horizons)) {
+      lines.push(
+        `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.positiveCloseRate ?? "-"}% | ${stats.strongTargetRate ?? "-"}% | ${stats.stretchTargetRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% | ${stats.avgPeakDay ?? "-"} |`
+      );
+    }
+    lines.push("");
+  }
+
+  if (report.meta.preset === "swing" && report.meta.swing) {
+    const filters = report.meta.swing;
+    lines.push("## Swing Filters", "");
+    lines.push(`- States: ${filters.states.join(", ")}`);
+    lines.push(`- Setups: ${filters.setups.join(", ")}`);
+    lines.push(`- Flow ratio: ${filters.minFlowRatio}% to ${filters.maxFlowRatio}%`);
+    lines.push(`- Value position: ${filters.minValuePosition}% to ${filters.maxValuePosition}%`);
+    lines.push(`- Score: ${filters.minScore} to ${filters.maxScore}`);
+    lines.push(`- Pullback from high: ${filters.minPullbackFromHigh}% to ${filters.maxPullbackFromHigh}%`);
+    lines.push(`- Evidence: ${filters.evidence}`);
+    if (filters.minIntradayScore > 0) lines.push(`- Min 30m score: ${filters.minIntradayScore}`);
+    if (filters.minIntradaySupportScore > 0) lines.push(`- Min 30m support: ${filters.minIntradaySupportScore}`);
+    if (filters.maxIntradayDaysSince < 99) lines.push(`- Max 30m days since burst: ${filters.maxIntradayDaysSince}`);
+    if (filters.maxIntradayPullbackAmountRatio < 99) lines.push(`- Max 30m pullback amount ratio: ${filters.maxIntradayPullbackAmountRatio}`);
+    if (filters.requireIntradayHeldMidpoint) lines.push("- Require 30m body midpoint held");
+    if (filters.minThirtyMinutePullbackScore > 0) lines.push(`- Min 30m pullback score: ${filters.minThirtyMinutePullbackScore}`);
+    if (filters.maxThirtyMinuteShrinkRatio < 99) lines.push(`- Max 30m shrink ratio: ${filters.maxThirtyMinuteShrinkRatio}`);
+    lines.push("");
+  }
+
+  if (report.meta.selectDate) {
+    lines.push("## Selected Signals", "");
+    lines.push("| Rank | Instrument | Name | Price | Score | Strategy | State | Setup | Flow 5d | Value | Pullback | 30m Score | 30m Shrink | 30m Drawdown |");
+    lines.push("| ---: | --- | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+    for (const pick of report.picks) {
+      lines.push(
+        `| ${pick.rank} | ${pick.instrument} | ${pick.name} | ${pick.price} | ${pick.score} | ${pick.strategyScore} | ${pick.actionState} | ${pick.setupState} | ${pick.flowRatio5d}% | ${pick.valuePosition}% | ${pick.pullbackFromHigh}% | ${pick.thirtyMinutePullbackScore ?? "-"} | ${pick.thirtyMinuteShrinkRatio ?? "-"} | ${pick.thirtyMinuteDrawdownFromHigh ?? "-"}% |`
       );
     }
     lines.push("");
@@ -324,28 +728,41 @@ function markdownReport(report: BacktestReport) {
 }
 
 async function run() {
+  const preset = presetArg();
+  const top = numberArg("top", 10);
+  const useIntraday30m = !hasFlag("no-30m") && boolArg("use-30m", preset === "swing");
   const config: BacktestConfig = {
     from: argValue("from"),
     to: argValue("to"),
+    selectDate: argValue("select-date"),
     horizons: horizonsArg(),
-    top: numberArg("top", 10),
+    top,
     historyDays: numberArg("history-days", 120),
     flowDays: numberArg("flow-days", 10),
     targetPct: numberArg("target-pct", 5),
+    strongTargetPct: numberArg("strong-target-pct", 8),
+    stretchTargetPct: numberArg("stretch-target-pct", 10),
     maxDates: numberArg("max-dates", 80),
-    outputDir: resolve(root, argValue("output-dir") ?? "public/reports/backtests")
+    outputDir: resolve(root, argValue("output-dir") ?? "public/reports/backtests"),
+    preset,
+    useIntraday30m,
+    intraday30mBars: numberArg("30m-bars", 160),
+    refineCandidates: numberArg("refine-candidates", preset === "swing" ? Math.max(top * 40, 400) : Math.max(top * 20, 200)),
+    swing: swingFilterConfig()
   };
   const maxHorizon = Math.max(...config.horizons);
+  const minHorizon = Math.min(...config.horizons);
+  const replayDays = maxHorizon;
 
   const { stocks, source: universeSource } = await loadBacktestUniverse();
 
-  const stockData = [];
+  const stockData: StockData[] = [];
   let skippedNoDaily = 0;
   let stocksWithMoneyFlow = 0;
   for (const stock of stocks) {
     const instrument = toInstrumentCode(plainCode(stock.dm), inferExchange(stock.dm, stock.jys));
     const daily = await readKLineCache("daily", instrument);
-    if (daily.length < config.historyDays + maxHorizon) {
+    if (daily.length < config.historyDays + (config.selectDate ? 0 : replayDays)) {
       skippedNoDaily += 1;
       continue;
     }
@@ -354,20 +771,36 @@ async function run() {
     stockData.push({ stock: { ...stock, dm: plainCode(stock.dm), jys: inferExchange(stock.dm, stock.jys) }, instrument, daily, flows });
   }
 
+  const intradayCache = new Map<string, KLine[]>();
+  const intradayStocksWithBars = new Set<string>();
+  let intraday30mRefinedCandidates = 0;
+  async function readIntraday30m(instrument: string) {
+    if (intradayCache.has(instrument)) return intradayCache.get(instrument) ?? [];
+    const bars = await readKLineCache("30m", instrument);
+    intradayCache.set(instrument, bars);
+    if (bars.length) intradayStocksWithBars.add(instrument);
+    return bars;
+  }
+
   const allDates = [...new Set(stockData.flatMap((item) => item.daily.map((bar) => dateKey(bar.t))))].sort();
-  const candidateDates = allDates
-    .filter((date) => (!config.from || date >= config.from) && (!config.to || date <= config.to))
-    .slice(-config.maxDates);
+  const candidateDates = config.selectDate
+    ? allDates.filter((date) => date === config.selectDate)
+    : allDates.filter((date) => (!config.from || date >= config.from) && (!config.to || date <= config.to)).slice(-config.maxDates);
+
+  if (config.selectDate && candidateDates.length === 0) {
+    throw new Error(`No cached trade date found for --select-date ${config.selectDate}`);
+  }
 
   const picks: BacktestPick[] = [];
+  const rejected = new Map<string, number>();
   for (const tradeDate of candidateDates) {
-    const scored: Array<{ pick: StockPick; future: KLine[] }> = [];
+    const scored: ScoredCandidate[] = [];
     for (const item of stockData) {
       const index = item.daily.findIndex((bar) => dateKey(bar.t) === tradeDate);
       if (index < config.historyDays || index < 0) continue;
       const history = item.daily.slice(Math.max(0, index - config.historyDays + 1), index + 1);
-      const future = item.daily.slice(index + 1, index + 1 + maxHorizon);
-      if (future.length < Math.min(...config.horizons)) continue;
+      const future = item.daily.slice(index + 1, index + 1 + replayDays);
+      if (!config.selectDate && future.length < minHorizon) continue;
       const flows = item.flows.filter((flow) => dateKey(flow.t) <= tradeDate).slice(-config.flowDays);
       const pick = scoreCandidate({
         stock: item.stock,
@@ -375,30 +808,71 @@ async function run() {
         history,
         flows
       });
-      if (pick) scored.push({ pick, future });
+      if (pick) scored.push({ item, pick, tradeIndex: index, history, flows, future });
     }
 
     scored.sort((a, b) => b.pick.score - a.pick.score);
-    scored.slice(0, config.top).forEach(({ pick, future }, index) => {
-      const replay = Object.fromEntries(
-        config.horizons.map((horizon) => [`${horizon}d`, replayPick(pick, future, horizon, config.targetPct)])
-      ) as Record<string, ReplayResult>;
-      picks.push({
-        tradeDate,
-        rank: index + 1,
-        instrument: pick.instrument,
-        name: pick.name,
-        score: pick.score,
-        signal: pick.signal,
-        actionState: pick.actionState ?? "track",
-        actionLabel: pick.actionLabel,
-        price: pick.price,
-        setupState: pick.setupState,
-        flowRatio5d: pick.flowRatio5d,
-        valuePosition: pick.valuePosition,
-        replay
+    let pool = scored;
+    if (config.useIntraday30m) {
+      const refined: ScoredCandidate[] = [];
+      for (const candidate of scored.slice(0, config.refineCandidates)) {
+        const intraday30m = intradayUpToDate(await readIntraday30m(candidate.item.instrument), tradeDate, config.intraday30mBars);
+        if (intraday30m.length) intraday30mRefinedCandidates += 1;
+        const thirtyMinuteSignal = evaluateThirtyMinuteSignal(intraday30m);
+        const pick = scoreCandidate({
+          stock: candidate.item.stock,
+          quote: quoteFromBar(candidate.item.stock, candidate.item.daily, candidate.tradeIndex),
+          history: candidate.history,
+          intraday30m,
+          flows: candidate.flows
+        });
+        if (pick) refined.push({ ...candidate, pick, thirtyMinuteSignal });
+      }
+      pool = refined.sort((a, b) => b.pick.score - a.pick.score);
+    }
+
+    selectStrategyCandidates(pool, config, rejected)
+      .slice(0, config.top)
+      .forEach(({ pick, future, strategyScore, thirtyMinuteSignal }, index) => {
+        const replay = Object.fromEntries(
+          config.horizons.map((horizon) => [`${horizon}d`, replayPick(pick, future, horizon, config)])
+        ) as Record<string, ReplayResult>;
+        picks.push({
+          tradeDate,
+          rank: index + 1,
+          instrument: pick.instrument,
+          name: pick.name,
+          score: pick.score,
+          strategyScore,
+          signal: pick.signal,
+          actionState: pick.actionState ?? "track",
+          actionLabel: pick.actionLabel,
+          price: pick.price,
+          setupState: pick.setupState,
+          flowRatio5d: pick.flowRatio5d,
+          valuePosition: pick.valuePosition,
+          pullbackFromHigh: pick.pullbackFromHigh,
+          actionReason: pick.actionReason,
+          intradayScore: pick.intradayBurst?.score,
+          intradaySupportScore: pick.intradayBurst?.supportScore,
+          intradayDaysSince: pick.intradayBurst?.daysSince,
+          intradayPullbackAmountRatio: pick.intradayBurst?.pullbackAmountRatio,
+          intradayHeldMidpoint: pick.intradayBurst?.heldBodyMidpoint,
+          surgeScore: pick.surgePullback?.score,
+          surgeDaysSince: pick.surgePullback?.daysSince,
+          surgePullbackAmountRatio: pick.surgePullback?.pullbackAmountRatio,
+          thirtyMinutePullbackScore: thirtyMinuteSignal?.score,
+          thirtyMinuteShrinkRatio: thirtyMinuteSignal?.shrinkRatio,
+          thirtyMinuteDrawdownFromHigh: thirtyMinuteSignal?.drawdownFromHigh,
+          thirtyMinuteDistanceFromLow: thirtyMinuteSignal?.distanceFromLow,
+          thirtyMinuteHeldRecentLow: thirtyMinuteSignal?.heldRecentLow,
+          thirtyMinuteCloseAboveMa20: thirtyMinuteSignal?.closeAboveMa20,
+          thirtyMinuteCloseAboveMa60: thirtyMinuteSignal?.closeAboveMa60,
+          reasons: pick.reasons,
+          risks: pick.risks,
+          replay
+        });
       });
-    });
 
     if (picks.length && picks.length % (config.top * 10) === 0) {
       console.log(`[backtest] ${tradeDate} picks=${picks.length}`);
@@ -412,28 +886,44 @@ async function run() {
       mode: "cache-only",
       from: candidateDates[0],
       to: candidateDates[candidateDates.length - 1],
+      selectDate: config.selectDate,
       horizons: config.horizons,
       top: config.top,
       historyDays: config.historyDays,
       flowDays: config.flowDays,
       targetPct: config.targetPct,
+      strongTargetPct: config.strongTargetPct,
+      stretchTargetPct: config.stretchTargetPct,
+      preset: config.preset,
+      useIntraday30m: config.useIntraday30m,
+      intraday30mBars: config.intraday30mBars,
+      refineCandidates: config.refineCandidates,
+      swing: config.preset === "swing" ? config.swing : undefined,
+      rejected: Object.fromEntries([...rejected.entries()].sort((a, b) => b[1] - a[1])),
       evaluatedDates: candidateDates.length,
       universe: stockData.length,
       notes: [
         "Backtest is cache-only and does not call Biying API.",
         `Universe source: ${universeSource}.`,
         "Each trade date only uses K-line and money-flow cache rows at or before that date.",
-        "Daily-bar replay is conservative when target and stop are touched in the same bar: stop wins.",
-        "This first lab version approximates quote turnover/volume-ratio from cached daily bars when realtime quote fields are unavailable."
+        "Signal replay treats the historical trade-date close as the signal price, then observes later 5/10 day performance without simulating buy/sell execution.",
+        config.useIntraday30m
+          ? "30m K-line refinement is also sliced at or before each trade date to avoid look-ahead bias."
+          : "30m K-line refinement is disabled for this run.",
+        "This replay reports future close return, max runup, max drawdown, and the date/day of peak runup; it does not simulate buy/sell execution.",
+        "This lab version approximates quote turnover/volume-ratio from cached daily bars when realtime quote fields are unavailable."
       ]
     },
     cache: {
       stocksWithDaily: stockData.length,
       stocksWithMoneyFlow,
+      stocksWithIntraday30m: intradayStocksWithBars.size,
+      intraday30mRefinedCandidates,
       skippedNoDaily
     },
     summary: stats.summary,
     byActionState: stats.byActionState,
+    bySetupState: stats.bySetupState,
     picks
   };
 

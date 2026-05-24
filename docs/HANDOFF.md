@@ -155,20 +155,42 @@ flowchart TD
 
 当前实验分支：`strategy-backtest-lab`。
 
-目标是把某个历史日期当作“今天”，只用该日期及以前的缓存数据选股，再用后续 10/20 个交易日验证策略表现，避免未来函数。
+目标是把某个历史日期当作“今天收盘”，只用该日期及以前的缓存数据选股，再直接观察后续 5/10 个交易日表现，避免未来函数。当前回测不模拟复杂买卖点；选出即视为收盘后进入观察/可买区。
 
 第一版脚本：
 
 ```bash
 npm run data:bootstrap
-npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 --top 10 --target-pct 5
+npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --top 10
 ```
+
+当前波段 preset：
+
+```bash
+npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --top=10
+```
+
+- `--preset swing` 默认使用当前稳定版：`缩量回踩`、操作状态 `pullback/risk`、5 日大单净流入占比 `1.5%-12%`、120 日分位 `62%-75%`、回撤 `8%-24%`、30m 回踩质量分 `>=80`，且最近 30m 缩量比 `<=0.95`。
+- 30m 回踩质量分综合最近 30m 量能收缩、回撤位置、低点是否守住、短均线承接；每个交易日只传入当日及以前的 30m bars，避免未来函数。
+- 更宽的候选池可以临时加 `--states=ready,pullback,track,risk,invalid --setups=缩量回踩 --min-value=50 --max-value=78 --min-30m-pullback-score=0.01 --max-30m-shrink-ratio=99`。
+- 输出会统计 5/10 日收盘涨跌、未来最高涨幅、最高涨幅日期/第几天、最大回撤，以及未来最高涨幅是否触达 `5%/8%/10%`。
+- 当日选股可以用 `npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10`，该模式不要求未来 K 线，结果中的 replay 会显示为 pending。
+
+2026-05-24 本地验证结果：
+
+- `2025-10-09` 至 `2026-05-08`，上一版 swing 默认样本 `77`：5/10 日最高涨幅触达 `5%` 的比例分别为 `46.8%/61.0%`，平均最高涨幅 `6.69%/9.89%`，平均最大回撤 `-5.89%/-7.46%`。
+- 同窗口当前 swing 默认版样本 `66`：5/10 日最高涨幅触达 `5%` 的比例分别为 `50.0%/69.7%`，触达 `8%` 比例 `31.8%/48.5%`，触达 `10%` 比例 `21.2%/36.4%`，平均收盘 `+1.04%/+1.86%`，平均最高涨幅 `7.46%/10.53%`，平均最大回撤 `-5.09%/-6.68%`。
+- `2026-01-05` 至 `2026-05-08`，当前 swing 默认版样本 `48`：5/10 日最高涨幅触达 `5%` 的比例分别为 `56.3%/75.0%`，触达 `8%` 比例 `33.3%/52.1%`，触达 `10%` 比例 `22.9%/41.7%`，平均收盘 `+2.03%/+2.67%`，平均最高涨幅 `7.74%/11.14%`，平均最大回撤 `-5.29%/-6.52%`。样本仍偏少，不能直接视为实盘收益。
+- `2026-05-22` 当日按当前默认版选出 `1` 只：`001223.SZ 欧克科技`，收盘价 `66.12`，原始分 `76.1`，策略分 `126.3`，状态 `pullback/缩量回踩`，5 日大单净流入占比 `1.93%`，120 日分位 `73.7%`，回撤 `10.0%`，30m 回踩分 `106`，30m 缩量比 `0.79`。由于没有未来 K 线，5/10 日 replay 仍为 pending。
 
 输出：
 
 - `public/reports/backtests/research-data-bootstrap.json`
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
+- `public/reports/backtests/swing-5-10-final-v2-wide/latest.json`
+- `public/reports/backtests/swing-5-10-final-v2-2026/latest.json`
+- `public/reports/backtests/signal-2026-05-22/latest.json`
 
 约束：
 
@@ -177,8 +199,8 @@ npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 
 - `cache:plan` 只作为诊断工具，估算缺口和请求批次，不请求 API。
 - 回测脚本只读 `.cache/kline` 和 `.cache/biying`，不导入 `BiyingClient`，不调用必盈 API。
 - 每个交易日只使用当日及以前的日 K/资金流缓存。
-- 第一版主要使用日 K 回放；30m K 用于后续更精细的入场/止损增强。
-- 同一根日 K 同时触发目标价和止损时，按保守口径算止损先触发。
+- swing preset 会使用 30m K 做承接/失效精修，但仍然只读本地缓存并按交易日切片。
+- 当前回测是信号表现统计，不做买卖点执行模拟。
 - 当前本地报价字段由日 K 近似构造，换手率/量比没有实时行情完整，回测结果用于策略迭代参考，不直接视为实盘收益。
 
 ## 关键报告文件
