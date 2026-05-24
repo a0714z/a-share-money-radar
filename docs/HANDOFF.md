@@ -97,7 +97,7 @@ npm run daily:close
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
 - `cache:plan`：缓存覆盖/补数计划器，只扫描本地缓存和报告，不调用必盈 API。
-- `data:bootstrap`：一次性串行补齐研究用日 K/30m K 缓存。
+- `data:bootstrap`：一次性串行补齐研究用日 K、30m K 和资金流缓存。
 - `daily:close`：18:00 收盘生产总入口。
 
 当前 `daily:close`：
@@ -172,7 +172,7 @@ npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --horizons 10,20 
 
 约束：
 
-- `data:bootstrap` 是研究数据集的一次性补齐入口，默认拉取全部主板非 ST 股票 `620` 根日 K、`1200` 根 30m K、主要指数约 `1100` 个自然日范围日 K。
+- `data:bootstrap` 是研究数据集的一次性补齐入口，默认拉取全部主板非 ST 股票 `620` 根日 K、`1200` 根 30m K、`240` 条资金流，以及主要指数约 `1100` 个自然日范围日 K。
 - `data:bootstrap` 全程串行请求，已满足数量要求的缓存会跳过；`--force` 才强制重拉。
 - `cache:plan` 只作为诊断工具，估算缺口和请求批次，不请求 API。
 - 回测脚本只读 `.cache/kline` 和 `.cache/biying`，不导入 `BiyingClient`，不调用必盈 API。
@@ -304,6 +304,7 @@ BIYING_MAX_REQUESTS=0
 BIYING_REQUEST_INTERVAL_MS=250
 RESEARCH_DAILY_BARS=620
 RESEARCH_30M_BARS=1200
+RESEARCH_FLOW_ROWS=240
 RESEARCH_INDEX_CALENDAR_DAYS=1100
 
 API_CACHE_DIR=/opt/a-share-money-radar/.cache/biying

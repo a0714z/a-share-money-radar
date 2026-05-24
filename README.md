@@ -119,7 +119,7 @@ npm run daily:close
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：只读本地缓存的策略回测实验脚本。
 - `cache:plan`：只扫描本地缓存并生成补数请求计划，不调用 API。
-- `data:bootstrap`：一次性串行补齐研究用日 K/30m K 缓存。
+- `data:bootstrap`：一次性串行补齐研究用日 K、30m K 和资金流缓存。
 
 ## 策略回测
 
@@ -146,6 +146,7 @@ npm run data:bootstrap
 
 - 全部主板非 ST 股票的 `620` 根日 K。
 - 全部主板非 ST 股票的 `1200` 根 30m K。
+- 全部主板非 ST 股票的 `240` 条资金流。
 - 主要指数约 `1100` 个自然日范围的日 K。
 
 可调参数：
@@ -153,6 +154,8 @@ npm run data:bootstrap
 ```bash
 npm run data:bootstrap -- --daily-bars 760 --30m-bars 1600
 npm run data:bootstrap -- --daily-only
+npm run data:bootstrap -- --flow-only
+npm run data:bootstrap -- --kline-only
 npm run data:bootstrap -- --force
 ```
 
