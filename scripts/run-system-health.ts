@@ -50,6 +50,7 @@ async function run() {
   const latest = await readJson<any>(resolve(reportsDir, "latest.json")).catch(() => undefined);
   const plan = await readJson<any>(resolve(reportsDir, "plan.json")).catch(() => undefined);
   const review = await readJson<any>(resolve(reportsDir, "performance.json")).catch(() => undefined);
+  const strategy = await readJson<any>(resolve(reportsDir, "backtests/latest.json")).catch(() => undefined);
   const klineSummary = await readJson<any>(resolve(reportsDir, "kline-cache.json")).catch(() => undefined);
   const intraday = await readJson<any>(resolve(reportsDir, "intraday.json")).catch(() => undefined);
 
@@ -63,7 +64,10 @@ async function run() {
   const minuteOk = minuteFiles >= Math.max(1, Math.floor(universe * 0.95));
   const flowWarn = flowFiles >= Math.min(200, Math.max(1, Math.floor(universe * 0.05)));
   const latestTradeDate = latest?.meta?.tradeDate ?? plan?.meta?.tradeDate;
+  const strategyTradeDate = strategy?.meta?.selectDate ?? strategy?.meta?.to ?? strategy?.meta?.from;
   const reportOk = Boolean(latest?.meta?.generatedAt && plan?.meta?.generatedAt && review?.meta?.generatedAt);
+  const strategyOk = Boolean(strategy?.meta?.generatedAt && latestTradeDate && strategyTradeDate === latestTradeDate);
+  const strategyWarn = Boolean(strategy?.meta?.generatedAt);
   const notes = [
     "页面只读取 reports 静态 JSON，不直接调用必盈 API。",
     "普通扫描脚本默认只读本地 API 缓存；只有 API_CACHE_REFRESH=1 时刷新资金流和公司资料。",
@@ -73,7 +77,7 @@ async function run() {
   const report = {
     generatedAt: chinaDateTime(),
     tradeDate: latestTradeDate,
-    status: reportOk && dailyOk && minuteOk ? "ok" : reportOk && dailyFiles && minuteFiles ? "warn" : "risk",
+    status: reportOk && strategyOk && dailyOk && minuteOk ? "ok" : reportOk && dailyFiles && minuteFiles ? "warn" : "risk",
     schedule: {
       closeRun: "交易日 18:00",
       mailNotify: "交易日 09:00"
@@ -87,6 +91,16 @@ async function run() {
       latestWatchlist: latest?.watchlist?.length ?? 0,
       planCount: plan?.plans?.length ?? 0,
       reviewSignals: review?.summary?.totalSignals ?? 0
+    },
+    strategyBacktest: {
+      tone: tone(strategyOk, strategyWarn),
+      generatedAt: strategy?.meta?.generatedAt,
+      tradeDate: strategyTradeDate,
+      expectedTradeDate: latestTradeDate,
+      mainSignals: strategy?.picks?.length ?? 0,
+      aestheticSignals: strategy?.aestheticWatch?.picks?.length ?? 0,
+      cooldown10dWinRate: strategy?.cooldownSummary?.["10d"]?.winRate,
+      aesthetic10dWinRate: strategy?.aestheticWatch?.cooldownSummary?.["10d"]?.winRate
     },
     klineCache: {
       tone: tone(dailyOk && minuteOk, dailyFiles > 0 && minuteFiles > 0),
@@ -120,4 +134,3 @@ async function run() {
 }
 
 await run();
-

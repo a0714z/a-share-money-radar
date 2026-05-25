@@ -73,6 +73,16 @@ type SystemHealthReport = {
     planCount: number;
     reviewSignals: number;
   };
+  strategyBacktest?: {
+    tone: "ok" | "warn" | "risk";
+    generatedAt?: string;
+    tradeDate?: string;
+    expectedTradeDate?: string;
+    mainSignals: number;
+    aestheticSignals: number;
+    cooldown10dWinRate?: number;
+    aesthetic10dWinRate?: number;
+  };
   klineCache: {
     tone: "ok" | "warn" | "risk";
     generatedAt?: string;
@@ -1386,6 +1396,18 @@ function SystemStatusPanel({
             <strong>{health.reports.latestWatchlist} 观察 · {health.reports.planCount} 预案</strong>
             <small>{health.generatedAt}</small>
           </div>
+          {health.strategyBacktest && (
+            <div className={`system-health-card health-${health.strategyBacktest.tone}`}>
+              <span>策略实验</span>
+              <strong>{health.strategyBacktest.mainSignals} 主选 · {health.strategyBacktest.aestheticSignals} 审美</strong>
+              <small>
+                {health.strategyBacktest.tradeDate ?? "未生成"}
+                {health.strategyBacktest.expectedTradeDate && health.strategyBacktest.tradeDate !== health.strategyBacktest.expectedTradeDate
+                  ? ` · 需同步 ${health.strategyBacktest.expectedTradeDate}`
+                  : ""}
+              </small>
+            </div>
+          )}
           <div className={`system-health-card health-${health.status}`}>
             <span>定时任务</span>
             <strong>{health.schedule.closeRun}</strong>

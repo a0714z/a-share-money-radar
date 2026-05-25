@@ -118,7 +118,7 @@ npm run daily:close
 - `review`：生成 `performance.json`，只读本地 K 线缓存。
 - `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json` 供前端“策略实验”页签使用；如果该交易日不在日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日。
 - `stock:details`：生成异动票详情 JSON 和搜索索引。
-- `health`：生成 `system-health.json`。
+- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
 - `notify:dry`：预览邮件内容，不发送。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：只读本地缓存的策略回测实验脚本。

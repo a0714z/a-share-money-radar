@@ -95,7 +95,7 @@ npm run daily:close
 - `review`：生成 `performance.json`，复盘收益只读本地 K 线缓存。
 - `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；如果该交易日不在本地日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日并打印 warning。
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
-- `health`：生成 `system-health.json`。
+- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
 - `cache:plan`：缓存覆盖/补数计划器，只扫描本地缓存和报告，不调用必盈 API。
