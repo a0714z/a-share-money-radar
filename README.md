@@ -116,7 +116,7 @@ npm run daily:close
 - `plan`：生成 `plan.json`，默认从本地缓存读 K 线。
 - `action:refresh`：给现有报告补操作状态，不调用 API。
 - `review`：生成 `performance.json`，只读本地 K 线缓存。
-- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json` 供前端“策略实验”页签使用；如果该交易日不在日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日。
+- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json` 供前端“策略实验”页签使用；报告外层是当日选股，`benchmark` 字段附带同策略历史基准回测。若交易日不在日 K 缓存，会优先保留已有同日选股并补历史基准，否则退到不晚于报告日的最近缓存交易日。
 - `stock:details`：生成异动票详情 JSON 和搜索索引。
 - `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
 - `notify:dry`：预览邮件内容，不发送。
@@ -164,8 +164,9 @@ npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
 - `public/reports/backtests/daily-ledger.md`
+- `public/reports/backtests/benchmark-latest/latest.json`（由 `strategy:latest` 自动生成，再嵌入 `latest.json.benchmark`）
 
-前端网站会读取 `public/reports/backtests/latest.json`，在“策略实验”页签展示主策略当日选股、审美观察池、分桶回测和最近每日流水。用户查看策略数据时以网页为准，不需要直接打开 JSON。
+前端网站会读取 `public/reports/backtests/latest.json`，在“策略实验”页签展示主策略当日选股、审美观察池、历史基准胜率、分桶回测和最近每日流水。用户查看策略数据时以网页为准，不需要直接打开 JSON。
 
 数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求频率保护。
 

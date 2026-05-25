@@ -93,7 +93,7 @@ npm run daily:close
 - `plan`：生成 `plan.json`，日 K/30m K 只读本地缓存。
 - `action:refresh`：不调用 API，只给已有 `latest.json` 和 `plan.json` 补操作状态字段。
 - `review`：生成 `performance.json`，复盘收益只读本地 K 线缓存。
-- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；如果该交易日不在本地日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日并打印 warning。
+- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；报告外层是当日选股，`benchmark` 字段附带同策略历史基准回测。如果该交易日不在本地日 K 缓存，会优先保留已有同日选股并补历史基准，否则退到不晚于报告日的最近缓存交易日并打印 warning。
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
 - `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
 - `notify`：发送邮件，只读本地 JSON。
@@ -180,7 +180,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - 输出同时包含 raw 信号统计、默认 `--cooldown-days=5` 的同票冷却去重统计、`main/watch` 分层统计，以及 `daily-ledger.md` 每日选股流水账。
 - 分层口径：`pullback/ready` 归为 `main` 主选，`risk` 等其他状态归为 `watch` 观察。
 - 审美观察池 `aestheticWatch` 已独立输出，不合并进主策略 summary；当前分为 `接近主策略`、`30m承接审美`、`低位修复观察` 三类，用于吸收用户截图审美里的 30m 平台承接、均线收敛和二次修复特征。
-- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json`，展示主策略当日选股、审美观察池、分桶回测和最近每日流水。后续新增策略数据时优先保证网页可见。
+- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json`，展示主策略当日选股、审美观察池、历史基准胜率、分桶回测和最近每日流水。后续新增策略数据时优先保证网页可见。
 - 当日选股可以用 `npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10`，该模式不要求未来 K 线，结果中的 replay 会显示为 pending。
 
 2026-05-25 本地验证结果：
@@ -195,6 +195,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - 同窗口审美观察池样本 `809`：5/10 日最高涨幅触达 `5%` 的比例分别为 `39.7%/55.4%`，默认 5 日冷却去重后样本 `704`，5/10 日触达 `5%` 为 `41.2%/57.4%`。其中 `30m承接审美` 10 日触达 `5%` 为 `60.6%`（样本 `33`），`低位修复观察` 为 `63.6%`（样本 `55`），`接近主策略` 为 `54.5%`（样本 `721`）。该池用于扩展观察，不和主策略同权。
 - `2026-05-22` 当日按当前默认版选出 `1` 只：`001223.SZ 欧克科技`，收盘价 `66.12`，原始分 `76.1`，策略分 `126.3`，状态 `pullback/缩量回踩`，5 日大单净流入占比 `1.93%`，120 日分位 `73.7%`，回撤 `10.0%`，30m 回踩分 `106`，30m 缩量比 `0.79`。由于没有未来 K 线，5/10 日 replay 仍为 pending。
 - 审美观察池在 `2026-05-22` 默认输出 20 只，其中用户审美样例里的 `600635.SH 大众公用` 被归入 `30m承接审美`，`000837.SZ 秦川机床` 被归入 `接近主策略`；`000591.SZ 太阳能`、`600076.SH 康欣新材` 因资金/失效风险未纳入。
+- `strategy:latest` 最新组合报告本地验证：外层当日仍为 `2026-05-22`，主策略 `1` 只、审美池 `20` 只；`benchmark` 覆盖 `2026-01-19` 至 `2026-05-22` 共 `80` 个回测交易日，主策略冷却 10 日最高触达 `5%` 胜率 `77.8%`（样本 `37`，完成 `36`），审美池冷却 10 日胜率 `56.2%`（样本 `679`，完成 `639`）。`system-health.json` 的策略胜率字段优先读取 `benchmark`。
 
 输出：
 
@@ -202,6 +203,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
 - `public/reports/backtests/daily-ledger.md`
+- `public/reports/backtests/benchmark-latest/latest.json`
 - `public/reports/backtests/swing-5-10-final-v2-wide/latest.json`
 - `public/reports/backtests/swing-5-10-final-v2-wide/daily-ledger.md`
 - `public/reports/backtests/swing-5-10-final-v2-2026/latest.json`

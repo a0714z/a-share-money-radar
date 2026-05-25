@@ -65,6 +65,7 @@ async function run() {
   const flowWarn = flowFiles >= Math.min(200, Math.max(1, Math.floor(universe * 0.05)));
   const latestTradeDate = latest?.meta?.tradeDate ?? plan?.meta?.tradeDate;
   const strategyTradeDate = strategy?.meta?.selectDate ?? strategy?.meta?.to ?? strategy?.meta?.from;
+  const strategyBenchmark = strategy?.benchmark ?? strategy;
   const reportOk = Boolean(latest?.meta?.generatedAt && plan?.meta?.generatedAt && review?.meta?.generatedAt);
   const strategyOk = Boolean(strategy?.meta?.generatedAt && latestTradeDate && strategyTradeDate === latestTradeDate);
   const strategyWarn = Boolean(strategy?.meta?.generatedAt);
@@ -99,8 +100,11 @@ async function run() {
       expectedTradeDate: latestTradeDate,
       mainSignals: strategy?.picks?.length ?? 0,
       aestheticSignals: strategy?.aestheticWatch?.picks?.length ?? 0,
-      cooldown10dWinRate: strategy?.cooldownSummary?.["10d"]?.winRate,
-      aesthetic10dWinRate: strategy?.aestheticWatch?.cooldownSummary?.["10d"]?.winRate
+      cooldown10dWinRate: strategyBenchmark?.cooldownSummary?.["10d"]?.winRate,
+      aesthetic10dWinRate: strategyBenchmark?.aestheticWatch?.cooldownSummary?.["10d"]?.winRate,
+      benchmarkFrom: strategyBenchmark?.meta?.from,
+      benchmarkTo: strategyBenchmark?.meta?.to,
+      benchmarkDates: strategyBenchmark?.meta?.evaluatedDates
     },
     klineCache: {
       tone: tone(dailyOk && minuteOk, dailyFiles > 0 && minuteFiles > 0),

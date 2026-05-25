@@ -82,6 +82,9 @@ type SystemHealthReport = {
     aestheticSignals: number;
     cooldown10dWinRate?: number;
     aesthetic10dWinRate?: number;
+    benchmarkFrom?: string;
+    benchmarkTo?: string;
+    benchmarkDates?: number;
   };
   klineCache: {
     tone: "ok" | "warn" | "risk";
@@ -264,6 +267,7 @@ type StrategyBacktestReport = {
   aestheticWatch?: StrategyAestheticReport;
   dailyRecords: StrategyDailyRecord[];
   picks: StrategyBacktestPick[];
+  benchmark?: StrategyBacktestReport;
 };
 
 function formatMoney(value?: number) {
@@ -1404,7 +1408,9 @@ function SystemStatusPanel({
                 {health.strategyBacktest.tradeDate ?? "未生成"}
                 {health.strategyBacktest.expectedTradeDate && health.strategyBacktest.tradeDate !== health.strategyBacktest.expectedTradeDate
                   ? ` · 需同步 ${health.strategyBacktest.expectedTradeDate}`
-                  : ""}
+                  : health.strategyBacktest.benchmarkTo
+                    ? ` · 基准至 ${health.strategyBacktest.benchmarkTo}`
+                    : ""}
               </small>
             </div>
           )}
@@ -1594,7 +1600,7 @@ function isAestheticPick(pick: StrategyBacktestPick | StrategyAestheticPick): pi
   return "bucketLabel" in pick;
 }
 
-function StrategyStatsTable({ title, rows }: { title: string; rows: Record<string, StrategyStats> }) {
+function StrategyStatsTable({ title, rows, subtitle = "选出后直接观察未来 5/10 日，不模拟买卖点" }: { title: string; rows: Record<string, StrategyStats>; subtitle?: string }) {
   const horizons = Object.entries(rows);
   if (!horizons.length) return null;
 
@@ -1603,7 +1609,7 @@ function StrategyStatsTable({ title, rows }: { title: string; rows: Record<strin
       <div className="panel-toolbar">
         <div>
           <h2>{title}</h2>
-          <span>选出后直接观察未来 5/10 日，不模拟买卖点</span>
+          <span>{subtitle}</span>
         </div>
       </div>
       <div className="strategy-kpis">
@@ -1781,7 +1787,7 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
   );
 }
 
-function StrategyDailyLedger({ report }: { report: StrategyBacktestReport }) {
+function StrategyDailyLedger({ report, title = "每日流水", subtitle = "最近 20 个回测交易日" }: { report: StrategyBacktestReport; title?: string; subtitle?: string }) {
   const aestheticByDate = new Map((report.aestheticWatch?.dailyRecords ?? []).map((day) => [day.tradeDate, day]));
   const days = report.dailyRecords.slice(-20).reverse();
 
@@ -1789,8 +1795,8 @@ function StrategyDailyLedger({ report }: { report: StrategyBacktestReport }) {
     <section className="list-panel">
       <div className="panel-toolbar">
         <div>
-          <h2>每日流水</h2>
-          <span>最近 20 个回测交易日</span>
+          <h2>{title}</h2>
+          <span>{subtitle}</span>
         </div>
       </div>
       <div className="table-wrap strategy-table">
@@ -1836,10 +1842,13 @@ function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
   }
 
   const date = strategyDate(report);
+  const benchmark = report.benchmark ?? report;
+  const hasBenchmark = Boolean(report.benchmark);
   const latestMain = strategyPicksForDate(report.picks, date);
   const latestAesthetic = strategyPicksForDate(report.aestheticWatch?.picks ?? [], date);
-  const tenDay = report.cooldownSummary["10d"] ?? report.summary["10d"];
-  const aestheticTen = report.aestheticWatch?.cooldownSummary["10d"] ?? report.aestheticWatch?.summary["10d"];
+  const tenDay = benchmark.cooldownSummary["10d"] ?? benchmark.summary["10d"];
+  const aestheticTen = benchmark.aestheticWatch?.cooldownSummary["10d"] ?? benchmark.aestheticWatch?.summary["10d"];
+  const benchmarkRange = `${benchmark.meta.from ?? "-"} 至 ${benchmark.meta.to ?? "-"}`;
 
   return (
     <section className="review-panel strategy-panel">
@@ -1849,18 +1858,27 @@ function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
         <Metric icon={Layers} label="当日审美池" value={latestAesthetic.length} tone="amber" />
         <Metric icon={Target} label="主策略10日" value={formatRate(tenDay?.winRate)} tone="green" />
         <Metric icon={Percent} label="审美池10日" value={formatRate(aestheticTen?.winRate)} tone="blue" />
-        <Metric icon={History} label="回测交易日" value={report.meta.evaluatedDates} />
+        <Metric icon={History} label="回测交易日" value={benchmark.meta.evaluatedDates} />
       </div>
 
       <div className="strategy-meta">
         <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</span>
-        <span>样本 {report.meta.from ?? "-"} 至 {report.meta.to ?? "-"} · preset {report.meta.preset}</span>
-        <span>目标 {report.meta.targetPct}% / {report.meta.strongTargetPct}% / {report.meta.stretchTargetPct}% · 冷却 {report.meta.cooldownDays} 日</span>
+        <span>当日 {date} · preset {report.meta.preset}</span>
+        <span>{hasBenchmark ? "历史基准" : "样本"} {benchmarkRange} · {benchmark.meta.evaluatedDates} 日</span>
+        <span>目标 {benchmark.meta.targetPct}% / {benchmark.meta.strongTargetPct}% / {benchmark.meta.stretchTargetPct}% · 冷却 {benchmark.meta.cooldownDays} 日</span>
       </div>
 
       <div className="strategy-grid">
-        <StrategyStatsTable title="主策略冷却统计" rows={report.cooldownSummary} />
-        <StrategyStatsTable title="审美池冷却统计" rows={report.aestheticWatch?.cooldownSummary ?? {}} />
+        <StrategyStatsTable
+          title={hasBenchmark ? "主策略历史冷却统计" : "主策略冷却统计"}
+          rows={benchmark.cooldownSummary}
+          subtitle="历史信号按同票冷却去重后统计，当前当日信号不参与"
+        />
+        <StrategyStatsTable
+          title={hasBenchmark ? "审美池历史冷却统计" : "审美池冷却统计"}
+          rows={benchmark.aestheticWatch?.cooldownSummary ?? {}}
+          subtitle="审美观察池独立统计，不合并进主策略"
+        />
       </div>
 
       <div className="strategy-grid">
@@ -1869,11 +1887,15 @@ function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
       </div>
 
       <div className="strategy-grid">
-        <StrategyBucketTable report={report.aestheticWatch} />
-        <StrategyDailyLedger report={report} />
+        <StrategyBucketTable report={benchmark.aestheticWatch} />
+        <StrategyDailyLedger
+          report={benchmark}
+          title={hasBenchmark ? "历史每日流水" : "每日流水"}
+          subtitle={hasBenchmark ? "历史基准最近 20 个回测交易日" : "最近 20 个回测交易日"}
+        />
       </div>
 
-      <StrategyStatsTable title="主策略原始统计" rows={report.summary} />
+      <StrategyStatsTable title={hasBenchmark ? "主策略历史原始统计" : "主策略原始统计"} rows={benchmark.summary} />
     </section>
   );
 }

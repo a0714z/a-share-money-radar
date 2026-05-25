@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { existsSync } from "node:fs";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,11 +15,26 @@ dotenv.config({ path: resolve(root, ".env"), override: false, quiet: true });
 type ScanReportMeta = {
   meta?: {
     tradeDate?: string;
+    selectDate?: string;
   };
 };
 
 type CachedBar = {
   t?: string;
+};
+
+type StrategyLatestReport = {
+  meta?: {
+    tradeDate?: string;
+    selectDate?: string;
+  };
+  benchmark?: {
+    meta?: {
+      from?: string;
+      to?: string;
+      evaluatedDates?: number;
+    };
+  };
 };
 
 function dateKey(value?: string) {
@@ -34,13 +49,21 @@ async function readLatestTradeDate(reportsDir: string) {
   return tradeDate;
 }
 
-async function readExistingBacktestDate(outputDir: string) {
+async function readExistingBacktest(outputDir: string) {
   try {
-    const report = JSON.parse(await readFile(resolve(outputDir, "latest.json"), "utf8")) as ScanReportMeta;
-    return report.meta?.tradeDate ?? (report.meta as { selectDate?: string } | undefined)?.selectDate;
+    const report = JSON.parse(await readFile(resolve(outputDir, "latest.json"), "utf8")) as StrategyLatestReport;
+    return {
+      date: report.meta?.tradeDate ?? report.meta?.selectDate,
+      hasBenchmark: Number(report.benchmark?.meta?.evaluatedDates ?? 0) > 0,
+      benchmark: report.benchmark
+    };
   } catch {
     return undefined;
   }
+}
+
+function benchmarkDates(benchmark?: StrategyLatestReport["benchmark"]) {
+  return Number(benchmark?.meta?.evaluatedDates ?? 0);
 }
 
 async function resolveCachedTradeDate(requestedDate: string) {
@@ -89,28 +112,29 @@ function runCommand(command: string, args: string[]) {
 async function run() {
   const reportsDir = resolve(root, process.env.REPORT_DIR ?? "public/reports");
   const outputDir = resolve(root, process.env.STRATEGY_BACKTEST_DIR ?? resolve(reportsDir, "backtests"));
+  const benchmarkDir = resolve(outputDir, "benchmark-latest");
   const top = process.env.STRATEGY_BACKTEST_TOP ?? "10";
   const aestheticTop = process.env.STRATEGY_BACKTEST_AESTHETIC_TOP;
+  const benchmarkMaxDates = process.env.STRATEGY_BACKTEST_BENCHMARK_MAX_DATES ?? "80";
   const requestedTradeDate = process.env.STRATEGY_BACKTEST_SELECT_DATE ?? (await readLatestTradeDate(reportsDir));
-  const existingDate = await readExistingBacktestDate(outputDir);
-  if (existingDate === requestedTradeDate && process.env.STRATEGY_BACKTEST_FORCE !== "1") {
+  const existing = await readExistingBacktest(outputDir);
+  if (existing?.date === requestedTradeDate && existing.hasBenchmark && process.env.STRATEGY_BACKTEST_FORCE !== "1") {
     console.log(`[strategy:latest] keeping existing report for ${requestedTradeDate} in ${outputDir}`);
     return;
   }
   const cachedTradeDate = await resolveCachedTradeDate(requestedTradeDate);
   if (!cachedTradeDate) throw new Error(`No cached daily K-line date found at or before ${requestedTradeDate}`);
+  const keepExistingSignal = !cachedTradeDate.exact && existing?.date === requestedTradeDate;
+  const tradeDate = keepExistingSignal ? requestedTradeDate : cachedTradeDate.date;
   if (!cachedTradeDate.exact) {
-    if (existingDate === requestedTradeDate) {
-      console.warn(`[strategy:latest] requested ${requestedTradeDate} is missing from daily K-line cache; keeping existing exact report in ${outputDir}`);
-      return;
+    if (keepExistingSignal) {
+      console.warn(`[strategy:latest] requested ${requestedTradeDate} is missing from daily K-line cache; keeping existing exact signal and attaching benchmark to ${cachedTradeDate.date}`);
+    } else {
+      console.warn(`[strategy:latest] requested ${requestedTradeDate} is not in daily K-line cache; using latest cached date ${tradeDate}`);
     }
   }
-  const tradeDate = cachedTradeDate.date;
-  if (!cachedTradeDate.exact) {
-    console.warn(`[strategy:latest] requested ${requestedTradeDate} is not in daily K-line cache; using latest cached date ${tradeDate}`);
-  }
 
-  const args = [
+  const signalArgs = [
     "run",
     "backtest:strategy",
     "--",
@@ -119,10 +143,54 @@ async function run() {
     `--top=${top}`,
     `--output-dir=${outputDir}`
   ];
-  if (aestheticTop) args.push(`--aesthetic-top=${aestheticTop}`);
+  if (aestheticTop) signalArgs.push(`--aesthetic-top=${aestheticTop}`);
 
-  console.log(`[strategy:latest] tradeDate=${tradeDate} outputDir=${outputDir}`);
-  await runCommand("npm", args);
+  if (keepExistingSignal) {
+    console.log(`[strategy:latest] keeping existing signal report for ${requestedTradeDate} in ${outputDir}`);
+  } else {
+    console.log(`[strategy:latest] tradeDate=${tradeDate} outputDir=${outputDir}`);
+    try {
+      await runCommand("npm", signalArgs);
+    } catch (error) {
+      if (existing?.date === requestedTradeDate || existing?.date === tradeDate) {
+        console.warn(`[strategy:latest] signal recompute failed; keeping existing signal report for ${existing.date}`);
+        console.warn(error instanceof Error ? error.message : String(error));
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  const benchmarkArgs = [
+    "run",
+    "backtest:strategy",
+    "--",
+    "--preset=swing",
+    `--to=${cachedTradeDate.date}`,
+    `--top=${top}`,
+    `--max-dates=${benchmarkMaxDates}`,
+    `--output-dir=${benchmarkDir}`
+  ];
+  if (aestheticTop) benchmarkArgs.push(`--aesthetic-top=${aestheticTop}`);
+
+  console.log(`[strategy:latest] benchmark to=${cachedTradeDate.date} maxDates=${benchmarkMaxDates} outputDir=${benchmarkDir}`);
+  await runCommand("npm", benchmarkArgs);
+
+  const signalPath = resolve(outputDir, "latest.json");
+  const benchmarkPath = resolve(benchmarkDir, "latest.json");
+  const signal = JSON.parse(await readFile(signalPath, "utf8")) as StrategyLatestReport;
+  const benchmark = JSON.parse(await readFile(benchmarkPath, "utf8")) as StrategyLatestReport["benchmark"];
+  if (benchmarkDates(benchmark) > 0) {
+    signal.benchmark = benchmark;
+  } else if (benchmarkDates(existing?.benchmark) > 0) {
+    signal.benchmark = existing?.benchmark;
+    console.warn(`[strategy:latest] generated benchmark is empty; keeping existing benchmark ${existing?.benchmark?.meta?.from ?? "-"}..${existing?.benchmark?.meta?.to ?? "-"}`);
+  } else {
+    console.warn("[strategy:latest] generated benchmark is empty and no existing benchmark is available");
+    delete signal.benchmark;
+  }
+  await writeFile(signalPath, `${JSON.stringify(signal, null, 2)}\n`, "utf8");
+  console.log(`[strategy:latest] attached benchmark ${signal.benchmark?.meta?.from ?? "-"}..${signal.benchmark?.meta?.to ?? "-"} to ${signalPath}`);
 }
 
 await run();
