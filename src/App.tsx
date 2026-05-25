@@ -270,6 +270,39 @@ type StrategyBacktestReport = {
   benchmark?: StrategyBacktestReport;
 };
 
+type StrategyArchiveItem = {
+  tradeDate: string;
+  path: string;
+  generatedAt?: string;
+  mainSignals: number;
+  aestheticSignals: number;
+  benchmarkFrom?: string;
+  benchmarkTo?: string;
+  benchmarkDates?: number;
+  main10dWinRate?: number;
+  aesthetic10dWinRate?: number;
+};
+
+type StrategyArchiveIndex = {
+  generatedAt: string;
+  latestTradeDate?: string;
+  items: StrategyArchiveItem[];
+};
+
+type StrategyAttributionRow = {
+  source: string;
+  factor: string;
+  bucket: string;
+  samples: number;
+  completed: number;
+  winRate?: number;
+  strongRate?: number;
+  stretchRate?: number;
+  avgMaxRunupPct?: number;
+  avgCloseReturnPct?: number;
+  avgMaxDrawdownPct?: number;
+};
+
 function formatMoney(value?: number) {
   if (!value) return "-";
   if (Math.abs(value) >= 100_000_000) return `${(value / 100_000_000).toFixed(2)}亿`;
@@ -460,6 +493,13 @@ async function loadStrategyBacktest() {
   const response = await fetch(`${base}reports/backtests/latest.json?t=${Date.now()}`);
   if (!response.ok) return undefined;
   return (await response.json()) as StrategyBacktestReport;
+}
+
+async function loadStrategyArchive() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/backtests/history/index.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as StrategyArchiveIndex;
 }
 
 async function loadPlan() {
@@ -1832,7 +1872,220 @@ function StrategyDailyLedger({ report, title = "每日流水", subtitle = "最�
   );
 }
 
-function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
+const strategyFactorBuckets = [
+  {
+    factor: "30m回踩分",
+    value: (pick: StrategyBacktestPick) => pick.thirtyMinutePullbackScore,
+    buckets: [
+      { label: "<80", min: -Infinity, max: 80 },
+      { label: "80-95", min: 80, max: 95 },
+      { label: "95-110", min: 95, max: 110 },
+      { label: ">=110", min: 110, max: Infinity }
+    ]
+  },
+  {
+    factor: "30m缩量比",
+    value: (pick: StrategyBacktestPick) => pick.thirtyMinuteShrinkRatio,
+    buckets: [
+      { label: "<=0.70", min: -Infinity, max: 0.7 },
+      { label: "0.70-0.95", min: 0.7, max: 0.95 },
+      { label: "0.95-1.10", min: 0.95, max: 1.1 },
+      { label: ">1.10", min: 1.1, max: Infinity }
+    ]
+  },
+  {
+    factor: "5日资金",
+    value: (pick: StrategyBacktestPick) => pick.flowRatio5d,
+    buckets: [
+      { label: "<1.5%", min: -Infinity, max: 1.5 },
+      { label: "1.5%-4%", min: 1.5, max: 4 },
+      { label: "4%-8%", min: 4, max: 8 },
+      { label: "8%-12%", min: 8, max: 12 },
+      { label: ">12%", min: 12, max: Infinity }
+    ]
+  },
+  {
+    factor: "120日分位",
+    value: (pick: StrategyBacktestPick) => pick.valuePosition,
+    buckets: [
+      { label: "<58%", min: -Infinity, max: 58 },
+      { label: "58%-62%", min: 58, max: 62 },
+      { label: "62%-70%", min: 62, max: 70 },
+      { label: "70%-75%", min: 70, max: 75 },
+      { label: ">75%", min: 75, max: Infinity }
+    ]
+  },
+  {
+    factor: "高点回撤",
+    value: (pick: StrategyBacktestPick) => pick.pullbackFromHigh,
+    buckets: [
+      { label: "<8%", min: -Infinity, max: 8 },
+      { label: "8%-12%", min: 8, max: 12 },
+      { label: "12%-18%", min: 12, max: 18 },
+      { label: "18%-24%", min: 18, max: 24 },
+      { label: ">24%", min: 24, max: Infinity }
+    ]
+  }
+];
+
+function bucketLabel(value: number | undefined, buckets: Array<{ label: string; min: number; max: number }>) {
+  if (!Number.isFinite(value)) return "缺失";
+  return buckets.find((bucket) => value! >= bucket.min && value! < bucket.max)?.label ?? "其他";
+}
+
+function summarizeAttribution(source: string, factor: string, bucket: string, picks: Array<StrategyBacktestPick | StrategyAestheticPick>): StrategyAttributionRow {
+  const completed = picks
+    .map((pick) => pick.replay["10d"])
+    .filter((replay): replay is StrategyReplay => Boolean(replay && replay.status === "complete"));
+  const ratio = (count: number) => (completed.length ? Number(((count / completed.length) * 100).toFixed(1)) : undefined);
+  const avg = (values: Array<number | undefined>) => {
+    const finite = values.filter((value): value is number => Number.isFinite(value));
+    return finite.length ? Number((finite.reduce((sum, value) => sum + value, 0) / finite.length).toFixed(2)) : undefined;
+  };
+
+  return {
+    source,
+    factor,
+    bucket,
+    samples: picks.length,
+    completed: completed.length,
+    winRate: ratio(completed.filter((replay) => replay.targetHit).length),
+    strongRate: ratio(completed.filter((replay) => replay.strongTargetHit).length),
+    stretchRate: ratio(completed.filter((replay) => replay.stretchTargetHit).length),
+    avgMaxRunupPct: avg(completed.map((replay) => replay.maxRunupPct)),
+    avgCloseReturnPct: avg(completed.map((replay) => replay.closeReturnPct)),
+    avgMaxDrawdownPct: avg(completed.map((replay) => replay.maxDrawdownPct))
+  };
+}
+
+function factorAttributionRows(source: string, picks: Array<StrategyBacktestPick | StrategyAestheticPick>) {
+  const eligible = picks.filter((pick) => !pick.cooldownDuplicate);
+  const rows: StrategyAttributionRow[] = [];
+  for (const factor of strategyFactorBuckets) {
+    const groups = new Map<string, Array<StrategyBacktestPick | StrategyAestheticPick>>();
+    for (const pick of eligible) {
+      const label = bucketLabel(factor.value(pick), factor.buckets);
+      groups.set(label, [...(groups.get(label) ?? []), pick]);
+    }
+    for (const bucket of factor.buckets.map((item) => item.label).concat("缺失")) {
+      const grouped = groups.get(bucket);
+      if (grouped?.length) rows.push(summarizeAttribution(source, factor.factor, bucket, grouped));
+    }
+  }
+  return rows;
+}
+
+function aestheticBucketAttributionRows(picks: StrategyAestheticPick[]) {
+  const groups = new Map<string, StrategyAestheticPick[]>();
+  for (const pick of picks.filter((item) => !item.cooldownDuplicate)) {
+    groups.set(pick.bucketLabel, [...(groups.get(pick.bucketLabel) ?? []), pick]);
+  }
+  return [...groups.entries()]
+    .map(([bucket, grouped]) => summarizeAttribution("审美池", "审美分桶", bucket, grouped))
+    .sort((a, b) => b.samples - a.samples);
+}
+
+function StrategyAttributionPanel({ report }: { report: StrategyBacktestReport }) {
+  const rows = useMemo(() => {
+    const mainRows = factorAttributionRows("主策略", report.picks);
+    const aestheticRows = factorAttributionRows("审美池", report.aestheticWatch?.picks ?? []);
+    const bucketRows = aestheticBucketAttributionRows(report.aestheticWatch?.picks ?? []);
+    return [...mainRows, ...bucketRows, ...aestheticRows];
+  }, [report]);
+
+  if (!rows.length) return null;
+
+  return (
+    <section className="list-panel strategy-wide-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>因子归因</h2>
+          <span>基于历史基准 10 日窗口，按同票冷却后的样本统计</span>
+        </div>
+      </div>
+      <div className="table-wrap strategy-table strategy-attribution-table">
+        <table>
+          <thead>
+            <tr>
+              <th>池子</th>
+              <th>因子</th>
+              <th>区间</th>
+              <th>样本</th>
+              <th>最高+5%</th>
+              <th>最高+8%</th>
+              <th>最高+10%</th>
+              <th>平均最高</th>
+              <th>平均收盘</th>
+              <th>平均回撤</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={`${row.source}-${row.factor}-${row.bucket}`}>
+                <td>{row.source}</td>
+                <td>{row.factor}</td>
+                <td>{row.bucket}</td>
+                <td>{row.completed}/{row.samples}</td>
+                <td>{formatRate(row.winRate)}</td>
+                <td>{formatRate(row.strongRate)}</td>
+                <td>{formatRate(row.stretchRate)}</td>
+                <td><ReviewReturn value={row.avgMaxRunupPct} /></td>
+                <td><ReviewReturn value={row.avgCloseReturnPct} /></td>
+                <td><ReviewReturn value={row.avgMaxDrawdownPct} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
+  const items = archive?.items.slice(0, 12) ?? [];
+  if (!items.length) return null;
+
+  return (
+    <section className="list-panel strategy-wide-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>策略归档</h2>
+          <span>最近 {items.length} 个已归档交易日</span>
+        </div>
+      </div>
+      <div className="table-wrap strategy-table">
+        <table>
+          <thead>
+            <tr>
+              <th>交易日</th>
+              <th>主策略</th>
+              <th>审美池</th>
+              <th>基准区间</th>
+              <th>基准天数</th>
+              <th>主策略10日</th>
+              <th>审美池10日</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.tradeDate}>
+                <td>{item.tradeDate}</td>
+                <td>{item.mainSignals}</td>
+                <td>{item.aestheticSignals}</td>
+                <td>{item.benchmarkFrom ?? "-"} 至 {item.benchmarkTo ?? "-"}</td>
+                <td>{item.benchmarkDates ?? "-"}</td>
+                <td>{formatRate(item.main10dWinRate)}</td>
+                <td>{formatRate(item.aesthetic10dWinRate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; archive?: StrategyArchiveIndex }) {
   if (!report) {
     return (
       <section className="review-panel">
@@ -1881,6 +2134,8 @@ function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
         />
       </div>
 
+      <StrategyAttributionPanel report={benchmark} />
+
       <div className="strategy-grid">
         <StrategyPickTable title="当日主策略" subtitle="不放宽当前稳定版，只展示真正通过条件的票" picks={latestMain} />
         <StrategyPickTable title="当日审美观察池" subtitle="接近主策略、30m承接、低位修复三类单独观察" picks={latestAesthetic} />
@@ -1896,6 +2151,7 @@ function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
       </div>
 
       <StrategyStatsTable title={hasBenchmark ? "主策略历史原始统计" : "主策略原始统计"} rows={benchmark.summary} />
+      <StrategyArchiveTable archive={archive} />
     </section>
   );
 }
@@ -2246,6 +2502,7 @@ export default function App() {
   const [plan, setPlan] = useState<PlanReport | null>(null);
   const [review, setReview] = useState<ReviewReport | null>(null);
   const [strategy, setStrategy] = useState<StrategyBacktestReport | undefined>();
+  const [strategyArchive, setStrategyArchive] = useState<StrategyArchiveIndex | undefined>();
   const [health, setHealth] = useState<SystemHealthReport | undefined>();
   const [stockIndex, setStockIndex] = useState<StockDetailIndex | undefined>();
   const [stockDetail, setStockDetail] = useState<StockDetailReport | undefined>();
@@ -2275,15 +2532,17 @@ export default function App() {
       loadPlan(),
       loadReview(),
       loadStrategyBacktest().catch(() => undefined),
+      loadStrategyArchive().catch(() => undefined),
       loadSystemHealth().catch(() => undefined),
       loadStockIndex().catch(() => undefined)
     ])
-      .then(([liveReport, livePlan, liveReview, liveStrategy, liveHealth, liveStockIndex]) => {
+      .then(([liveReport, livePlan, liveReview, liveStrategy, liveStrategyArchive, liveHealth, liveStockIndex]) => {
         if (cancelled) return;
         setReport(liveReport);
         setPlan(livePlan);
         setReview(liveReview);
         setStrategy(liveStrategy);
+        setStrategyArchive(liveStrategyArchive);
         setHealth(liveHealth);
         setStockIndex(liveStockIndex);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
@@ -2497,7 +2756,7 @@ export default function App() {
       ) : view === "plan" ? (
         <PlanPanel plan={plan} reviewRecords={review.records} />
       ) : view === "strategy" ? (
-        <StrategyPanel report={strategy} />
+        <StrategyPanel report={strategy} archive={strategyArchive} />
       ) : (
         <ReviewPanel review={review} />
       )}

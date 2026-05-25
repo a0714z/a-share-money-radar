@@ -1345,6 +1345,10 @@ a {
   min-height: 100%;
 }
 
+.strategy-wide-panel {
+  min-width: 0;
+}
+
 .strategy-kpis {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1374,6 +1378,10 @@ a {
 
 .strategy-table {
   max-height: 560px;
+}
+
+.strategy-attribution-table {
+  max-height: 640px;
 }
 
 .mobile-strategy-list {
