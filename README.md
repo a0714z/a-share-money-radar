@@ -140,6 +140,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - raw 信号统计。
 - `--cooldown-days=5` 默认同票 5 个交易日冷却后的新机会统计。
 - `main/watch` 分层统计：`pullback/ready` 归为主选，`risk` 等归为观察。
+- `aestheticWatch` 审美观察池：不放宽主策略，单独输出“接近主策略 / 30m 承接审美 / 低位修复观察”三类候选和独立回测统计。
 - 每日选股流水账，包含空信号日期、当日入选、冷却跳过和 5/10 日结果。
 
 如果需要更宽的候选池，可放宽操作状态、分位和 30m 过滤：
@@ -159,6 +160,8 @@ npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
 - `public/reports/backtests/daily-ledger.md`
+
+前端网站会读取 `public/reports/backtests/latest.json`，在“策略实验”页签展示主策略当日选股、审美观察池、分桶回测和最近每日流水。用户查看策略数据时以网页为准，不需要直接打开 JSON。
 
 数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求频率保护。
 

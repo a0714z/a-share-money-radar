@@ -1313,6 +1313,77 @@ a {
   font-size: 20px;
 }
 
+.strategy-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.strategy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.strategy-meta span {
+  padding: 7px 10px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.strategy-stats-panel {
+  min-height: 100%;
+}
+
+.strategy-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 16px;
+}
+
+.strategy-kpis div {
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.strategy-kpis span,
+.strategy-kpis small {
+  display: block;
+  color: #657168;
+}
+
+.strategy-kpis strong {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 24px;
+}
+
+.strategy-table {
+  max-height: 560px;
+}
+
+.mobile-strategy-list {
+  display: none;
+}
+
+.strategy-mobile-card .mobile-card-foot {
+  align-items: flex-start;
+}
+
 .detail-panel {
   position: sticky;
   top: 16px;
@@ -1837,7 +1908,8 @@ a {
 
 @media (max-width: 1180px) {
   .workspace,
-  .review-layout {
+  .review-layout,
+  .strategy-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1945,7 +2017,8 @@ a {
   .action-conclusion,
   .evidence-grid,
   .trade-plan-grid,
-  .review-kpis {
+  .review-kpis,
+  .strategy-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -2008,12 +2081,14 @@ a {
 
   .view-switch button {
     min-width: 0;
+    font-size: 12px;
   }
 
   .summary-grid,
   .detail-grid,
   .trade-plan-grid,
   .review-kpis,
+  .strategy-kpis,
   .health-grid,
   .market-index-grid,
   .sector-bars,
@@ -2042,6 +2117,7 @@ a {
   .change-block,
   .health-grid div,
   .review-kpis div,
+  .strategy-kpis div,
   .detail-grid div,
   .trade-plan-grid div {
     min-height: 0;
@@ -2397,7 +2473,8 @@ a {
   }
 
   .workspace,
-  .review-layout {
+  .review-layout,
+  .strategy-grid {
     gap: 10px;
   }
 
@@ -2456,7 +2533,8 @@ a {
   }
 
   .mobile-pick-list,
-  .mobile-review-list {
+  .mobile-review-list,
+  .mobile-strategy-list {
     display: grid;
     gap: 10px;
   }
@@ -2511,9 +2589,14 @@ a {
   }
 
   .review-kpis,
+  .strategy-kpis,
   .detail-grid,
   .trade-plan-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .strategy-meta span {
+    width: 100%;
   }
 
   .stock-page {

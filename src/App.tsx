@@ -8,6 +8,7 @@ import {
   CalendarClock,
   Filter,
   History,
+  Layers,
   Link as LinkIcon,
   ListChecks,
   Percent,
@@ -131,6 +132,128 @@ type StockDetailReport = {
   latestPick?: StockPick;
   planPick?: StockPick;
   reviewRecords: ReviewRecord[];
+};
+
+type StrategyStats = {
+  samples: number;
+  completed: number;
+  targetHits: number;
+  strongTargetHits: number;
+  stretchTargetHits: number;
+  winRate?: number;
+  positiveCloseRate?: number;
+  strongTargetRate?: number;
+  stretchTargetRate?: number;
+  avgCloseReturnPct?: number;
+  avgMaxRunupPct?: number;
+  avgMaxDrawdownPct?: number;
+  avgPeakDay?: number;
+};
+
+type StrategyReplay = {
+  horizon: number;
+  status: "complete" | "pending";
+  entryPrice: number;
+  closeReturnPct?: number;
+  maxRunupPct?: number;
+  maxRunupDate?: string;
+  maxRunupDay?: number;
+  maxDrawdownPct?: number;
+  maxDrawdownDate?: string;
+  maxDrawdownDay?: number;
+  targetHit?: boolean;
+  strongTargetHit?: boolean;
+  stretchTargetHit?: boolean;
+};
+
+type StrategyBacktestPick = {
+  tradeDate: string;
+  rank: number;
+  instrument: string;
+  name: string;
+  score: number;
+  strategyScore: number;
+  signalLayer: "main" | "watch";
+  actionState: StockActionState;
+  price: number;
+  pctChange?: number;
+  setupState: StockPick["setupState"];
+  flowRatio5d: number;
+  valuePosition: number;
+  pullbackFromHigh: number;
+  intradayScore?: number;
+  intradaySupportScore?: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
+  thirtyMinuteDrawdownFromHigh?: number;
+  reasons: string[];
+  risks: string[];
+  cooldownDuplicate?: boolean;
+  replay: Record<string, StrategyReplay>;
+};
+
+type StrategyAestheticPick = StrategyBacktestPick & {
+  bucket: "near-main" | "intraday-support" | "low-repair";
+  bucketLabel: string;
+  bucketScore: number;
+  priority: "high" | "medium" | "low";
+  watchReason: string;
+  matchReasons: string[];
+};
+
+type StrategyDailyRecord = {
+  tradeDate: string;
+  signals: number;
+  mainSignals: number;
+  watchSignals: number;
+  cooldownEligibleSignals: number;
+  cooldownSkippedSignals: number;
+  picks: StrategyBacktestPick[];
+};
+
+type StrategyAestheticDailyRecord = {
+  tradeDate: string;
+  signals: number;
+  cooldownEligibleSignals: number;
+  cooldownSkippedSignals: number;
+  byBucket: Record<string, number>;
+  picks: StrategyAestheticPick[];
+};
+
+type StrategyAestheticReport = {
+  summary: Record<string, StrategyStats>;
+  cooldownSummary: Record<string, StrategyStats>;
+  byBucket: Record<string, Record<string, StrategyStats>>;
+  cooldownByBucket: Record<string, Record<string, StrategyStats>>;
+  dailyRecords: StrategyAestheticDailyRecord[];
+  picks: StrategyAestheticPick[];
+};
+
+type StrategyBacktestReport = {
+  meta: {
+    generatedAt: string;
+    from?: string;
+    to?: string;
+    selectDate?: string;
+    horizons: number[];
+    top: number;
+    targetPct: number;
+    strongTargetPct: number;
+    stretchTargetPct: number;
+    cooldownDays: number;
+    preset: string;
+    aestheticTop?: number;
+    evaluatedDates: number;
+    universe: number;
+    notes: string[];
+  };
+  summary: Record<string, StrategyStats>;
+  cooldownSummary: Record<string, StrategyStats>;
+  bySignalLayer: Record<string, Record<string, StrategyStats>>;
+  cooldownBySignalLayer: Record<string, Record<string, StrategyStats>>;
+  aestheticWatch?: StrategyAestheticReport;
+  dailyRecords: StrategyDailyRecord[];
+  picks: StrategyBacktestPick[];
 };
 
 function formatMoney(value?: number) {
@@ -316,6 +439,13 @@ async function loadReview() {
   const response = await fetch(`${base}reports/performance.json?t=${Date.now()}`);
   if (!response.ok) throw new Error("no review report");
   return (await response.json()) as ReviewReport;
+}
+
+async function loadStrategyBacktest() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/backtests/latest.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as StrategyBacktestReport;
 }
 
 async function loadPlan() {
@@ -1420,6 +1550,312 @@ function ReviewReturn({ value }: { value?: number }) {
   return <span className={value! >= 0 ? "up" : "down"}>{formatPct(value)}</span>;
 }
 
+function formatRate(value?: number) {
+  return Number.isFinite(value) ? `${Number(value).toFixed(1)}%` : "追踪中";
+}
+
+function replayValue(pick: StrategyBacktestPick, horizon: "5d" | "10d", key: "maxRunupPct" | "closeReturnPct" | "maxDrawdownPct") {
+  const replay = pick.replay[horizon];
+  if (!replay || replay.status !== "complete") return undefined;
+  return replay[key];
+}
+
+function strategyDate(report: StrategyBacktestReport) {
+  return report.meta.selectDate ?? report.meta.to ?? report.meta.from ?? "-";
+}
+
+function strategyPicksForDate<T extends StrategyBacktestPick>(picks: T[], date: string) {
+  return picks.filter((pick) => pick.tradeDate === date).sort((a, b) => a.rank - b.rank);
+}
+
+function isAestheticPick(pick: StrategyBacktestPick | StrategyAestheticPick): pick is StrategyAestheticPick {
+  return "bucketLabel" in pick;
+}
+
+function StrategyStatsTable({ title, rows }: { title: string; rows: Record<string, StrategyStats> }) {
+  const horizons = Object.entries(rows);
+  if (!horizons.length) return null;
+
+  return (
+    <section className="list-panel strategy-stats-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>{title}</h2>
+          <span>选出后直接观察未来 5/10 日，不模拟买卖点</span>
+        </div>
+      </div>
+      <div className="strategy-kpis">
+        {horizons.map(([horizon, stats]) => (
+          <div key={horizon}>
+            <span>{horizon.replace("d", "日")}最高触达</span>
+            <strong>{formatRate(stats.winRate)}</strong>
+            <small>
+              {stats.completed}/{stats.samples} 完成 · 平均最高 {formatPct(stats.avgMaxRunupPct)}
+            </small>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function StrategyBucketTable({ report }: { report?: StrategyAestheticReport }) {
+  if (!report) return null;
+  const rows = Object.entries(report.cooldownByBucket).flatMap(([bucket, horizons]) =>
+    Object.entries(horizons).map(([horizon, stats]) => ({
+      bucket,
+      label: report.picks.find((pick) => pick.bucket === bucket)?.bucketLabel ?? bucket,
+      horizon,
+      stats
+    }))
+  );
+
+  return (
+    <section className="list-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>审美分桶回测</h2>
+          <span>独立观察池，默认同票 {rows.length ? "冷却去重后" : ""}统计</span>
+        </div>
+      </div>
+      <div className="table-wrap strategy-table">
+        <table>
+          <thead>
+            <tr>
+              <th>分桶</th>
+              <th>窗口</th>
+              <th>样本</th>
+              <th>最高+5%</th>
+              <th>最高+8%</th>
+              <th>最高+10%</th>
+              <th>平均收盘</th>
+              <th>平均最高</th>
+              <th>平均回撤</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ bucket, label, horizon, stats }) => (
+              <tr key={`${bucket}-${horizon}`}>
+                <td>{label}</td>
+                <td>{horizon.replace("d", "日")}</td>
+                <td>{stats.completed}/{stats.samples}</td>
+                <td>{formatRate(stats.winRate)}</td>
+                <td>{formatRate(stats.strongTargetRate)}</td>
+                <td>{formatRate(stats.stretchTargetRate)}</td>
+                <td><ReviewReturn value={stats.avgCloseReturnPct} /></td>
+                <td><ReviewReturn value={stats.avgMaxRunupPct} /></td>
+                <td><ReviewReturn value={stats.avgMaxDrawdownPct} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAestheticPick }) {
+  const isAesthetic = isAestheticPick(pick);
+  return (
+    <article className="mobile-review-card strategy-mobile-card">
+      <div className="mobile-card-head">
+        <div>
+          <div className="mobile-rank">#{pick.rank} · {pick.tradeDate}</div>
+          <h3>{pick.name}</h3>
+          <p>{pick.instrument}</p>
+        </div>
+        <div className="mobile-card-badges">
+          <span className={`action-chip action-${pick.actionState}`}>{isAesthetic ? pick.bucketLabel : pick.signalLayer}</span>
+          <strong>{(isAesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong>
+        </div>
+      </div>
+      <div className="mobile-review-grid">
+        <div>
+          <span>5日最高</span>
+          <strong><ReviewReturn value={replayValue(pick, "5d", "maxRunupPct")} /></strong>
+        </div>
+        <div>
+          <span>10日最高</span>
+          <strong><ReviewReturn value={replayValue(pick, "10d", "maxRunupPct")} /></strong>
+        </div>
+        <div>
+          <span>分位</span>
+          <strong>{pick.valuePosition.toFixed(1)}%</strong>
+        </div>
+        <div>
+          <span>30m</span>
+          <strong>{pick.thirtyMinutePullbackScore ?? "-"}</strong>
+        </div>
+      </div>
+      <div className="mobile-card-foot">
+        <span>{isAesthetic ? pick.watchReason : pick.setupState}</span>
+        <span>{formatPct(pick.flowRatio5d)}</span>
+      </div>
+    </article>
+  );
+}
+
+function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle: string; picks: Array<StrategyBacktestPick | StrategyAestheticPick> }) {
+  return (
+    <section className="list-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>{title}</h2>
+          <span>{subtitle}</span>
+        </div>
+      </div>
+      <div className="table-wrap strategy-table">
+        <div className="mobile-strategy-list">
+          {picks.map((pick) => (
+            <MobileStrategyCard key={`${pick.tradeDate}-${pick.instrument}-${isAestheticPick(pick) ? pick.bucket : "main"}`} pick={pick} />
+          ))}
+        </div>
+        <table className="desktop-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>代码</th>
+              <th>名称</th>
+              <th>类型</th>
+              <th>价格</th>
+              <th>分数</th>
+              <th>状态</th>
+              <th>形态</th>
+              <th>5日资金</th>
+              <th>分位</th>
+              <th>回撤</th>
+              <th>30m</th>
+              <th>5日最高</th>
+              <th>10日最高</th>
+            </tr>
+          </thead>
+          <tbody>
+            {picks.map((pick) => {
+              const aesthetic = isAestheticPick(pick);
+              return (
+                <tr key={`${pick.tradeDate}-${pick.instrument}-${aesthetic ? pick.bucket : "main"}`}>
+                  <td>{pick.rank}</td>
+                  <td className="code">{pick.instrument}</td>
+                  <td>{pick.name}</td>
+                  <td>{aesthetic ? pick.bucketLabel : pick.signalLayer === "main" ? "主策略" : "观察"}</td>
+                  <td>{pick.price.toFixed(2)}</td>
+                  <td><strong>{(aesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong></td>
+                  <td><span className={`action-chip action-${pick.actionState}`}>{pick.actionState}</span></td>
+                  <td><span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState}</span></td>
+                  <td><ReviewReturn value={pick.flowRatio5d} /></td>
+                  <td>{pick.valuePosition.toFixed(1)}%</td>
+                  <td>{pick.pullbackFromHigh.toFixed(1)}%</td>
+                  <td>{pick.thirtyMinutePullbackScore ?? "-"} / {pick.thirtyMinuteShrinkRatio ?? "-"}</td>
+                  <td><ReviewReturn value={replayValue(pick, "5d", "maxRunupPct")} /></td>
+                  <td><ReviewReturn value={replayValue(pick, "10d", "maxRunupPct")} /></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!picks.length && <div className="empty">这个交易日没有选出标的</div>}
+      </div>
+    </section>
+  );
+}
+
+function StrategyDailyLedger({ report }: { report: StrategyBacktestReport }) {
+  const aestheticByDate = new Map((report.aestheticWatch?.dailyRecords ?? []).map((day) => [day.tradeDate, day]));
+  const days = report.dailyRecords.slice(-20).reverse();
+
+  return (
+    <section className="list-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>每日流水</h2>
+          <span>最近 20 个回测交易日</span>
+        </div>
+      </div>
+      <div className="table-wrap strategy-table">
+        <table>
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>主策略</th>
+              <th>主选</th>
+              <th>观察</th>
+              <th>冷却跳过</th>
+              <th>审美池</th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day) => {
+              const aesthetic = aestheticByDate.get(day.tradeDate);
+              return (
+                <tr key={day.tradeDate}>
+                  <td>{day.tradeDate}</td>
+                  <td>{day.signals}</td>
+                  <td>{day.mainSignals}</td>
+                  <td>{day.watchSignals}</td>
+                  <td>{day.cooldownSkippedSignals}</td>
+                  <td>{aesthetic?.signals ?? 0}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function StrategyPanel({ report }: { report?: StrategyBacktestReport }) {
+  if (!report) {
+    return (
+      <section className="review-panel">
+        <div className="empty standalone-empty">还没有生成策略实验报告，请先运行 backtest:strategy。</div>
+      </section>
+    );
+  }
+
+  const date = strategyDate(report);
+  const latestMain = strategyPicksForDate(report.picks, date);
+  const latestAesthetic = strategyPicksForDate(report.aestheticWatch?.picks ?? [], date);
+  const tenDay = report.cooldownSummary["10d"] ?? report.summary["10d"];
+  const aestheticTen = report.aestheticWatch?.cooldownSummary["10d"] ?? report.aestheticWatch?.summary["10d"];
+
+  return (
+    <section className="review-panel strategy-panel">
+      <div className="summary-grid review-summary">
+        <Metric icon={CalendarClock} label="策略交易日" value={date} tone="blue" />
+        <Metric icon={ListChecks} label="当日主策略" value={latestMain.length} tone="green" />
+        <Metric icon={Layers} label="当日审美池" value={latestAesthetic.length} tone="amber" />
+        <Metric icon={Target} label="主策略10日" value={formatRate(tenDay?.winRate)} tone="green" />
+        <Metric icon={Percent} label="审美池10日" value={formatRate(aestheticTen?.winRate)} tone="blue" />
+        <Metric icon={History} label="回测交易日" value={report.meta.evaluatedDates} />
+      </div>
+
+      <div className="strategy-meta">
+        <span>{report.meta.generatedAt.replace("T", " ").slice(0, 19)}</span>
+        <span>样本 {report.meta.from ?? "-"} 至 {report.meta.to ?? "-"} · preset {report.meta.preset}</span>
+        <span>目标 {report.meta.targetPct}% / {report.meta.strongTargetPct}% / {report.meta.stretchTargetPct}% · 冷却 {report.meta.cooldownDays} 日</span>
+      </div>
+
+      <div className="strategy-grid">
+        <StrategyStatsTable title="主策略冷却统计" rows={report.cooldownSummary} />
+        <StrategyStatsTable title="审美池冷却统计" rows={report.aestheticWatch?.cooldownSummary ?? {}} />
+      </div>
+
+      <div className="strategy-grid">
+        <StrategyPickTable title="当日主策略" subtitle="不放宽当前稳定版，只展示真正通过条件的票" picks={latestMain} />
+        <StrategyPickTable title="当日审美观察池" subtitle="接近主策略、30m承接、低位修复三类单独观察" picks={latestAesthetic} />
+      </div>
+
+      <div className="strategy-grid">
+        <StrategyBucketTable report={report.aestheticWatch} />
+        <StrategyDailyLedger report={report} />
+      </div>
+
+      <StrategyStatsTable title="主策略原始统计" rows={report.summary} />
+    </section>
+  );
+}
+
 function MobileReviewCard({ record }: { record: ReviewRecord }) {
   return (
     <article className="mobile-review-card">
@@ -1765,10 +2201,11 @@ export default function App() {
   const [report, setReport] = useState<ScanReport | null>(null);
   const [plan, setPlan] = useState<PlanReport | null>(null);
   const [review, setReview] = useState<ReviewReport | null>(null);
+  const [strategy, setStrategy] = useState<StrategyBacktestReport | undefined>();
   const [health, setHealth] = useState<SystemHealthReport | undefined>();
   const [stockIndex, setStockIndex] = useState<StockDetailIndex | undefined>();
   const [stockDetail, setStockDetail] = useState<StockDetailReport | undefined>();
-  const [view, setView] = useState<"radar" | "plan" | "review">("radar");
+  const [view, setView] = useState<"radar" | "plan" | "review" | "strategy">("radar");
   const [stockRoute, setStockRoute] = useState<string | undefined>(() => parseStockHash());
   const [query, setQuery] = useState("");
   const [signal, setSignal] = useState<Signal | "all">("all");
@@ -1789,12 +2226,20 @@ export default function App() {
     setStatus("loading");
     setLoadError(undefined);
 
-    Promise.all([loadReport(), loadPlan(), loadReview(), loadSystemHealth().catch(() => undefined), loadStockIndex().catch(() => undefined)])
-      .then(([liveReport, livePlan, liveReview, liveHealth, liveStockIndex]) => {
+    Promise.all([
+      loadReport(),
+      loadPlan(),
+      loadReview(),
+      loadStrategyBacktest().catch(() => undefined),
+      loadSystemHealth().catch(() => undefined),
+      loadStockIndex().catch(() => undefined)
+    ])
+      .then(([liveReport, livePlan, liveReview, liveStrategy, liveHealth, liveStockIndex]) => {
         if (cancelled) return;
         setReport(liveReport);
         setPlan(livePlan);
         setReview(liveReview);
+        setStrategy(liveStrategy);
         setHealth(liveHealth);
         setStockIndex(liveStockIndex);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
@@ -1938,6 +2383,15 @@ export default function App() {
             >
               复盘统计
             </button>
+            <button
+              className={view === "strategy" && !stockRoute ? "active" : ""}
+              onClick={() => {
+                clearRoute();
+                setView("strategy");
+              }}
+            >
+              策略实验
+            </button>
           </div>
           <div className={`live-badge live-${status}`}>
             <span />
@@ -1998,6 +2452,8 @@ export default function App() {
         </div>
       ) : view === "plan" ? (
         <PlanPanel plan={plan} reviewRecords={review.records} />
+      ) : view === "strategy" ? (
+        <StrategyPanel report={strategy} />
       ) : (
         <ReviewPanel review={review} />
       )}

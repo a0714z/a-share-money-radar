@@ -19,10 +19,19 @@ type Horizon = 5 | 10;
 type StrategyPreset = "baseline" | "swing";
 type EvidenceMode = "any" | "intraday" | "daily" | "both";
 type SignalLayer = "main" | "watch";
+type AestheticBucket = "near-main" | "intraday-support" | "low-repair";
+type AestheticPriority = "high" | "medium" | "low";
 
 const ACTION_STATES = ["ready", "pullback", "track", "risk", "invalid"] as const satisfies readonly StockActionState[];
 const SETUP_STATES = ["二次突破", "承接确认", "缩量回踩", "爆量启动", "承接转弱", "放量派发风险", "跌破失效", "常规观察"] as const satisfies readonly SetupState[];
 const SIGNAL_LAYERS = ["main", "watch"] as const satisfies readonly SignalLayer[];
+const AESTHETIC_BUCKETS = ["near-main", "intraday-support", "low-repair"] as const satisfies readonly AestheticBucket[];
+
+const aestheticBucketLabels: Record<AestheticBucket, string> = {
+  "near-main": "接近主策略",
+  "intraday-support": "30m承接审美",
+  "low-repair": "低位修复观察"
+};
 
 type SwingFilterConfig = {
   minFlowRatio: number;
@@ -61,6 +70,7 @@ type BacktestConfig = {
   maxDates: number;
   outputDir: string;
   preset: StrategyPreset;
+  aestheticTop: number;
   useIntraday30m: boolean;
   intraday30mBars: number;
   refineCandidates: number;
@@ -98,10 +108,12 @@ type BacktestPick = {
   actionState: StockActionState;
   actionLabel?: string;
   price: number;
+  pctChange: number;
   setupState: StockPick["setupState"];
   flowRatio5d: number;
   valuePosition: number;
   pullbackFromHigh: number;
+  amountRatio20?: number;
   actionReason?: string;
   intradayScore?: number;
   intradaySupportScore?: number;
@@ -122,6 +134,15 @@ type BacktestPick = {
   risks: string[];
   cooldownDuplicate?: boolean;
   replay: Record<string, ReplayResult>;
+};
+
+type AestheticWatchPick = BacktestPick & {
+  bucket: AestheticBucket;
+  bucketLabel: string;
+  bucketScore: number;
+  priority: AestheticPriority;
+  watchReason: string;
+  matchReasons: string[];
 };
 
 type Stats = {
@@ -156,6 +177,7 @@ type BacktestReport = {
     stretchTargetPct: number;
     cooldownDays: number;
     preset: StrategyPreset;
+    aestheticTop: number;
     useIntraday30m: boolean;
     intraday30mBars: number;
     refineCandidates: number;
@@ -178,6 +200,7 @@ type BacktestReport = {
   bySetupState: Record<string, Record<string, Stats>>;
   bySignalLayer: Record<SignalLayer, Record<string, Stats>>;
   cooldownBySignalLayer: Record<SignalLayer, Record<string, Stats>>;
+  aestheticWatch?: AestheticWatchReport;
   dailyRecords: DailyRecord[];
   picks: BacktestPick[];
 };
@@ -209,6 +232,33 @@ type DailyRecord = {
   cooldownEligibleSignals: number;
   cooldownSkippedSignals: number;
   picks: DailyRecordPick[];
+};
+
+type AestheticDailyRecordPick = DailyRecordPick & {
+  bucket: AestheticBucket;
+  bucketLabel: string;
+  bucketScore: number;
+  priority: AestheticPriority;
+  watchReason: string;
+  matchReasons: string[];
+};
+
+type AestheticDailyRecord = {
+  tradeDate: string;
+  signals: number;
+  cooldownEligibleSignals: number;
+  cooldownSkippedSignals: number;
+  byBucket: Record<AestheticBucket, number>;
+  picks: AestheticDailyRecordPick[];
+};
+
+type AestheticWatchReport = {
+  summary: Record<string, Stats>;
+  cooldownSummary: Record<string, Stats>;
+  byBucket: Record<AestheticBucket, Record<string, Stats>>;
+  cooldownByBucket: Record<AestheticBucket, Record<string, Stats>>;
+  dailyRecords: AestheticDailyRecord[];
+  picks: AestheticWatchPick[];
 };
 
 type MoneyFlowEnvelope = {
@@ -596,10 +646,16 @@ function buildLayerStats(picks: BacktestPick[], horizons: Horizon[]) {
   return bySignalLayer;
 }
 
-function applyCooldown(picks: BacktestPick[], tradeDates: string[], cooldownDays: number) {
+function buildAestheticBucketStats(picks: AestheticWatchPick[], horizons: Horizon[]) {
+  return Object.fromEntries(
+    AESTHETIC_BUCKETS.map((bucket) => [bucket, summarizeByHorizon(picks.filter((pick) => pick.bucket === bucket), horizons)])
+  ) as Record<AestheticBucket, Record<string, Stats>>;
+}
+
+function applyCooldown<T extends { tradeDate: string; rank: number; instrument: string; cooldownDuplicate?: boolean }>(picks: T[], tradeDates: string[], cooldownDays: number) {
   const dateIndex = new Map(tradeDates.map((date, index) => [date, index]));
   const lastAcceptedIndex = new Map<string, number>();
-  const cooldownPicks: BacktestPick[] = [];
+  const cooldownPicks: T[] = [];
   const ordered = [...picks].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate) || a.rank - b.rank);
 
   for (const pick of ordered) {
@@ -621,6 +677,27 @@ function applyCooldown(picks: BacktestPick[], tradeDates: string[], cooldownDays
   return cooldownPicks;
 }
 
+function toDailyRecordPick(pick: BacktestPick): DailyRecordPick {
+  return {
+    rank: pick.rank,
+    instrument: pick.instrument,
+    name: pick.name,
+    layer: pick.signalLayer,
+    state: pick.actionState,
+    setup: pick.setupState,
+    price: pick.price,
+    score: pick.score,
+    strategyScore: pick.strategyScore,
+    flowRatio5d: pick.flowRatio5d,
+    valuePosition: pick.valuePosition,
+    pullbackFromHigh: pick.pullbackFromHigh,
+    thirtyMinutePullbackScore: pick.thirtyMinutePullbackScore,
+    thirtyMinuteShrinkRatio: pick.thirtyMinuteShrinkRatio,
+    cooldownDuplicate: Boolean(pick.cooldownDuplicate),
+    replay: pick.replay
+  };
+}
+
 function buildDailyRecords(picks: BacktestPick[], tradeDates: string[]) {
   const byDate = new Map<string, BacktestPick[]>();
   for (const pick of picks) {
@@ -638,23 +715,39 @@ function buildDailyRecords(picks: BacktestPick[], tradeDates: string[]) {
       watchSignals: dayPicks.filter((pick) => pick.signalLayer === "watch").length,
       cooldownEligibleSignals: cooldownEligible.length,
       cooldownSkippedSignals: dayPicks.length - cooldownEligible.length,
+      picks: dayPicks.map(toDailyRecordPick)
+    };
+  });
+}
+
+function buildAestheticDailyRecords(picks: AestheticWatchPick[], tradeDates: string[]) {
+  const byDate = new Map<string, AestheticWatchPick[]>();
+  for (const pick of picks) {
+    if (!byDate.has(pick.tradeDate)) byDate.set(pick.tradeDate, []);
+    byDate.get(pick.tradeDate)?.push(pick);
+  }
+
+  return tradeDates.map((tradeDate): AestheticDailyRecord => {
+    const dayPicks = (byDate.get(tradeDate) ?? []).sort((a, b) => a.rank - b.rank);
+    const cooldownEligible = dayPicks.filter((pick) => !pick.cooldownDuplicate);
+    const byBucket = Object.fromEntries(
+      AESTHETIC_BUCKETS.map((bucket) => [bucket, dayPicks.filter((pick) => pick.bucket === bucket).length])
+    ) as Record<AestheticBucket, number>;
+
+    return {
+      tradeDate,
+      signals: dayPicks.length,
+      cooldownEligibleSignals: cooldownEligible.length,
+      cooldownSkippedSignals: dayPicks.length - cooldownEligible.length,
+      byBucket,
       picks: dayPicks.map((pick) => ({
-        rank: pick.rank,
-        instrument: pick.instrument,
-        name: pick.name,
-        layer: pick.signalLayer,
-        state: pick.actionState,
-        setup: pick.setupState,
-        price: pick.price,
-        score: pick.score,
-        strategyScore: pick.strategyScore,
-        flowRatio5d: pick.flowRatio5d,
-        valuePosition: pick.valuePosition,
-        pullbackFromHigh: pick.pullbackFromHigh,
-        thirtyMinutePullbackScore: pick.thirtyMinutePullbackScore,
-        thirtyMinuteShrinkRatio: pick.thirtyMinuteShrinkRatio,
-        cooldownDuplicate: Boolean(pick.cooldownDuplicate),
-        replay: pick.replay
+        ...toDailyRecordPick(pick),
+        bucket: pick.bucket,
+        bucketLabel: pick.bucketLabel,
+        bucketScore: pick.bucketScore,
+        priority: pick.priority,
+        watchReason: pick.watchReason,
+        matchReasons: pick.matchReasons
       }))
     };
   });
@@ -695,6 +788,155 @@ function swingRankScore(pick: StockPick, thirtyMinuteSignal?: ThirtyMinuteSignal
         : -6;
   const thirtyMinuteBonus = thirtyMinuteSignal ? Math.max(-8, Math.min(10, (thirtyMinuteSignal.score - 64) * 0.35)) : 0;
   return round(pick.score + setupBonus + actionBonus + flowBonus + valueBonus + pullbackBonus + thirtyMinuteBonus - pick.risks.length * 1.8, 2);
+}
+
+function bounded(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function priorityFromScore(bucket: AestheticBucket, score: number): AestheticPriority {
+  if (bucket === "low-repair") return score >= 78 ? "medium" : "low";
+  if (bucket === "intraday-support") return score >= 100 ? "high" : score >= 90 ? "medium" : "low";
+  return score >= 92 ? "high" : score >= 82 ? "medium" : "low";
+}
+
+function evaluateAestheticWatch(candidate: ScoredCandidate): Omit<AestheticWatchPick, keyof BacktestPick> | undefined {
+  const pick = candidate.pick;
+  const actionState = pick.actionState ?? "track";
+  const thirty = candidate.thirtyMinuteSignal;
+  const burst = pick.intradayBurst;
+  const hardRisk = hardRiskReason(pick);
+  const choices: Array<Omit<AestheticWatchPick, keyof BacktestPick>> = [];
+
+  if (
+    !hardRisk &&
+    actionState !== "invalid" &&
+    ["缩量回踩", "承接确认", "常规观察"].includes(pick.setupState) &&
+    pick.score >= 62 &&
+    pick.flowRatio5d >= 1.5 &&
+    pick.flowRatio5d <= 12 &&
+    pick.valuePosition >= 58 &&
+    pick.valuePosition <= 78 &&
+    pick.pullbackFromHigh >= 5.5 &&
+    pick.pullbackFromHigh <= 24 &&
+    thirty &&
+    thirty.score >= 88 &&
+    thirty.shrinkRatio <= 1.08 &&
+    pick.risks.length <= 4
+  ) {
+    const setupFit = pick.setupState === "缩量回踩" ? 10 : pick.setupState === "承接确认" ? 6 : 3;
+    const pullbackFit = pick.pullbackFromHigh >= 8 ? 10 : bounded((pick.pullbackFromHigh - 5) * 3, 0, 9);
+    const bucketScore = round(
+      pick.score +
+        (thirty.score - 80) * 0.45 +
+        (1.08 - thirty.shrinkRatio) * 12 +
+        setupFit +
+        pullbackFit +
+        Math.min(8, pick.flowRatio5d * 0.6) -
+        pick.risks.length * 1.5,
+      1
+    );
+    const bucket: AestheticBucket = "near-main";
+    choices.push({
+      bucket,
+      bucketLabel: aestheticBucketLabels[bucket],
+      bucketScore,
+      priority: priorityFromScore(bucket, bucketScore),
+      watchReason: "主策略只差少量形态/回撤条件，30m 缩量回踩质量较好",
+      matchReasons: [
+        `30m回踩分 ${thirty.score}`,
+        `30m缩量比 ${thirty.shrinkRatio}`,
+        `5日资金 ${round(pick.flowRatio5d, 2)}%`,
+        `分位 ${round(pick.valuePosition, 1)}%`
+      ]
+    });
+  }
+
+  if (
+    !hardRisk &&
+    actionState !== "invalid" &&
+    burst &&
+    burst.score >= 78 &&
+    burst.supportScore >= 82 &&
+    burst.daysSince <= 4 &&
+    burst.pullbackAmountRatio <= 0.65 &&
+    pick.score >= 65 &&
+    pick.flowRatio5d >= 1 &&
+    pick.flowRatio5d <= 6 &&
+    pick.pctChange <= 5.5 &&
+    pick.pullbackFromHigh <= 38 &&
+    pick.risks.length <= 4
+  ) {
+    const bucketScore = round(
+      pick.score +
+        (burst.score - 70) * 0.55 +
+        (burst.supportScore - 80) * 0.45 +
+        (0.65 - burst.pullbackAmountRatio) * 16 +
+        Math.min(7, pick.flowRatio5d * 0.5) +
+        (burst.daysSince <= 2 ? 6 : 2) -
+        Math.max(0, pick.pctChange - 3) * 2 -
+        pick.risks.length * 1.4,
+      1
+    );
+    const bucket: AestheticBucket = "intraday-support";
+    choices.push({
+      bucket,
+      bucketLabel: aestheticBucketLabels[bucket],
+      bucketScore,
+      priority: priorityFromScore(bucket, bucketScore),
+      watchReason: "30m 爆量后承接未坏，回调量能明显收缩",
+      matchReasons: [
+        `异动分 ${burst.score}`,
+        `承接分 ${burst.supportScore}`,
+        `异动后 ${burst.daysSince} 天`,
+        `回调量比 ${burst.pullbackAmountRatio}`
+      ]
+    });
+  }
+
+  if (
+    !hardRisk &&
+    actionState !== "invalid" &&
+    pick.score >= 40 &&
+    pick.flowRatio5d >= 2.5 &&
+    pick.flowRatio5d <= 6 &&
+    pick.valuePosition >= 25 &&
+    pick.valuePosition <= 58 &&
+    pick.pullbackFromHigh >= 12 &&
+    pick.pullbackFromHigh <= 24 &&
+    pick.pctChange <= 2.5 &&
+    thirty &&
+    thirty.score >= 104 &&
+    thirty.shrinkRatio <= 0.75 &&
+    pick.risks.length <= 4
+  ) {
+    const valueFit = 10 - Math.min(10, Math.abs(pick.valuePosition - 42) * 0.28);
+    const bucketScore = round(
+      pick.score +
+        (thirty.score - 80) * 0.7 +
+        (0.75 - thirty.shrinkRatio) * 18 +
+        Math.min(8, pick.flowRatio5d * 0.8) +
+        valueFit -
+        pick.risks.length * 1.2,
+      1
+    );
+    const bucket: AestheticBucket = "low-repair";
+    choices.push({
+      bucket,
+      bucketLabel: aestheticBucketLabels[bucket],
+      bucketScore,
+      priority: priorityFromScore(bucket, bucketScore),
+      watchReason: "低位修复型，30m 缩量守低点，但日线强度尚未达到主策略",
+      matchReasons: [
+        `分位 ${round(pick.valuePosition, 1)}%`,
+        `30m回踩分 ${thirty.score}`,
+        `30m缩量比 ${thirty.shrinkRatio}`,
+        `5日资金 ${round(pick.flowRatio5d, 2)}%`
+      ]
+    });
+  }
+
+  return choices.sort((a, b) => b.bucketScore - a.bucketScore)[0];
 }
 
 function evaluateStrategyPick(candidate: ScoredCandidate, config: BacktestConfig): { eligible: boolean; strategyScore: number; rejectReason?: string } {
@@ -759,6 +1001,82 @@ function selectStrategyCandidates(candidates: ScoredCandidate[], config: Backtes
   return selected.sort((a, b) => b.strategyScore - a.strategyScore || b.pick.score - a.pick.score);
 }
 
+function buildBacktestPick(args: { tradeDate: string; rank: number; candidate: ScoredCandidate; strategyScore: number; config: BacktestConfig }): BacktestPick {
+  const { tradeDate, rank, candidate, strategyScore, config } = args;
+  const pick = candidate.pick;
+  const thirtyMinuteSignal = candidate.thirtyMinuteSignal;
+  const replay = Object.fromEntries(
+    config.horizons.map((horizon) => [`${horizon}d`, replayPick(pick, candidate.future, horizon, config)])
+  ) as Record<string, ReplayResult>;
+
+  return {
+    tradeDate,
+    rank,
+    instrument: pick.instrument,
+    name: pick.name,
+    score: pick.score,
+    strategyScore,
+    signal: pick.signal,
+    signalLayer: signalLayerForAction(pick.actionState ?? "track"),
+    actionState: pick.actionState ?? "track",
+    actionLabel: pick.actionLabel,
+    price: pick.price,
+    pctChange: pick.pctChange,
+    setupState: pick.setupState,
+    flowRatio5d: pick.flowRatio5d,
+    valuePosition: pick.valuePosition,
+    pullbackFromHigh: pick.pullbackFromHigh,
+    amountRatio20: pick.amountRatio20,
+    actionReason: pick.actionReason,
+    intradayScore: pick.intradayBurst?.score,
+    intradaySupportScore: pick.intradayBurst?.supportScore,
+    intradayDaysSince: pick.intradayBurst?.daysSince,
+    intradayPullbackAmountRatio: pick.intradayBurst?.pullbackAmountRatio,
+    intradayHeldMidpoint: pick.intradayBurst?.heldBodyMidpoint,
+    surgeScore: pick.surgePullback?.score,
+    surgeDaysSince: pick.surgePullback?.daysSince,
+    surgePullbackAmountRatio: pick.surgePullback?.pullbackAmountRatio,
+    thirtyMinutePullbackScore: thirtyMinuteSignal?.score,
+    thirtyMinuteShrinkRatio: thirtyMinuteSignal?.shrinkRatio,
+    thirtyMinuteDrawdownFromHigh: thirtyMinuteSignal?.drawdownFromHigh,
+    thirtyMinuteDistanceFromLow: thirtyMinuteSignal?.distanceFromLow,
+    thirtyMinuteHeldRecentLow: thirtyMinuteSignal?.heldRecentLow,
+    thirtyMinuteCloseAboveMa20: thirtyMinuteSignal?.closeAboveMa20,
+    thirtyMinuteCloseAboveMa60: thirtyMinuteSignal?.closeAboveMa60,
+    reasons: pick.reasons,
+    risks: pick.risks,
+    replay
+  };
+}
+
+function selectAestheticWatchCandidates(candidates: ScoredCandidate[], excludedInstruments: Set<string>, config: BacktestConfig, tradeDate: string): AestheticWatchPick[] {
+  return candidates
+    .filter((candidate) => !excludedInstruments.has(candidate.pick.instrument))
+    .map((candidate) => {
+      const decision = evaluateAestheticWatch(candidate);
+      if (!decision) return undefined;
+      const baseScore = decision.bucketScore + (decision.priority === "high" ? 6 : decision.priority === "medium" ? 2 : 0);
+      return {
+        candidate,
+        decision,
+        sortScore: baseScore
+      };
+    })
+    .filter((item): item is { candidate: ScoredCandidate; decision: Omit<AestheticWatchPick, keyof BacktestPick>; sortScore: number } => Boolean(item))
+    .sort((a, b) => b.sortScore - a.sortScore || b.candidate.pick.score - a.candidate.pick.score)
+    .slice(0, config.aestheticTop)
+    .map((item, index) => ({
+      ...buildBacktestPick({
+        tradeDate,
+        rank: index + 1,
+        candidate: item.candidate,
+        strategyScore: item.decision.bucketScore,
+        config
+      }),
+      ...item.decision
+    }));
+}
+
 function intradayUpToDate(bars: KLine[], tradeDate: string, limit: number) {
   return bars.filter((bar) => dateKey(bar.t) <= tradeDate).slice(-limit);
 }
@@ -787,7 +1105,13 @@ function formatDailyPick(pick: DailyRecordPick) {
   return `${pick.instrument} ${pick.name} [${pick.layer}/${cooldown}] ${formatReplayForLedger(pick.replay)}`;
 }
 
+function formatAestheticDailyPick(pick: AestheticDailyRecordPick) {
+  const cooldown = pick.cooldownDuplicate ? "cooldown" : "new";
+  return `${pick.instrument} ${pick.name} [${pick.bucketLabel}/${pick.priority}/${cooldown}] ${formatReplayForLedger(pick.replay)}`;
+}
+
 function markdownDailyLedger(report: BacktestReport) {
+  const aestheticByDate = new Map((report.aestheticWatch?.dailyRecords ?? []).map((day) => [day.tradeDate, day]));
   const lines = [
     "# Strategy Daily Ledger",
     "",
@@ -795,14 +1119,16 @@ function markdownDailyLedger(report: BacktestReport) {
     `Range: ${report.meta.from ?? "-"} to ${report.meta.to ?? "-"}`,
     `Cooldown: ${report.meta.cooldownDays} trade days`,
     "",
-    "| Date | Signals | New | Main | Watch | Cooldown Skips | Picks |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | --- |"
+    "| Date | Signals | New | Main | Watch | Cooldown Skips | Picks | Aesthetic Watch |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | --- | --- |"
   ];
 
   for (const day of report.dailyRecords) {
     const picks = day.picks.length ? day.picks.map(formatDailyPick).join("<br>") : "-";
+    const aesthetic = aestheticByDate.get(day.tradeDate);
+    const aestheticPicks = aesthetic?.picks.length ? aesthetic.picks.map(formatAestheticDailyPick).join("<br>") : "-";
     lines.push(
-      `| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} | ${picks} |`
+      `| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} | ${picks} | ${aestheticPicks} |`
     );
   }
 
@@ -843,14 +1169,31 @@ function markdownReport(report: BacktestReport) {
     lines.push(...markdownStatsTable(horizons), "");
   }
 
+  if (report.aestheticWatch) {
+    lines.push("## Aesthetic Watch", "");
+    lines.push("审美观察池独立统计，不合并进主策略 summary。", "");
+    lines.push("### Summary", "");
+    lines.push(...markdownStatsTable(report.aestheticWatch.summary), "");
+    lines.push("### Cooldown Summary", "");
+    lines.push(...markdownStatsTable(report.aestheticWatch.cooldownSummary), "");
+    lines.push("### By Bucket", "");
+    for (const bucket of AESTHETIC_BUCKETS) {
+      lines.push(`#### ${aestheticBucketLabels[bucket]}`, "");
+      lines.push(...markdownStatsTable(report.aestheticWatch.byBucket[bucket]), "");
+    }
+  }
+
   lines.push(
     "## Daily Ledger Preview",
     "",
-    "| Date | Signals | New | Main | Watch | Cooldown Skips |",
-    "| --- | ---: | ---: | ---: | ---: | ---: |"
+    "| Date | Signals | New | Main | Watch | Cooldown Skips | Aesthetic |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"
   );
   for (const day of report.dailyRecords) {
-    lines.push(`| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} |`);
+    const aesthetic = report.aestheticWatch?.dailyRecords.find((item) => item.tradeDate === day.tradeDate);
+    lines.push(
+      `| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} | ${aesthetic?.signals ?? 0} |`
+    );
   }
 
   lines.push(
@@ -916,6 +1259,18 @@ function markdownReport(report: BacktestReport) {
       );
     }
     lines.push("");
+
+    if (report.aestheticWatch?.picks.length) {
+      lines.push("## Selected Aesthetic Watch", "");
+      lines.push("| Rank | Bucket | Priority | Instrument | Name | Price | Score | Watch Score | State | Setup | Flow 5d | Value | Pullback | 30m Score | 30m Shrink | Reason |");
+      lines.push("| ---: | --- | --- | --- | --- | ---: | ---: | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |");
+      for (const pick of report.aestheticWatch.picks) {
+        lines.push(
+          `| ${pick.rank} | ${pick.bucketLabel} | ${pick.priority} | ${pick.instrument} | ${pick.name} | ${pick.price} | ${pick.score} | ${pick.bucketScore} | ${pick.actionState} | ${pick.setupState} | ${pick.flowRatio5d}% | ${pick.valuePosition}% | ${pick.pullbackFromHigh}% | ${pick.thirtyMinutePullbackScore ?? "-"} | ${pick.thirtyMinuteShrinkRatio ?? "-"} | ${pick.watchReason} |`
+        );
+      }
+      lines.push("");
+    }
   }
 
   lines.push("## Notes", "");
@@ -942,6 +1297,7 @@ async function run() {
     maxDates: numberArg("max-dates", 80),
     outputDir: resolve(root, argValue("output-dir") ?? "public/reports/backtests"),
     preset,
+    aestheticTop: numberArg("aesthetic-top", Math.max(top * 2, 20)),
     useIntraday30m,
     intraday30mBars: numberArg("30m-bars", 160),
     refineCandidates: numberArg("refine-candidates", preset === "swing" ? Math.max(top * 40, 400) : Math.max(top * 20, 200)),
@@ -989,6 +1345,7 @@ async function run() {
   }
 
   const picks: BacktestPick[] = [];
+  const aestheticPicks: AestheticWatchPick[] = [];
   const rejected = new Map<string, number>();
   for (const tradeDate of candidateDates) {
     const scored: ScoredCandidate[] = [];
@@ -1028,49 +1385,17 @@ async function run() {
       pool = refined.sort((a, b) => b.pick.score - a.pick.score);
     }
 
-    selectStrategyCandidates(pool, config, rejected)
+    const strategyCandidates = selectStrategyCandidates(pool, config, rejected);
+    const strategyEligibleInstruments = new Set(strategyCandidates.map((candidate) => candidate.pick.instrument));
+    strategyCandidates
       .slice(0, config.top)
-      .forEach(({ pick, future, strategyScore, thirtyMinuteSignal }, index) => {
-        const replay = Object.fromEntries(
-          config.horizons.map((horizon) => [`${horizon}d`, replayPick(pick, future, horizon, config)])
-        ) as Record<string, ReplayResult>;
-        picks.push({
-          tradeDate,
-          rank: index + 1,
-          instrument: pick.instrument,
-          name: pick.name,
-          score: pick.score,
-          strategyScore,
-          signal: pick.signal,
-          signalLayer: signalLayerForAction(pick.actionState ?? "track"),
-          actionState: pick.actionState ?? "track",
-          actionLabel: pick.actionLabel,
-          price: pick.price,
-          setupState: pick.setupState,
-          flowRatio5d: pick.flowRatio5d,
-          valuePosition: pick.valuePosition,
-          pullbackFromHigh: pick.pullbackFromHigh,
-          actionReason: pick.actionReason,
-          intradayScore: pick.intradayBurst?.score,
-          intradaySupportScore: pick.intradayBurst?.supportScore,
-          intradayDaysSince: pick.intradayBurst?.daysSince,
-          intradayPullbackAmountRatio: pick.intradayBurst?.pullbackAmountRatio,
-          intradayHeldMidpoint: pick.intradayBurst?.heldBodyMidpoint,
-          surgeScore: pick.surgePullback?.score,
-          surgeDaysSince: pick.surgePullback?.daysSince,
-          surgePullbackAmountRatio: pick.surgePullback?.pullbackAmountRatio,
-          thirtyMinutePullbackScore: thirtyMinuteSignal?.score,
-          thirtyMinuteShrinkRatio: thirtyMinuteSignal?.shrinkRatio,
-          thirtyMinuteDrawdownFromHigh: thirtyMinuteSignal?.drawdownFromHigh,
-          thirtyMinuteDistanceFromLow: thirtyMinuteSignal?.distanceFromLow,
-          thirtyMinuteHeldRecentLow: thirtyMinuteSignal?.heldRecentLow,
-          thirtyMinuteCloseAboveMa20: thirtyMinuteSignal?.closeAboveMa20,
-          thirtyMinuteCloseAboveMa60: thirtyMinuteSignal?.closeAboveMa60,
-          reasons: pick.reasons,
-          risks: pick.risks,
-          replay
-        });
+      .forEach((candidate, index) => {
+        picks.push(buildBacktestPick({ tradeDate, rank: index + 1, candidate, strategyScore: candidate.strategyScore, config }));
       });
+
+    if (config.preset === "swing") {
+      aestheticPicks.push(...selectAestheticWatchCandidates(pool, strategyEligibleInstruments, config, tradeDate));
+    }
 
     if (picks.length && picks.length % (config.top * 10) === 0) {
       console.log(`[backtest] ${tradeDate} picks=${picks.length}`);
@@ -1078,8 +1403,21 @@ async function run() {
   }
 
   const cooldownPicks = applyCooldown(picks, candidateDates, config.cooldownDays);
+  const cooldownAestheticPicks = applyCooldown(aestheticPicks, candidateDates, config.cooldownDays);
   const dailyRecords = buildDailyRecords(picks, candidateDates);
+  const aestheticDailyRecords = buildAestheticDailyRecords(aestheticPicks, candidateDates);
   const stats = buildStats(picks, config.horizons);
+  const aestheticWatch: AestheticWatchReport | undefined =
+    config.preset === "swing"
+      ? {
+          summary: summarizeByHorizon(aestheticPicks, config.horizons),
+          cooldownSummary: summarizeByHorizon(cooldownAestheticPicks, config.horizons),
+          byBucket: buildAestheticBucketStats(aestheticPicks, config.horizons),
+          cooldownByBucket: buildAestheticBucketStats(cooldownAestheticPicks, config.horizons),
+          dailyRecords: aestheticDailyRecords,
+          picks: aestheticPicks
+        }
+      : undefined;
   const report: BacktestReport = {
     meta: {
       generatedAt: new Date().toISOString(),
@@ -1096,6 +1434,7 @@ async function run() {
       stretchTargetPct: config.stretchTargetPct,
       cooldownDays: config.cooldownDays,
       preset: config.preset,
+      aestheticTop: config.aestheticTop,
       useIntraday30m: config.useIntraday30m,
       intraday30mBars: config.intraday30mBars,
       refineCandidates: config.refineCandidates,
@@ -1113,7 +1452,8 @@ async function run() {
           : "30m K-line refinement is disabled for this run.",
         "This replay reports future close return, max runup, max drawdown, and the date/day of peak runup; it does not simulate buy/sell execution.",
         "Cooldown summary removes repeated signals for the same instrument within the configured trade-day window, while raw summary keeps every signal.",
-        "This lab version approximates quote turnover/volume-ratio from cached daily bars when realtime quote fields are unavailable."
+        "This lab version approximates quote turnover/volume-ratio from cached daily bars when realtime quote fields are unavailable.",
+        "Aesthetic watch is a separate observation pool for near-main, 30m-support, and low-repair patterns; it is not merged into main strategy statistics."
       ]
     },
     cache: {
@@ -1129,6 +1469,7 @@ async function run() {
     bySetupState: stats.bySetupState,
     bySignalLayer: buildLayerStats(picks, config.horizons),
     cooldownBySignalLayer: buildLayerStats(cooldownPicks, config.horizons),
+    aestheticWatch,
     dailyRecords,
     picks
   };
