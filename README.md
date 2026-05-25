@@ -135,7 +135,14 @@ npm run backtest:strategy -- --from 2026-01-01 --to 2026-03-31 --top 10
 npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --top=10
 ```
 
-输出会统计 5/10 日收盘涨跌、未来最高涨幅、最高涨幅日期/第几天、最大回撤，以及未来最高涨幅是否触达 `5%/8%/10%`。如果需要更宽的候选池，可放宽操作状态、分位和 30m 过滤：
+输出会统计 5/10 日收盘涨跌、未来最高涨幅、最高涨幅日期/第几天、最大回撤，以及未来最高涨幅是否触达 `5%/8%/10%`。报告同时包含：
+
+- raw 信号统计。
+- `--cooldown-days=5` 默认同票 5 个交易日冷却后的新机会统计。
+- `main/watch` 分层统计：`pullback/ready` 归为主选，`risk` 等归为观察。
+- 每日选股流水账，包含空信号日期、当日入选、冷却跳过和 5/10 日结果。
+
+如果需要更宽的候选池，可放宽操作状态、分位和 30m 过滤：
 
 ```bash
 npm run backtest:strategy -- --preset=swing --states=ready,pullback,track,risk,invalid --setups=缩量回踩 --min-value=50 --max-value=78 --min-30m-pullback-score=0.01 --max-30m-shrink-ratio=99
@@ -151,6 +158,7 @@ npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10
 
 - `public/reports/backtests/latest.json`
 - `public/reports/backtests/summary.md`
+- `public/reports/backtests/daily-ledger.md`
 
 数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求频率保护。
 

@@ -18,9 +18,11 @@ dotenv.config({ path: resolve(root, ".env"), override: false, quiet: true });
 type Horizon = 5 | 10;
 type StrategyPreset = "baseline" | "swing";
 type EvidenceMode = "any" | "intraday" | "daily" | "both";
+type SignalLayer = "main" | "watch";
 
 const ACTION_STATES = ["ready", "pullback", "track", "risk", "invalid"] as const satisfies readonly StockActionState[];
 const SETUP_STATES = ["二次突破", "承接确认", "缩量回踩", "爆量启动", "承接转弱", "放量派发风险", "跌破失效", "常规观察"] as const satisfies readonly SetupState[];
+const SIGNAL_LAYERS = ["main", "watch"] as const satisfies readonly SignalLayer[];
 
 type SwingFilterConfig = {
   minFlowRatio: number;
@@ -55,6 +57,7 @@ type BacktestConfig = {
   targetPct: number;
   strongTargetPct: number;
   stretchTargetPct: number;
+  cooldownDays: number;
   maxDates: number;
   outputDir: string;
   preset: StrategyPreset;
@@ -91,6 +94,7 @@ type BacktestPick = {
   score: number;
   strategyScore: number;
   signal: StockPick["signal"];
+  signalLayer: SignalLayer;
   actionState: StockActionState;
   actionLabel?: string;
   price: number;
@@ -116,6 +120,7 @@ type BacktestPick = {
   thirtyMinuteCloseAboveMa60?: boolean;
   reasons: string[];
   risks: string[];
+  cooldownDuplicate?: boolean;
   replay: Record<string, ReplayResult>;
 };
 
@@ -149,6 +154,7 @@ type BacktestReport = {
     targetPct: number;
     strongTargetPct: number;
     stretchTargetPct: number;
+    cooldownDays: number;
     preset: StrategyPreset;
     useIntraday30m: boolean;
     intraday30mBars: number;
@@ -167,9 +173,42 @@ type BacktestReport = {
     skippedNoDaily: number;
   };
   summary: Record<string, Stats>;
+  cooldownSummary: Record<string, Stats>;
   byActionState: Record<string, Record<string, Stats>>;
   bySetupState: Record<string, Record<string, Stats>>;
+  bySignalLayer: Record<SignalLayer, Record<string, Stats>>;
+  cooldownBySignalLayer: Record<SignalLayer, Record<string, Stats>>;
+  dailyRecords: DailyRecord[];
   picks: BacktestPick[];
+};
+
+type DailyRecordPick = {
+  rank: number;
+  instrument: string;
+  name: string;
+  layer: SignalLayer;
+  state: StockActionState;
+  setup: SetupState;
+  price: number;
+  score: number;
+  strategyScore: number;
+  flowRatio5d: number;
+  valuePosition: number;
+  pullbackFromHigh: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
+  cooldownDuplicate: boolean;
+  replay: Record<string, ReplayResult>;
+};
+
+type DailyRecord = {
+  tradeDate: string;
+  signals: number;
+  mainSignals: number;
+  watchSignals: number;
+  cooldownEligibleSignals: number;
+  cooldownSkippedSignals: number;
+  picks: DailyRecordPick[];
 };
 
 type MoneyFlowEnvelope = {
@@ -227,6 +266,11 @@ function hasFlag(name: string) {
 function numberArg(name: string, fallback: number) {
   const value = Number(argValue(name));
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function nonNegativeNumberArg(name: string, fallback: number) {
+  const value = Number(argValue(name));
+  return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
 function boolArg(name: string, fallback: boolean) {
@@ -514,12 +558,8 @@ function summarize(results: ReplayResult[]): Stats {
 }
 
 function buildStats(picks: BacktestPick[], horizons: Horizon[]) {
-  const summary: Record<string, Stats> = {};
   const byActionState: Record<string, Record<string, Stats>> = {};
   const bySetupState: Record<string, Record<string, Stats>> = {};
-  for (const horizon of horizons) {
-    summary[`${horizon}d`] = summarize(picks.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
-  }
   for (const state of ACTION_STATES) {
     const group = picks.filter((pick) => pick.actionState === state);
     byActionState[state] = {};
@@ -534,7 +574,90 @@ function buildStats(picks: BacktestPick[], horizons: Horizon[]) {
       bySetupState[state][`${horizon}d`] = summarize(group.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
     }
   }
-  return { summary, byActionState, bySetupState };
+  return { summary: summarizeByHorizon(picks, horizons), byActionState, bySetupState };
+}
+
+function summarizeByHorizon(picks: BacktestPick[], horizons: Horizon[]) {
+  const summary: Record<string, Stats> = {};
+  for (const horizon of horizons) {
+    summary[`${horizon}d`] = summarize(picks.map((pick) => pick.replay[`${horizon}d`]).filter(Boolean));
+  }
+  return summary;
+}
+
+function signalLayerForAction(actionState: StockActionState): SignalLayer {
+  return actionState === "pullback" || actionState === "ready" ? "main" : "watch";
+}
+
+function buildLayerStats(picks: BacktestPick[], horizons: Horizon[]) {
+  const bySignalLayer = Object.fromEntries(
+    SIGNAL_LAYERS.map((layer) => [layer, summarizeByHorizon(picks.filter((pick) => pick.signalLayer === layer), horizons)])
+  ) as Record<SignalLayer, Record<string, Stats>>;
+  return bySignalLayer;
+}
+
+function applyCooldown(picks: BacktestPick[], tradeDates: string[], cooldownDays: number) {
+  const dateIndex = new Map(tradeDates.map((date, index) => [date, index]));
+  const lastAcceptedIndex = new Map<string, number>();
+  const cooldownPicks: BacktestPick[] = [];
+  const ordered = [...picks].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate) || a.rank - b.rank);
+
+  for (const pick of ordered) {
+    const currentIndex = dateIndex.get(pick.tradeDate);
+    const previousIndex = lastAcceptedIndex.get(pick.instrument);
+    const isDuplicate =
+      cooldownDays > 0 &&
+      currentIndex !== undefined &&
+      previousIndex !== undefined &&
+      currentIndex - previousIndex <= cooldownDays;
+
+    pick.cooldownDuplicate = isDuplicate;
+    if (isDuplicate) continue;
+
+    cooldownPicks.push(pick);
+    if (currentIndex !== undefined) lastAcceptedIndex.set(pick.instrument, currentIndex);
+  }
+
+  return cooldownPicks;
+}
+
+function buildDailyRecords(picks: BacktestPick[], tradeDates: string[]) {
+  const byDate = new Map<string, BacktestPick[]>();
+  for (const pick of picks) {
+    if (!byDate.has(pick.tradeDate)) byDate.set(pick.tradeDate, []);
+    byDate.get(pick.tradeDate)?.push(pick);
+  }
+
+  return tradeDates.map((tradeDate): DailyRecord => {
+    const dayPicks = (byDate.get(tradeDate) ?? []).sort((a, b) => a.rank - b.rank);
+    const cooldownEligible = dayPicks.filter((pick) => !pick.cooldownDuplicate);
+    return {
+      tradeDate,
+      signals: dayPicks.length,
+      mainSignals: dayPicks.filter((pick) => pick.signalLayer === "main").length,
+      watchSignals: dayPicks.filter((pick) => pick.signalLayer === "watch").length,
+      cooldownEligibleSignals: cooldownEligible.length,
+      cooldownSkippedSignals: dayPicks.length - cooldownEligible.length,
+      picks: dayPicks.map((pick) => ({
+        rank: pick.rank,
+        instrument: pick.instrument,
+        name: pick.name,
+        layer: pick.signalLayer,
+        state: pick.actionState,
+        setup: pick.setupState,
+        price: pick.price,
+        score: pick.score,
+        strategyScore: pick.strategyScore,
+        flowRatio5d: pick.flowRatio5d,
+        valuePosition: pick.valuePosition,
+        pullbackFromHigh: pick.pullbackFromHigh,
+        thirtyMinutePullbackScore: pick.thirtyMinutePullbackScore,
+        thirtyMinuteShrinkRatio: pick.thirtyMinuteShrinkRatio,
+        cooldownDuplicate: Boolean(pick.cooldownDuplicate),
+        replay: pick.replay
+      }))
+    };
+  });
 }
 
 function hardRiskReason(pick: StockPick) {
@@ -640,6 +763,52 @@ function intradayUpToDate(bars: KLine[], tradeDate: string, limit: number) {
   return bars.filter((bar) => dateKey(bar.t) <= tradeDate).slice(-limit);
 }
 
+function markdownStatsTable(rows: Record<string, Stats>) {
+  return [
+    "| Horizon | Signals | Complete | Hit Target | Positive Close | Hit Strong | Hit Stretch | Avg Close | Avg Runup | Avg Drawdown | Avg Peak Day |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+    ...Object.entries(rows).map(([horizon, stats]) =>
+      `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.positiveCloseRate ?? "-"}% | ${stats.strongTargetRate ?? "-"}% | ${stats.stretchTargetRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% | ${stats.avgPeakDay ?? "-"} |`
+    )
+  ];
+}
+
+function formatReplayForLedger(replay: Record<string, ReplayResult>) {
+  return Object.entries(replay)
+    .map(([horizon, result]) => {
+      if (result.status !== "complete") return `${horizon}: pending`;
+      return `${horizon}: high ${result.maxRunupPct ?? "-"}%, close ${result.closeReturnPct ?? "-"}%, dd ${result.maxDrawdownPct ?? "-"}%`;
+    })
+    .join("; ");
+}
+
+function formatDailyPick(pick: DailyRecordPick) {
+  const cooldown = pick.cooldownDuplicate ? "cooldown" : "new";
+  return `${pick.instrument} ${pick.name} [${pick.layer}/${cooldown}] ${formatReplayForLedger(pick.replay)}`;
+}
+
+function markdownDailyLedger(report: BacktestReport) {
+  const lines = [
+    "# Strategy Daily Ledger",
+    "",
+    `Generated: ${report.meta.generatedAt}`,
+    `Range: ${report.meta.from ?? "-"} to ${report.meta.to ?? "-"}`,
+    `Cooldown: ${report.meta.cooldownDays} trade days`,
+    "",
+    "| Date | Signals | New | Main | Watch | Cooldown Skips | Picks |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | --- |"
+  ];
+
+  for (const day of report.dailyRecords) {
+    const picks = day.picks.length ? day.picks.map(formatDailyPick).join("<br>") : "-";
+    lines.push(
+      `| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} | ${picks} |`
+    );
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function markdownReport(report: BacktestReport) {
   const lines = [
     "# Strategy Backtest",
@@ -649,19 +818,46 @@ function markdownReport(report: BacktestReport) {
     `Mode: ${report.meta.mode}`,
     `Preset: ${report.meta.preset}; 30m refine: ${report.meta.useIntraday30m ? `${report.meta.refineCandidates} candidates/date, ${report.meta.intraday30mBars} bars` : "off"}`,
     `Signal replay: close-to-future; hit thresholds: ${report.meta.targetPct}% / ${report.meta.strongTargetPct}% / ${report.meta.stretchTargetPct}%`,
-    `Universe: ${report.meta.universe}; evaluated dates: ${report.meta.evaluatedDates}; top per day: ${report.meta.top}`,
+    `Universe: ${report.meta.universe}; evaluated dates: ${report.meta.evaluatedDates}; top per day: ${report.meta.top}; cooldown: ${report.meta.cooldownDays} trade days`,
     "",
     "## Summary",
     "",
-    "| Horizon | Signals | Complete | Hit Target | Positive Close | Hit Strong | Hit Stretch | Avg Close | Avg Runup | Avg Drawdown | Avg Peak Day |",
-    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ...Object.entries(report.summary).map(([horizon, stats]) =>
-      `| ${horizon} | ${stats.samples} | ${stats.completed} | ${stats.winRate ?? "-"}% | ${stats.positiveCloseRate ?? "-"}% | ${stats.strongTargetRate ?? "-"}% | ${stats.stretchTargetRate ?? "-"}% | ${stats.avgCloseReturnPct ?? "-"}% | ${stats.avgMaxRunupPct ?? "-"}% | ${stats.avgMaxDrawdownPct ?? "-"}% | ${stats.avgPeakDay ?? "-"} |`
-    ),
+    ...markdownStatsTable(report.summary),
+    "",
+    "## Cooldown Summary",
+    "",
+    ...markdownStatsTable(report.cooldownSummary),
+    "",
+    "## By Signal Layer",
+    "",
+  ];
+
+  for (const [layer, horizons] of Object.entries(report.bySignalLayer)) {
+    lines.push(`### ${layer}`, "");
+    lines.push(...markdownStatsTable(horizons), "");
+  }
+
+  lines.push("## Cooldown By Signal Layer", "");
+  for (const [layer, horizons] of Object.entries(report.cooldownBySignalLayer)) {
+    lines.push(`### ${layer}`, "");
+    lines.push(...markdownStatsTable(horizons), "");
+  }
+
+  lines.push(
+    "## Daily Ledger Preview",
+    "",
+    "| Date | Signals | New | Main | Watch | Cooldown Skips |",
+    "| --- | ---: | ---: | ---: | ---: | ---: |"
+  );
+  for (const day of report.dailyRecords) {
+    lines.push(`| ${day.tradeDate} | ${day.signals} | ${day.cooldownEligibleSignals} | ${day.mainSignals} | ${day.watchSignals} | ${day.cooldownSkippedSignals} |`);
+  }
+
+  lines.push(
     "",
     "## By Action State",
     ""
-  ];
+  );
 
   for (const [state, horizons] of Object.entries(report.byActionState)) {
     lines.push(`### ${state}`, "");
@@ -742,6 +938,7 @@ async function run() {
     targetPct: numberArg("target-pct", 5),
     strongTargetPct: numberArg("strong-target-pct", 8),
     stretchTargetPct: numberArg("stretch-target-pct", 10),
+    cooldownDays: nonNegativeNumberArg("cooldown-days", 5),
     maxDates: numberArg("max-dates", 80),
     outputDir: resolve(root, argValue("output-dir") ?? "public/reports/backtests"),
     preset,
@@ -845,6 +1042,7 @@ async function run() {
           score: pick.score,
           strategyScore,
           signal: pick.signal,
+          signalLayer: signalLayerForAction(pick.actionState ?? "track"),
           actionState: pick.actionState ?? "track",
           actionLabel: pick.actionLabel,
           price: pick.price,
@@ -879,6 +1077,8 @@ async function run() {
     }
   }
 
+  const cooldownPicks = applyCooldown(picks, candidateDates, config.cooldownDays);
+  const dailyRecords = buildDailyRecords(picks, candidateDates);
   const stats = buildStats(picks, config.horizons);
   const report: BacktestReport = {
     meta: {
@@ -894,6 +1094,7 @@ async function run() {
       targetPct: config.targetPct,
       strongTargetPct: config.strongTargetPct,
       stretchTargetPct: config.stretchTargetPct,
+      cooldownDays: config.cooldownDays,
       preset: config.preset,
       useIntraday30m: config.useIntraday30m,
       intraday30mBars: config.intraday30mBars,
@@ -911,6 +1112,7 @@ async function run() {
           ? "30m K-line refinement is also sliced at or before each trade date to avoid look-ahead bias."
           : "30m K-line refinement is disabled for this run.",
         "This replay reports future close return, max runup, max drawdown, and the date/day of peak runup; it does not simulate buy/sell execution.",
+        "Cooldown summary removes repeated signals for the same instrument within the configured trade-day window, while raw summary keeps every signal.",
         "This lab version approximates quote turnover/volume-ratio from cached daily bars when realtime quote fields are unavailable."
       ]
     },
@@ -922,16 +1124,22 @@ async function run() {
       skippedNoDaily
     },
     summary: stats.summary,
+    cooldownSummary: summarizeByHorizon(cooldownPicks, config.horizons),
     byActionState: stats.byActionState,
     bySetupState: stats.bySetupState,
+    bySignalLayer: buildLayerStats(picks, config.horizons),
+    cooldownBySignalLayer: buildLayerStats(cooldownPicks, config.horizons),
+    dailyRecords,
     picks
   };
 
   await mkdir(config.outputDir, { recursive: true });
   await writeFile(resolve(config.outputDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
   await writeFile(resolve(config.outputDir, "summary.md"), markdownReport(report), "utf8");
+  await writeFile(resolve(config.outputDir, "daily-ledger.md"), markdownDailyLedger(report), "utf8");
   console.log(`[backtest] wrote ${resolve(config.outputDir, "latest.json")}`);
   console.log(`[backtest] wrote ${resolve(config.outputDir, "summary.md")}`);
+  console.log(`[backtest] wrote ${resolve(config.outputDir, "daily-ledger.md")}`);
 }
 
 await run();
