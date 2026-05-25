@@ -34,6 +34,7 @@ API_CACHE_REFRESH=1 npm run scan &&
 API_CACHE_REFRESH=1 npm run plan &&
 npm run action:refresh &&
 npm run review &&
+npm run strategy:latest &&
 npm run stock:details &&
 npm run health
 ```
@@ -43,6 +44,7 @@ npm run health
 - `public/reports/latest.json`：今日异动票和观察名单
 - `public/reports/plan.json`：交易预案
 - `public/reports/performance.json`：历史复盘
+- `public/reports/backtests/latest.json`：策略实验当日选股和审美观察池
 - `public/reports/system-health.json`：系统健康
 - `public/reports/stocks/index.json`：异动票详情索引
 - `public/reports/stocks/{instrument}.json`：单票详情
@@ -101,6 +103,7 @@ npm run scan
 npm run plan
 npm run action:refresh
 npm run review
+npm run strategy:latest
 npm run stock:details
 npm run health
 npm run notify:dry
@@ -113,6 +116,7 @@ npm run daily:close
 - `plan`：生成 `plan.json`，默认从本地缓存读 K 线。
 - `action:refresh`：给现有报告补操作状态，不调用 API。
 - `review`：生成 `performance.json`，只读本地 K 线缓存。
+- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json` 供前端“策略实验”页签使用；如果该交易日不在日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日。
 - `stock:details`：生成异动票详情 JSON 和搜索索引。
 - `health`：生成 `system-health.json`。
 - `notify:dry`：预览邮件内容，不发送。

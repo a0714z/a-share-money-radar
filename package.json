@@ -14,7 +14,7 @@
     "action:refresh": "tsx scripts/run-action-refresh.ts",
     "health": "tsx scripts/run-system-health.ts",
     "stock:details": "tsx scripts/run-stock-details.ts",
-    "daily:close": "npm run kline:sync && API_CACHE_REFRESH=1 npm run scan && API_CACHE_REFRESH=1 npm run plan && npm run action:refresh && npm run review && npm run stock:details && npm run health",
+    "daily:close": "npm run kline:sync && API_CACHE_REFRESH=1 npm run scan && API_CACHE_REFRESH=1 npm run plan && npm run action:refresh && npm run review && npm run strategy:latest && npm run stock:details && npm run health",
     "intraday:pulse": "tsx scripts/run-intraday-pulse.ts",
     "scan:sample": "tsx scripts/run-scan.ts --sample",
     "review": "tsx scripts/run-review.ts",
@@ -22,6 +22,7 @@
     "notify": "tsx scripts/send-email.ts",
     "notify:dry": "tsx scripts/send-email.ts --dry-run",
     "backtest:strategy": "tsx scripts/run-strategy-backtest.ts",
+    "strategy:latest": "tsx scripts/run-strategy-latest.ts",
     "cache:plan": "tsx scripts/run-cache-coverage.ts",
     "data:bootstrap": "tsx scripts/run-research-data-bootstrap.ts"
   },

@@ -78,6 +78,7 @@ npm run scan
 npm run plan
 npm run action:refresh
 npm run review
+npm run strategy:latest
 npm run stock:details
 npm run health
 npm run notify:dry
@@ -92,6 +93,7 @@ npm run daily:close
 - `plan`：生成 `plan.json`，日 K/30m K 只读本地缓存。
 - `action:refresh`：不调用 API，只给已有 `latest.json` 和 `plan.json` 补操作状态字段。
 - `review`：生成 `performance.json`，复盘收益只读本地 K 线缓存。
+- `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；如果该交易日不在本地日 K 缓存，会优先保留已有同日策略报告，否则退到不晚于报告日的最近缓存交易日并打印 warning。
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
 - `health`：生成 `system-health.json`。
 - `notify`：发送邮件，只读本地 JSON。
@@ -108,6 +110,7 @@ API_CACHE_REFRESH=1 npm run scan &&
 API_CACHE_REFRESH=1 npm run plan &&
 npm run action:refresh &&
 npm run review &&
+npm run strategy:latest &&
 npm run stock:details &&
 npm run health
 ```
@@ -364,6 +367,10 @@ PLAN_TOP_N=40
 PLAN_MIN_AMOUNT=30000000
 
 REVIEW_REPORT_PATH=/var/www/a-share-money-radar/reports/performance.json
+STRATEGY_BACKTEST_DIR=/var/www/a-share-money-radar/reports/backtests
+STRATEGY_BACKTEST_TOP=10
+# 已有同日策略报告时默认跳过，设为 1 可强制重算。
+STRATEGY_BACKTEST_FORCE=0
 SYSTEM_HEALTH_REPORT_PATH=/var/www/a-share-money-radar/reports/system-health.json
 STOCK_DETAILS_DIR=/var/www/a-share-money-radar/reports/stocks
 
