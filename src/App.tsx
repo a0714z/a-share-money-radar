@@ -79,8 +79,10 @@ type SystemHealthReport = {
     tradeDate?: string;
     expectedTradeDate?: string;
     mainSignals: number;
+    strongWatchSignals?: number;
     aestheticSignals: number;
     cooldown10dWinRate?: number;
+    strongWatch10dWinRate?: number;
     aesthetic10dWinRate?: number;
     benchmarkFrom?: string;
     benchmarkTo?: string;
@@ -214,6 +216,12 @@ type StrategyAestheticPick = StrategyBacktestPick & {
   matchReasons: string[];
 };
 
+type StrategyStrongWatchPick = StrategyAestheticPick & {
+  strongWatchScore: number;
+  strongWatchTier: "A" | "B";
+  strongWatchReason: string;
+};
+
 type StrategyDailyRecord = {
   tradeDate: string;
   signals: number;
@@ -242,6 +250,15 @@ type StrategyAestheticReport = {
   picks: StrategyAestheticPick[];
 };
 
+type StrategyStrongWatchReport = {
+  summary: Record<string, StrategyStats>;
+  cooldownSummary: Record<string, StrategyStats>;
+  byBucket: Record<string, Record<string, StrategyStats>>;
+  cooldownByBucket: Record<string, Record<string, StrategyStats>>;
+  dailyRecords: StrategyAestheticDailyRecord[];
+  picks: StrategyStrongWatchPick[];
+};
+
 type StrategyBacktestReport = {
   meta: {
     generatedAt: string;
@@ -265,6 +282,7 @@ type StrategyBacktestReport = {
   bySignalLayer: Record<string, Record<string, StrategyStats>>;
   cooldownBySignalLayer: Record<string, Record<string, StrategyStats>>;
   aestheticWatch?: StrategyAestheticReport;
+  strongWatch?: StrategyStrongWatchReport;
   dailyRecords: StrategyDailyRecord[];
   picks: StrategyBacktestPick[];
   benchmark?: StrategyBacktestReport;
@@ -275,11 +293,13 @@ type StrategyArchiveItem = {
   path: string;
   generatedAt?: string;
   mainSignals: number;
+  strongWatchSignals?: number;
   aestheticSignals: number;
   benchmarkFrom?: string;
   benchmarkTo?: string;
   benchmarkDates?: number;
   main10dWinRate?: number;
+  strongWatch10dWinRate?: number;
   aesthetic10dWinRate?: number;
 };
 
@@ -1443,7 +1463,9 @@ function SystemStatusPanel({
           {health.strategyBacktest && (
             <div className={`system-health-card health-${health.strategyBacktest.tone}`}>
               <span>策略实验</span>
-              <strong>{health.strategyBacktest.mainSignals} 主选 · {health.strategyBacktest.aestheticSignals} 审美</strong>
+              <strong>
+                {health.strategyBacktest.mainSignals} 主选 · {health.strategyBacktest.strongWatchSignals ?? 0} 强观察 · {health.strategyBacktest.aestheticSignals} 审美
+              </strong>
               <small>
                 {health.strategyBacktest.tradeDate ?? "未生成"}
                 {health.strategyBacktest.expectedTradeDate && health.strategyBacktest.tradeDate !== health.strategyBacktest.expectedTradeDate
@@ -1640,6 +1662,10 @@ function isAestheticPick(pick: StrategyBacktestPick | StrategyAestheticPick): pi
   return "bucketLabel" in pick;
 }
 
+function isStrongWatchPick(pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick): pick is StrategyStrongWatchPick {
+  return "strongWatchScore" in pick;
+}
+
 function StrategyStatsTable({ title, rows, subtitle = "选出后直接观察未来 5/10 日，不模拟买卖点" }: { title: string; rows: Record<string, StrategyStats>; subtitle?: string }) {
   const horizons = Object.entries(rows);
   if (!horizons.length) return null;
@@ -1722,8 +1748,9 @@ function StrategyBucketTable({ report }: { report?: StrategyAestheticReport }) {
   );
 }
 
-function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAestheticPick }) {
+function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick }) {
   const isAesthetic = isAestheticPick(pick);
+  const isStrong = isStrongWatchPick(pick);
   return (
     <article className="mobile-review-card strategy-mobile-card">
       <div className="mobile-card-head">
@@ -1733,8 +1760,8 @@ function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAes
           <p>{pick.instrument}</p>
         </div>
         <div className="mobile-card-badges">
-          <span className={`action-chip action-${pick.actionState}`}>{isAesthetic ? pick.bucketLabel : pick.signalLayer}</span>
-          <strong>{(isAesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong>
+          <span className={`action-chip action-${pick.actionState}`}>{isStrong ? `强观察${pick.strongWatchTier}` : isAesthetic ? pick.bucketLabel : pick.signalLayer}</span>
+          <strong>{(isStrong ? pick.strongWatchScore : isAesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong>
         </div>
       </div>
       <div className="mobile-review-grid">
@@ -1756,14 +1783,14 @@ function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAes
         </div>
       </div>
       <div className="mobile-card-foot">
-        <span>{isAesthetic ? pick.watchReason : pick.setupState}</span>
+        <span>{isStrong ? pick.strongWatchReason : isAesthetic ? pick.watchReason : pick.setupState}</span>
         <span>{formatPct(pick.flowRatio5d)}</span>
       </div>
     </article>
   );
 }
 
-function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle: string; picks: Array<StrategyBacktestPick | StrategyAestheticPick> }) {
+function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle: string; picks: Array<StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick> }) {
   return (
     <section className="list-panel">
       <div className="panel-toolbar">
@@ -1775,7 +1802,7 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
       <div className="table-wrap strategy-table">
         <div className="mobile-strategy-list">
           {picks.map((pick) => (
-            <MobileStrategyCard key={`${pick.tradeDate}-${pick.instrument}-${isAestheticPick(pick) ? pick.bucket : "main"}`} pick={pick} />
+            <MobileStrategyCard key={`${pick.tradeDate}-${pick.instrument}-${isStrongWatchPick(pick) ? "strong" : isAestheticPick(pick) ? pick.bucket : "main"}`} pick={pick} />
           ))}
         </div>
         <table className="desktop-table">
@@ -1800,14 +1827,15 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
           <tbody>
             {picks.map((pick) => {
               const aesthetic = isAestheticPick(pick);
+              const strong = isStrongWatchPick(pick);
               return (
-                <tr key={`${pick.tradeDate}-${pick.instrument}-${aesthetic ? pick.bucket : "main"}`}>
+                <tr key={`${pick.tradeDate}-${pick.instrument}-${strong ? "strong" : aesthetic ? pick.bucket : "main"}`}>
                   <td>{pick.rank}</td>
                   <td className="code">{pick.instrument}</td>
                   <td>{pick.name}</td>
-                  <td>{aesthetic ? pick.bucketLabel : pick.signalLayer === "main" ? "主策略" : "观察"}</td>
+                  <td>{strong ? `强观察${pick.strongWatchTier}` : aesthetic ? pick.bucketLabel : pick.signalLayer === "main" ? "主策略" : "观察"}</td>
                   <td>{pick.price.toFixed(2)}</td>
-                  <td><strong>{(aesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong></td>
+                  <td><strong>{(strong ? pick.strongWatchScore : aesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong></td>
                   <td><span className={`action-chip action-${pick.actionState}`}>{pick.actionState}</span></td>
                   <td><span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState}</span></td>
                   <td><ReviewReturn value={pick.flowRatio5d} /></td>
@@ -1829,6 +1857,7 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
 
 function StrategyDailyLedger({ report, title = "每日流水", subtitle = "最近 20 个回测交易日" }: { report: StrategyBacktestReport; title?: string; subtitle?: string }) {
   const aestheticByDate = new Map((report.aestheticWatch?.dailyRecords ?? []).map((day) => [day.tradeDate, day]));
+  const strongByDate = new Map((report.strongWatch?.dailyRecords ?? []).map((day) => [day.tradeDate, day]));
   const days = report.dailyRecords.slice(-20).reverse();
 
   return (
@@ -1848,12 +1877,14 @@ function StrategyDailyLedger({ report, title = "每日流水", subtitle = "最�
               <th>主选</th>
               <th>观察</th>
               <th>冷却跳过</th>
+              <th>强观察</th>
               <th>审美池</th>
             </tr>
           </thead>
           <tbody>
             {days.map((day) => {
               const aesthetic = aestheticByDate.get(day.tradeDate);
+              const strong = strongByDate.get(day.tradeDate);
               return (
                 <tr key={day.tradeDate}>
                   <td>{day.tradeDate}</td>
@@ -1861,6 +1892,7 @@ function StrategyDailyLedger({ report, title = "每日流水", subtitle = "最�
                   <td>{day.mainSignals}</td>
                   <td>{day.watchSignals}</td>
                   <td>{day.cooldownSkippedSignals}</td>
+                  <td>{strong?.signals ?? 0}</td>
                   <td>{aesthetic?.signals ?? 0}</td>
                 </tr>
               );
@@ -1988,9 +2020,10 @@ function aestheticBucketAttributionRows(picks: StrategyAestheticPick[]) {
 function StrategyAttributionPanel({ report }: { report: StrategyBacktestReport }) {
   const rows = useMemo(() => {
     const mainRows = factorAttributionRows("主策略", report.picks);
+    const strongRows = factorAttributionRows("强观察", report.strongWatch?.picks ?? []);
     const aestheticRows = factorAttributionRows("审美池", report.aestheticWatch?.picks ?? []);
     const bucketRows = aestheticBucketAttributionRows(report.aestheticWatch?.picks ?? []);
-    return [...mainRows, ...bucketRows, ...aestheticRows];
+    return [...mainRows, ...strongRows, ...bucketRows, ...aestheticRows];
   }, [report]);
 
   if (!rows.length) return null;
@@ -2059,10 +2092,12 @@ function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
             <tr>
               <th>交易日</th>
               <th>主策略</th>
+              <th>强观察</th>
               <th>审美池</th>
               <th>基准区间</th>
               <th>基准天数</th>
               <th>主策略10日</th>
+              <th>强观察10日</th>
               <th>审美池10日</th>
             </tr>
           </thead>
@@ -2071,10 +2106,12 @@ function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
               <tr key={item.tradeDate}>
                 <td>{item.tradeDate}</td>
                 <td>{item.mainSignals}</td>
+                <td>{item.strongWatchSignals ?? 0}</td>
                 <td>{item.aestheticSignals}</td>
                 <td>{item.benchmarkFrom ?? "-"} 至 {item.benchmarkTo ?? "-"}</td>
                 <td>{item.benchmarkDates ?? "-"}</td>
                 <td>{formatRate(item.main10dWinRate)}</td>
+                <td>{formatRate(item.strongWatch10dWinRate)}</td>
                 <td>{formatRate(item.aesthetic10dWinRate)}</td>
               </tr>
             ))}
@@ -2098,8 +2135,10 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
   const benchmark = report.benchmark ?? report;
   const hasBenchmark = Boolean(report.benchmark);
   const latestMain = strategyPicksForDate(report.picks, date);
+  const latestStrongWatch = strategyPicksForDate(report.strongWatch?.picks ?? [], date);
   const latestAesthetic = strategyPicksForDate(report.aestheticWatch?.picks ?? [], date);
   const tenDay = benchmark.cooldownSummary["10d"] ?? benchmark.summary["10d"];
+  const strongTen = benchmark.strongWatch?.cooldownSummary["10d"] ?? benchmark.strongWatch?.summary["10d"];
   const aestheticTen = benchmark.aestheticWatch?.cooldownSummary["10d"] ?? benchmark.aestheticWatch?.summary["10d"];
   const benchmarkRange = `${benchmark.meta.from ?? "-"} 至 ${benchmark.meta.to ?? "-"}`;
 
@@ -2108,8 +2147,10 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
       <div className="summary-grid review-summary">
         <Metric icon={CalendarClock} label="策略交易日" value={date} tone="blue" />
         <Metric icon={ListChecks} label="当日主策略" value={latestMain.length} tone="green" />
+        <Metric icon={BadgeCheck} label="当日强观察" value={latestStrongWatch.length} tone="green" />
         <Metric icon={Layers} label="当日审美池" value={latestAesthetic.length} tone="amber" />
         <Metric icon={Target} label="主策略10日" value={formatRate(tenDay?.winRate)} tone="green" />
+        <Metric icon={Activity} label="强观察10日" value={formatRate(strongTen?.winRate)} tone="green" />
         <Metric icon={Percent} label="审美池10日" value={formatRate(aestheticTen?.winRate)} tone="blue" />
         <Metric icon={History} label="回测交易日" value={benchmark.meta.evaluatedDates} />
       </div>
@@ -2128,6 +2169,11 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
           subtitle="历史信号按同票冷却去重后统计，当前当日信号不参与"
         />
         <StrategyStatsTable
+          title={hasBenchmark ? "强观察历史冷却统计" : "强观察冷却统计"}
+          rows={benchmark.strongWatch?.cooldownSummary ?? {}}
+          subtitle="从审美池二次筛选，目标是更少但更接近波段买点"
+        />
+        <StrategyStatsTable
           title={hasBenchmark ? "审美池历史冷却统计" : "审美池冷却统计"}
           rows={benchmark.aestheticWatch?.cooldownSummary ?? {}}
           subtitle="审美观察池独立统计，不合并进主策略"
@@ -2138,6 +2184,7 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
 
       <div className="strategy-grid">
         <StrategyPickTable title="当日主策略" subtitle="不放宽当前稳定版，只展示真正通过条件的票" picks={latestMain} />
+        <StrategyPickTable title="当日强观察" subtitle="审美池二次筛选，优先看 30m 缩量承接和回撤位置" picks={latestStrongWatch} />
         <StrategyPickTable title="当日审美观察池" subtitle="接近主策略、30m承接、低位修复三类单独观察" picks={latestAesthetic} />
       </div>
 

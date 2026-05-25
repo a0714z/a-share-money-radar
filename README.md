@@ -4,7 +4,7 @@
 
 生产页面：`http://112.126.57.131/`
 
-更完整的接手说明见 `docs/HANDOFF.md`。开发前请先阅读该文档，尤其是 API 风控边界和服务器部署事实。
+更完整的接手说明见 `docs/HANDOFF.md`。开发前请先阅读该文档，尤其是 API 风控边界和服务器部署事实。多 agent 协作进度记录见 `docs/CHANGELOG.md`，每个开发里程碑都需要更新。
 
 ## 当前生产方式
 
@@ -145,6 +145,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - `--cooldown-days=5` 默认同票 5 个交易日冷却后的新机会统计。
 - `main/watch` 分层统计：`pullback/ready` 归为主选，`risk` 等归为观察。
 - `aestheticWatch` 审美观察池：不放宽主策略，单独输出“接近主策略 / 30m 承接审美 / 低位修复观察”三类候选和独立回测统计。
+- `strongWatch` 强观察池：从审美池二次筛选，每日默认最多 5 只，优先保留 30m 承接审美、低位修复，以及分数特别高的接近主策略候选。
 - 每日选股流水账，包含空信号日期、当日入选、冷却跳过和 5/10 日结果。
 
 如果需要更宽的候选池，可放宽操作状态、分位和 30m 过滤：
@@ -168,7 +169,7 @@ npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10
 - `public/reports/backtests/history/index.json`
 - `public/reports/backtests/history/YYYY-MM-DD.json`
 
-前端网站会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，在“策略实验”页签展示主策略当日选股、审美观察池、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。用户查看策略数据时以网页为准，不需要直接打开 JSON。
+前端网站会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，在“策略实验”页签展示主策略当日选股、强观察池、审美观察池、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。用户查看策略数据时以网页为准，不需要直接打开 JSON。
 
 数据补齐必须通过受控脚本进行。必盈 API 请求只能串行，不能并发；项目已在 `BiyingClient` 层加入串行队列和请求频率保护。
 

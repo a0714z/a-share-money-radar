@@ -37,6 +37,10 @@ type StrategyLatestReport = {
     picks?: unknown[];
     cooldownSummary?: Record<string, { winRate?: number }>;
   };
+  strongWatch?: {
+    picks?: unknown[];
+    cooldownSummary?: Record<string, { winRate?: number }>;
+  };
   cooldownSummary?: Record<string, { winRate?: number }>;
   benchmark?: StrategyLatestReport;
 };
@@ -46,11 +50,13 @@ type StrategyArchiveIndexItem = {
   path: string;
   generatedAt?: string;
   mainSignals: number;
+  strongWatchSignals: number;
   aestheticSignals: number;
   benchmarkFrom?: string;
   benchmarkTo?: string;
   benchmarkDates?: number;
   main10dWinRate?: number;
+  strongWatch10dWinRate?: number;
   aesthetic10dWinRate?: number;
 };
 
@@ -78,6 +84,7 @@ async function readExistingBacktest(outputDir: string) {
     return {
       date: strategyTradeDate(report),
       hasBenchmark: Number(report.benchmark?.meta?.evaluatedDates ?? 0) > 0,
+      hasStrongWatch: Boolean(report.strongWatch?.picks),
       benchmark: report.benchmark,
       report
     };
@@ -126,11 +133,13 @@ async function writeStrategyArchive(outputDir: string, report: StrategyLatestRep
     path: `reports/backtests/history/${tradeDate}.json`,
     generatedAt: report.meta?.generatedAt,
     mainSignals: report.picks?.length ?? 0,
+    strongWatchSignals: report.strongWatch?.picks?.length ?? 0,
     aestheticSignals: report.aestheticWatch?.picks?.length ?? 0,
     benchmarkFrom: benchmark.meta?.from,
     benchmarkTo: benchmark.meta?.to,
     benchmarkDates: benchmark.meta?.evaluatedDates,
     main10dWinRate: benchmark.cooldownSummary?.["10d"]?.winRate,
+    strongWatch10dWinRate: benchmark.strongWatch?.cooldownSummary?.["10d"]?.winRate,
     aesthetic10dWinRate: benchmark.aestheticWatch?.cooldownSummary?.["10d"]?.winRate
   };
 
@@ -196,10 +205,11 @@ async function run() {
   const benchmarkDir = resolve(outputDir, "benchmark-latest");
   const top = process.env.STRATEGY_BACKTEST_TOP ?? "10";
   const aestheticTop = process.env.STRATEGY_BACKTEST_AESTHETIC_TOP;
+  const strongWatchTop = process.env.STRATEGY_BACKTEST_STRONG_WATCH_TOP;
   const benchmarkMaxDates = process.env.STRATEGY_BACKTEST_BENCHMARK_MAX_DATES ?? "80";
   const requestedTradeDate = process.env.STRATEGY_BACKTEST_SELECT_DATE ?? (await readLatestTradeDate(reportsDir));
   const existing = await readExistingBacktest(outputDir);
-  if (existing?.date === requestedTradeDate && existing.hasBenchmark && process.env.STRATEGY_BACKTEST_FORCE !== "1") {
+  if (existing?.date === requestedTradeDate && existing.hasBenchmark && existing.hasStrongWatch && process.env.STRATEGY_BACKTEST_FORCE !== "1") {
     console.log(`[strategy:latest] keeping existing report for ${requestedTradeDate} in ${outputDir}`);
     await writeStrategyArchive(outputDir, existing.report);
     return;
@@ -226,6 +236,7 @@ async function run() {
     `--output-dir=${outputDir}`
   ];
   if (aestheticTop) signalArgs.push(`--aesthetic-top=${aestheticTop}`);
+  if (strongWatchTop) signalArgs.push(`--strong-watch-top=${strongWatchTop}`);
 
   if (keepExistingSignal) {
     console.log(`[strategy:latest] keeping existing signal report for ${requestedTradeDate} in ${outputDir}`);
@@ -234,9 +245,10 @@ async function run() {
     try {
       await runCommand("npm", signalArgs);
     } catch (error) {
-      if (existing?.date === requestedTradeDate || existing?.date === tradeDate) {
-        console.warn(`[strategy:latest] signal recompute failed; keeping existing signal report for ${existing.date}`);
+      if (existing?.report) {
+        console.warn(`[strategy:latest] signal recompute failed; keeping existing signal report for ${existing.date ?? "unknown date"}`);
         console.warn(error instanceof Error ? error.message : String(error));
+        await writeFile(resolve(outputDir, "latest.json"), `${JSON.stringify(existing.report, null, 2)}\n`, "utf8");
       } else {
         throw error;
       }
@@ -254,6 +266,7 @@ async function run() {
     `--output-dir=${benchmarkDir}`
   ];
   if (aestheticTop) benchmarkArgs.push(`--aesthetic-top=${aestheticTop}`);
+  if (strongWatchTop) benchmarkArgs.push(`--strong-watch-top=${strongWatchTop}`);
 
   console.log(`[strategy:latest] benchmark to=${cachedTradeDate.date} maxDates=${benchmarkMaxDates} outputDir=${benchmarkDir}`);
   await runCommand("npm", benchmarkArgs);
