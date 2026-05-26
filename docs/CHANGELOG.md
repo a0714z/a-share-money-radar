@@ -4,6 +4,46 @@ This file is the shared multi-agent update log. Every development milestone shou
 
 ## 2026-05-26
 
+### Strategy Replay Tracking Automation
+
+- Added `strategy:refresh-replay` to refresh archived strategy replay results from local daily K-line cache.
+- The refresh script updates archived `history/YYYY-MM-DD.json` reports with:
+  - 5/10 day close return
+  - max runup and max runup date/day
+  - max drawdown and max drawdown date/day
+  - +5%/+8%/+10% hit flags
+  - pending progress via `availableDays` and `remainingDays`
+- The archive index now records replay status and recent hit rates, enabling the website to show “追踪中 / 5日已验证 / 10日已验证”.
+- `daily:close` now runs `strategy:refresh-replay` after `strategy:latest`.
+- The strategy tab now has a “最近信号追踪” panel and candidate cards show replay verification status.
+- `run-strategy-backtest.ts` now writes replay progress metadata even when a selected date has no future bars yet.
+
+Changed files:
+
+- `package.json`
+- `scripts/run-strategy-backtest.ts`
+- `scripts/run-strategy-replay-refresh.ts`
+- `src/App.tsx`
+- `src/styles.css`
+- `README.md`
+- `docs/HANDOFF.md`
+- `docs/CHANGELOG.md`
+
+Validation:
+
+- `npm run build`
+- `npm run strategy:refresh-replay`
+
+Deployment:
+
+- Deployed source to `/opt/a-share-money-radar`.
+- Built on server with `/opt/node-v24`.
+- Synced `dist/` to `http://112.126.57.131/` with `reports` excluded.
+- Ran `npm run strategy:refresh-replay` on production reports:
+  - `2026-05-22`: pending, 1 future trade day available, 9 days remaining for 10d.
+  - `2026-05-25`: pending, 0 future trade days available, 10 days remaining for 10d.
+- Refreshed `system-health.json` and verified production UI exposes “最近信号追踪”.
+
 ### Strategy Candidate Archive UI
 
 - Added a front-end “当日核心候选池” section on the strategy experiment tab.

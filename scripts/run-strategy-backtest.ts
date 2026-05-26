@@ -82,6 +82,10 @@ type ReplayResult = {
   horizon: Horizon;
   status: "complete" | "pending";
   entryPrice: number;
+  availableDays?: number;
+  remainingDays?: number;
+  latestDate?: string;
+  dueDate?: string;
   closeReturnPct?: number;
   maxRunupPct?: number;
   maxRunupDate?: string;
@@ -563,7 +567,16 @@ function evaluateThirtyMinuteSignal(bars: KLine[]): ThirtyMinuteSignal | undefin
 function replayPick(pick: StockPick, futureBars: KLine[], horizon: Horizon, config: BacktestConfig): ReplayResult {
   const window = futureBars.slice(0, horizon);
   const entry = pick.price;
-  if (window.length < horizon) return { horizon, status: "pending", entryPrice: entry };
+  if (window.length < horizon) {
+    return {
+      horizon,
+      status: "pending",
+      entryPrice: entry,
+      availableDays: window.length,
+      remainingDays: horizon - window.length,
+      latestDate: dateKey(window[window.length - 1]?.t) || undefined
+    };
+  }
 
   let maxHigh = entry;
   let maxRunupDate: string | undefined;
@@ -601,6 +614,10 @@ function replayPick(pick: StockPick, futureBars: KLine[], horizon: Horizon, conf
     horizon,
     status: "complete",
     entryPrice: entry,
+    availableDays: horizon,
+    remainingDays: 0,
+    latestDate: dateKey(window[window.length - 1]?.t) || undefined,
+    dueDate: dateKey(window[horizon - 1]?.t) || undefined,
     closeReturnPct: round(pctChange(close, entry), 2),
     maxRunupPct,
     maxRunupDate,

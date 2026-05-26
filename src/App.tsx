@@ -169,6 +169,10 @@ type StrategyReplay = {
   horizon: number;
   status: "complete" | "pending";
   entryPrice: number;
+  availableDays?: number;
+  remainingDays?: number;
+  latestDate?: string;
+  dueDate?: string;
   closeReturnPct?: number;
   maxRunupPct?: number;
   maxRunupDate?: string;
@@ -283,6 +287,7 @@ type StrategyBacktestReport = {
     evaluatedDates: number;
     universe: number;
     notes: string[];
+    replayTracking?: StrategyReplayTracking;
   };
   summary: Record<string, StrategyStats>;
   cooldownSummary: Record<string, StrategyStats>;
@@ -308,12 +313,47 @@ type StrategyArchiveItem = {
   main10dWinRate?: number;
   strongWatch10dWinRate?: number;
   aesthetic10dWinRate?: number;
+  replayStatus?: "pending" | "5d-complete" | "10d-complete";
+  replayAvailableDays?: number;
+  replayRemainingDays?: number;
+  replayUpdatedAt?: string;
+  replay5dCompleted?: number;
+  replay10dCompleted?: number;
+  replay5dWinRate?: number;
+  replay10dWinRate?: number;
+  strongWatchReplay5dWinRate?: number;
+  strongWatchReplay10dWinRate?: number;
+  aestheticReplay5dWinRate?: number;
+  aestheticReplay10dWinRate?: number;
 };
 
 type StrategyArchiveIndex = {
   generatedAt: string;
   latestTradeDate?: string;
   items: StrategyArchiveItem[];
+};
+
+type StrategyReplayTrackingHorizon = Record<string, {
+  completed: number;
+  samples: number;
+  targetHits: number;
+  strongTargetHits: number;
+  stretchTargetHits: number;
+  winRate?: number;
+  strongTargetRate?: number;
+  stretchTargetRate?: number;
+}>;
+
+type StrategyReplayTracking = {
+  refreshedAt: string;
+  latestCachedDate?: string;
+  status: "pending" | "5d-complete" | "10d-complete";
+  candidates: number;
+  availableDays: number;
+  remainingDays: number;
+  horizons: StrategyReplayTrackingHorizon;
+  strongWatch?: StrategyReplayTrackingHorizon;
+  aestheticWatch?: StrategyReplayTrackingHorizon;
 };
 
 type StrategyAttributionRow = {
@@ -1748,6 +1788,35 @@ function formatStrategyNumber(value?: number, digits = 1) {
   return Number.isFinite(value) ? Number(value).toFixed(digits) : "-";
 }
 
+function strategyReplayStatusLabel(status?: StrategyArchiveItem["replayStatus"]) {
+  if (status === "10d-complete") return "10日已验证";
+  if (status === "5d-complete") return "5日已验证";
+  return "追踪中";
+}
+
+function pickReplayStatus(pick: StrategyBacktestPick) {
+  const five = pick.replay["5d"];
+  const ten = pick.replay["10d"];
+  if (ten?.status === "complete") return "10日已验证";
+  if (five?.status === "complete") return "5日已验证";
+  const remaining = ten?.remainingDays ?? five?.remainingDays;
+  if (Number.isFinite(remaining) && Number(remaining) > 0) return `追踪中 · 还差 ${remaining} 日`;
+  return "追踪中";
+}
+
+function replayStatusClass(value: string) {
+  if (value.includes("10日")) return "replay-complete";
+  if (value.includes("5日")) return "replay-half";
+  return "replay-pending";
+}
+
+function archiveReplayHint(item: StrategyArchiveItem) {
+  if (item.replayStatus === "10d-complete") return "10日窗口已完成";
+  if (item.replayStatus === "5d-complete") return "5日窗口已完成";
+  if (Number.isFinite(item.replayRemainingDays)) return `还差 ${item.replayRemainingDays} 个交易日`;
+  return "等待后续 K 线";
+}
+
 function StrategyStatsTable({ title, rows, subtitle = "选出后直接观察未来 5/10 日，不模拟买卖点" }: { title: string; rows: Record<string, StrategyStats>; subtitle?: string }) {
   const horizons = Object.entries(rows);
   if (!horizons.length) return null;
@@ -1882,6 +1951,11 @@ function StrategyCandidateBoard({
                   </div>
                 </div>
 
+                <div className={`candidate-replay-chip ${replayStatusClass(pickReplayStatus(pick))}`}>
+                  <History size={14} />
+                  <span>{pickReplayStatus(pick)}</span>
+                </div>
+
                 <div className="candidate-metrics">
                   <div>
                     <span>价格</span>
@@ -1982,7 +2056,7 @@ function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAes
       </div>
       <div className="mobile-card-foot">
         <span>{reasons[0] ?? pick.setupState}</span>
-        <span>{formatPct(pick.flowRatio5d)}</span>
+        <span>{pickReplayStatus(pick)}</span>
       </div>
     </article>
   );
@@ -2303,6 +2377,7 @@ function StrategyArchiveTable({
               <th>主策略</th>
               <th>强观察</th>
               <th>审美池</th>
+              <th>后验</th>
               <th>基准区间</th>
               <th>基准天数</th>
               <th>主策略10日</th>
@@ -2322,6 +2397,11 @@ function StrategyArchiveTable({
                 <td>{item.mainSignals}</td>
                 <td>{item.strongWatchSignals ?? 0}</td>
                 <td>{item.aestheticSignals}</td>
+                <td>
+                  <span className={`replay-status-pill ${replayStatusClass(strategyReplayStatusLabel(item.replayStatus))}`}>
+                    {strategyReplayStatusLabel(item.replayStatus)}
+                  </span>
+                </td>
                 <td>{item.benchmarkFrom ?? "-"} 至 {item.benchmarkTo ?? "-"}</td>
                 <td>{item.benchmarkDates ?? "-"}</td>
                 <td>{formatRate(item.main10dWinRate)}</td>
@@ -2331,6 +2411,53 @@ function StrategyArchiveTable({
             ))}
           </tbody>
         </table>
+      </div>
+    </section>
+  );
+}
+
+function StrategyTrackingPanel({ archive }: { archive?: StrategyArchiveIndex }) {
+  const items = archive?.items.slice(0, 8) ?? [];
+  if (!items.length) return null;
+
+  return (
+    <section className="list-panel strategy-wide-panel strategy-tracking-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>最近信号追踪</h2>
+          <span>归档日选出后按 5/10 个交易日自动回填后验</span>
+        </div>
+      </div>
+      <div className="tracking-grid">
+        {items.map((item) => (
+          <article key={item.tradeDate} className={`tracking-card ${replayStatusClass(strategyReplayStatusLabel(item.replayStatus))}`}>
+            <div className="tracking-head">
+              <div>
+                <strong>{item.tradeDate}</strong>
+                <span>{strategyReplayStatusLabel(item.replayStatus)} · {archiveReplayHint(item)}</span>
+              </div>
+              <TrendingUp size={18} />
+            </div>
+            <div className="tracking-kpis">
+              <div>
+                <span>候选</span>
+                <strong>{item.mainSignals + (item.strongWatchSignals ?? 0) + item.aestheticSignals}</strong>
+              </div>
+              <div>
+                <span>5日命中</span>
+                <strong>{formatRate(item.replay5dWinRate)}</strong>
+              </div>
+              <div>
+                <span>10日命中</span>
+                <strong>{formatRate(item.replay10dWinRate)}</strong>
+              </div>
+              <div>
+                <span>强观察10日</span>
+                <strong>{formatRate(item.strongWatchReplay10dWinRate)}</strong>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );
@@ -2488,6 +2615,8 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
         strong={latestStrongWatch}
         aesthetic={latestAesthetic}
       />
+
+      <StrategyTrackingPanel archive={archive} />
 
       <div className="strategy-grid">
         <StrategyStatsTable

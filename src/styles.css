@@ -1525,6 +1525,40 @@ a {
   font-weight: 850;
 }
 
+.candidate-replay-chip,
+.replay-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #dfe7e2;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #526057;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.replay-complete {
+  border-color: rgba(21, 154, 101, 0.28);
+  background: #eef8f2;
+  color: #0f704b;
+}
+
+.replay-half {
+  border-color: rgba(59, 130, 185, 0.26);
+  background: #eef6fb;
+  color: #255f86;
+}
+
+.replay-pending {
+  border-color: rgba(198, 130, 32, 0.28);
+  background: #fff8ea;
+  color: #8a5a10;
+}
+
 .candidate-metrics {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1615,6 +1649,74 @@ a {
 .strategy-archive-detail {
   display: grid;
   gap: 16px;
+}
+
+.strategy-tracking-panel .panel-toolbar {
+  border-bottom: 1px solid #e2e9e5;
+}
+
+.tracking-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.tracking-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid #e1e8e4;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.tracking-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.tracking-head strong,
+.tracking-head span {
+  display: block;
+}
+
+.tracking-head span {
+  margin-top: 4px;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.tracking-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.tracking-kpis div {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.tracking-kpis span {
+  display: block;
+  color: #657168;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tracking-kpis strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
 }
 
 .mobile-strategy-list {
@@ -2747,6 +2849,15 @@ a {
   }
 
   .candidate-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tracking-grid {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .tracking-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

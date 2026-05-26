@@ -23,7 +23,7 @@
 
 不要把 root 密码、必盈 license、SMTP 授权码写入仓库或文档。服务器密钥在 `/etc/a-share-money-radar.env`。
 
-当前注意：生产 `latest.json` 和策略实验报告都已到 `2026-05-25`，`system-health.json` 为 `ok`。2026-05-25 当日策略结果是主策略 `0` 只、强观察 `1` 只（`002048.SZ 宁波华翔`）、审美池 `7` 只。服务器已按串行请求补足个股日 K 到最多 180 根，少数新股/短历史文件仍不足 120 根是正常现象。
+当前注意：生产 `latest.json` 和策略实验报告都已到 `2026-05-25`，`system-health.json` 为 `ok`。2026-05-25 当日策略结果是主策略 `0` 只、强观察 `1` 只（`002048.SZ 宁波华翔`）、审美池 `7` 只。服务器已按串行请求补足个股日 K 到最多 180 根，少数新股/短历史文件仍不足 120 根是正常现象。策略归档后验追踪已启用：`2026-05-22` 归档已有 1 个后续交易日，距离 10 日验证还差 9 个交易日；`2026-05-25` 归档还差 10 个交易日。
 
 ## 服务器事实
 
@@ -83,6 +83,7 @@ npm run plan
 npm run action:refresh
 npm run review
 npm run strategy:latest
+npm run strategy:refresh-replay
 npm run stock:details
 npm run health
 npm run notify:dry
@@ -98,6 +99,7 @@ npm run daily:close
 - `action:refresh`：不调用 API，只给已有 `latest.json` 和 `plan.json` 补操作状态字段。
 - `review`：生成 `performance.json`，复盘收益只读本地 K 线缓存。
 - `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；报告外层是当日选股，`benchmark` 字段附带同策略历史基准回测，并写入 `REPORT_DIR/backtests/history` 归档索引。如果该交易日不在本地日 K 缓存，会优先保留已有同日选股并补历史基准，否则退到不晚于报告日的最近缓存交易日并打印 warning。
+- `strategy:refresh-replay`：只读本地日 K 缓存，回填 `reports/backtests/history/YYYY-MM-DD.json` 内候选票的 5/10 日后验表现，并更新归档索引里的“追踪中/5日已验证/10日已验证”状态；不调用必盈 API。
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
 - `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
 - `notify`：发送邮件，只读本地 JSON。
@@ -115,6 +117,7 @@ API_CACHE_REFRESH=1 npm run plan &&
 npm run action:refresh &&
 npm run review &&
 npm run strategy:latest &&
+npm run strategy:refresh-replay &&
 npm run stock:details &&
 npm run health
 ```
@@ -185,7 +188,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - 分层口径：`pullback/ready` 归为 `main` 主选，`risk` 等其他状态归为 `watch` 观察。
 - 审美观察池 `aestheticWatch` 已独立输出，不合并进主策略 summary；当前分为 `接近主策略`、`30m承接审美`、`低位修复观察` 三类，用于吸收用户截图审美里的 30m 平台承接、均线收敛和二次修复特征。
 - 强观察池 `strongWatch` 从审美池二次筛选，每日默认最多 5 只；口径优先保留 `30m承接审美`、`低位修复观察`，以及分数特别高的 `接近主策略`。该池用于解决主策略票少、审美池偏泛的问题，独立统计，不合并进主策略。
-- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，展示主策略当日选股、强观察池、审美观察池、当日核心候选池、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。归档日期可在网页上点开，前端再读取 `reports/backtests/history/YYYY-MM-DD.json` 展示当日候选池和 5/10 日后验表现。后续新增策略数据时优先保证网页可见。
+- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，展示主策略当日选股、强观察池、审美观察池、当日核心候选池、最近信号追踪、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。归档日期可在网页上点开，前端再读取 `reports/backtests/history/YYYY-MM-DD.json` 展示当日候选池和 5/10 日后验表现。后续新增策略数据时优先保证网页可见。
 - 当日选股可以用 `npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10`，该模式不要求未来 K 线，结果中的 replay 会显示为 pending。
 
 2026-05-25 本地验证结果：
@@ -203,6 +206,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - `strategy:latest` 最新组合报告本地验证：外层当日仍为 `2026-05-22`，主策略 `1` 只、审美池 `20` 只；`benchmark` 覆盖 `2026-01-19` 至 `2026-05-22` 共 `80` 个回测交易日，主策略冷却 10 日最高触达 `5%` 胜率 `77.8%`（样本 `37`，完成 `36`），审美池冷却 10 日胜率 `56.2%`（样本 `679`，完成 `639`）。`system-health.json` 的策略胜率字段优先读取 `benchmark`。
 - 强观察池本地验证：`2026-05-22` 当日输出 `3` 只，`600857.SH 宁波中百`、`600635.SH 大众公用`、`002346.SZ 柘中股份`；同一 `2026-01-19` 至 `2026-05-22` 历史基准里，强观察 10 日最高触达 `5%` 胜率 `60.2%`（样本 `135`，完成 `133`），高于审美池 `56.2%`。强观察默认上限 `--strong-watch-top=5`。
 - `strategy:latest` 会将组合报告归档到 `history/YYYY-MM-DD.json`，并维护 `history/index.json`；前端策略页的“策略归档”读取该索引。
+- `strategy:refresh-replay` 在 `strategy:latest` 之后运行，用最新日 K 缓存回填历史归档 replay。未满 5/10 个交易日时保留 pending 并写入 `availableDays/remainingDays`；满足窗口后写入收盘涨跌、最高涨幅、最高日期、最大回撤和 +5%/+8%/+10% 命中状态。
 - 前端“因子归因”基于 `benchmark` 的 10 日 replay 现场聚合，当前分桶包含 `30m回踩分`、`30m缩量比`、`5日资金`、`120日分位`、`高点回撤`，审美池额外展示 `审美分桶`。
 
 输出：
