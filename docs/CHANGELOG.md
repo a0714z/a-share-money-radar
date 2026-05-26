@@ -2,6 +2,39 @@
 
 This file is the shared multi-agent update log. Every development milestone should add a dated entry with scope, changed files, validation, deployment status, and follow-up notes.
 
+## 2026-05-26
+
+### Strategy Candidate Archive UI
+
+- Added a front-end “当日核心候选池” section on the strategy experiment tab.
+- The candidate pool deduplicates by stock and prioritizes main strategy, then strong watch, then aesthetic watch.
+- Each candidate card now exposes the selection reason, 30m score, shrink ratio, pullback, 5-day flow, and 5/10-day replay status directly on the page.
+- Strategy archive rows are now selectable; selecting a date loads `reports/backtests/history/YYYY-MM-DD.json` and shows that day’s candidate pool plus benchmark metrics.
+- Tightened strategy mobile layout so candidate cards and strategy mobile tables do not create horizontal overflow.
+- Corrected handoff notes for production `2026-05-25`: strategy report and health are now synced and `ok`.
+
+Changed files:
+
+- `src/App.tsx`
+- `src/styles.css`
+- `docs/HANDOFF.md`
+- `docs/CHANGELOG.md`
+
+Validation:
+
+- `npm run build`
+- Browser check on `http://localhost:5174/` strategy tab:
+  - desktop DOM contained “当日核心候选池”, “策略归档”, and “归档候选池”
+  - archive date button loaded without console errors
+  - mobile viewport `390x844` had no horizontal overflow
+
+Deployment:
+
+- Deployed `dist/` to `http://112.126.57.131/` with `reports` excluded.
+- Verified production HTML references the new built assets.
+- Verified production strategy report remains `2026-05-25` with main `0`, strong watch `1`, aesthetic `7`.
+- Verified production `system-health.json` status is `ok`.
+
 ## 2026-05-25
 
 ### Strong Watch Strategy Layer

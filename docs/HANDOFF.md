@@ -23,7 +23,7 @@
 
 不要把 root 密码、必盈 license、SMTP 授权码写入仓库或文档。服务器密钥在 `/etc/a-share-money-radar.env`。
 
-当前注意：生产 `latest.json` 已到 `2026-05-25`，但策略 K 线缓存暂时不足以重算 `2026-05-25` 策略信号。`strategy:latest` 会保留上一份有效 `2026-05-22` 策略报告并保护已有 benchmark/strongWatch，因此 `system-health.json` 策略项会显示 `warn`，这是可预期状态，直到缓存补齐。
+当前注意：生产 `latest.json` 和策略实验报告都已到 `2026-05-25`，`system-health.json` 为 `ok`。2026-05-25 当日策略结果是主策略 `0` 只、强观察 `1` 只（`002048.SZ 宁波华翔`）、审美池 `7` 只。服务器已按串行请求补足个股日 K 到最多 180 根，少数新股/短历史文件仍不足 120 根是正常现象。
 
 ## 服务器事实
 
@@ -185,7 +185,7 @@ npm run backtest:strategy -- --preset=swing --from=2025-10-09 --to=2026-05-08 --
 - 分层口径：`pullback/ready` 归为 `main` 主选，`risk` 等其他状态归为 `watch` 观察。
 - 审美观察池 `aestheticWatch` 已独立输出，不合并进主策略 summary；当前分为 `接近主策略`、`30m承接审美`、`低位修复观察` 三类，用于吸收用户截图审美里的 30m 平台承接、均线收敛和二次修复特征。
 - 强观察池 `strongWatch` 从审美池二次筛选，每日默认最多 5 只；口径优先保留 `30m承接审美`、`低位修复观察`，以及分数特别高的 `接近主策略`。该池用于解决主策略票少、审美池偏泛的问题，独立统计，不合并进主策略。
-- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，展示主策略当日选股、强观察池、审美观察池、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。后续新增策略数据时优先保证网页可见。
+- 前端“策略实验”页签会读取 `public/reports/backtests/latest.json` 和 `public/reports/backtests/history/index.json`，展示主策略当日选股、强观察池、审美观察池、当日核心候选池、历史基准胜率、因子归因、分桶回测、最近每日流水和策略归档。归档日期可在网页上点开，前端再读取 `reports/backtests/history/YYYY-MM-DD.json` 展示当日候选池和 5/10 日后验表现。后续新增策略数据时优先保证网页可见。
 - 当日选股可以用 `npm run backtest:strategy -- --preset=swing --select-date=2026-05-22 --top=10`，该模式不要求未来 K 线，结果中的 replay 会显示为 pending。
 
 2026-05-25 本地验证结果：

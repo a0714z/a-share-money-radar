@@ -188,14 +188,21 @@ type StrategyBacktestPick = {
   name: string;
   score: number;
   strategyScore: number;
+  signal?: Signal;
   signalLayer: "main" | "watch";
   actionState: StockActionState;
+  actionLabel?: string;
+  actionReason?: string;
   price: number;
   pctChange?: number;
   setupState: StockPick["setupState"];
   flowRatio5d: number;
   valuePosition: number;
   pullbackFromHigh: number;
+  amountRatio20?: number;
+  surgeScore?: number;
+  surgeDaysSince?: number;
+  surgePullbackAmountRatio?: number;
   intradayScore?: number;
   intradaySupportScore?: number;
   thirtyMinutePullbackScore?: number;
@@ -520,6 +527,14 @@ async function loadStrategyArchive() {
   const response = await fetch(`${base}reports/backtests/history/index.json?t=${Date.now()}`);
   if (!response.ok) return undefined;
   return (await response.json()) as StrategyArchiveIndex;
+}
+
+async function loadStrategyArchiveReport(path: string) {
+  const base = import.meta.env.BASE_URL || "/";
+  const normalizedPath = path.replace(/^\/+/, "");
+  const response = await fetch(`${base}${normalizedPath}?t=${Date.now()}`);
+  if (!response.ok) throw new Error("no archive report");
+  return (await response.json()) as StrategyBacktestReport;
 }
 
 async function loadPlan() {
@@ -1666,6 +1681,73 @@ function isStrongWatchPick(pick: StrategyBacktestPick | StrategyAestheticPick | 
   return "strongWatchScore" in pick;
 }
 
+function strategyActionLabel(pick: StrategyBacktestPick) {
+  const labels: Record<string, string> = {
+    ready: "可操作",
+    pullback: "等回踩",
+    track: "继续跟踪",
+    risk: "风控提醒",
+    invalid: "已失效"
+  };
+  return pick.actionLabel ?? labels[pick.actionState] ?? pick.actionState;
+}
+
+function strategyPickTypeLabel(pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick) {
+  if (isStrongWatchPick(pick)) return `强观察${pick.strongWatchTier}`;
+  if (isAestheticPick(pick)) return pick.bucketLabel;
+  return pick.signalLayer === "main" ? "主策略" : "观察";
+}
+
+function strategyPickScore(pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick) {
+  if (isStrongWatchPick(pick)) return pick.strongWatchScore;
+  if (isAestheticPick(pick)) return pick.bucketScore;
+  return pick.strategyScore;
+}
+
+function strategyCandidatePriority(pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick) {
+  if (pick.signalLayer === "main" && !isAestheticPick(pick)) return 0;
+  if (isStrongWatchPick(pick)) return 1;
+  if (isAestheticPick(pick) && pick.priority === "high") return 2;
+  if (isAestheticPick(pick) && pick.priority === "medium") return 3;
+  return 4;
+}
+
+function dedupeStrategyCandidates(
+  main: StrategyBacktestPick[],
+  strong: StrategyStrongWatchPick[],
+  aesthetic: StrategyAestheticPick[]
+) {
+  const candidates = [...main, ...strong, ...aesthetic].sort((a, b) => {
+    const priority = strategyCandidatePriority(a) - strategyCandidatePriority(b);
+    if (priority !== 0) return priority;
+    return strategyPickScore(b) - strategyPickScore(a);
+  });
+  const seen = new Set<string>();
+  return candidates.filter((pick) => {
+    if (seen.has(pick.instrument)) return false;
+    seen.add(pick.instrument);
+    return true;
+  });
+}
+
+function strategyPickReasons(pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick) {
+  const primary = isStrongWatchPick(pick)
+    ? pick.strongWatchReason
+    : isAestheticPick(pick)
+      ? pick.watchReason
+      : pick.actionReason ?? pick.setupState;
+  const details = [
+    ...(primary ? [primary] : []),
+    ...(isAestheticPick(pick) ? pick.matchReasons : []),
+    ...pick.reasons
+  ];
+  return [...new Set(details)].slice(0, 4);
+}
+
+function formatStrategyNumber(value?: number, digits = 1) {
+  return Number.isFinite(value) ? Number(value).toFixed(digits) : "-";
+}
+
 function StrategyStatsTable({ title, rows, subtitle = "选出后直接观察未来 5/10 日，不模拟买卖点" }: { title: string; rows: Record<string, StrategyStats>; subtitle?: string }) {
   const horizons = Object.entries(rows);
   if (!horizons.length) return null;
@@ -1748,9 +1830,125 @@ function StrategyBucketTable({ report }: { report?: StrategyAestheticReport }) {
   );
 }
 
+function StrategyCandidateBoard({
+  title,
+  subtitle,
+  date,
+  main,
+  strong,
+  aesthetic
+}: {
+  title: string;
+  subtitle: string;
+  date: string;
+  main: StrategyBacktestPick[];
+  strong: StrategyStrongWatchPick[];
+  aesthetic: StrategyAestheticPick[];
+}) {
+  const candidates = dedupeStrategyCandidates(main, strong, aesthetic);
+
+  return (
+    <section className="list-panel strategy-wide-panel strategy-candidate-board">
+      <div className="panel-toolbar">
+        <div>
+          <h2>{title}</h2>
+          <span>{subtitle}</span>
+        </div>
+        <div className="strategy-count-pill">
+          <Target size={16} />
+          <strong>{candidates.length}</strong>
+          <span>{date}</span>
+        </div>
+      </div>
+      {candidates.length ? (
+        <div className="strategy-candidate-grid">
+          {candidates.map((pick) => {
+            const reasons = strategyPickReasons(pick);
+            const risk = pick.risks[0];
+            return (
+              <article
+                key={`${pick.tradeDate}-${pick.instrument}-${strategyPickTypeLabel(pick)}`}
+                className={`strategy-candidate-card candidate-${pick.actionState}`}
+              >
+                <div className="candidate-head">
+                  <div>
+                    <span className="candidate-type">{strategyPickTypeLabel(pick)}</span>
+                    <h3>{pick.name}</h3>
+                    <p>{pick.instrument} · Rank {pick.rank}</p>
+                  </div>
+                  <div className="candidate-score">
+                    <strong>{strategyPickScore(pick).toFixed(1)}</strong>
+                    <span>{strategyActionLabel(pick)}</span>
+                  </div>
+                </div>
+
+                <div className="candidate-metrics">
+                  <div>
+                    <span>价格</span>
+                    <strong>{pick.price.toFixed(2)}</strong>
+                  </div>
+                  <div>
+                    <span>5日资金</span>
+                    <strong><ReviewReturn value={pick.flowRatio5d} /></strong>
+                  </div>
+                  <div>
+                    <span>分位</span>
+                    <strong>{pick.valuePosition.toFixed(1)}%</strong>
+                  </div>
+                  <div>
+                    <span>回撤</span>
+                    <strong>{pick.pullbackFromHigh.toFixed(1)}%</strong>
+                  </div>
+                  <div>
+                    <span>30m分</span>
+                    <strong>{formatStrategyNumber(pick.thirtyMinutePullbackScore, 0)}</strong>
+                  </div>
+                  <div>
+                    <span>缩量比</span>
+                    <strong>{formatStrategyNumber(pick.thirtyMinuteShrinkRatio, 2)}</strong>
+                  </div>
+                  <div>
+                    <span>5日最高</span>
+                    <strong><ReviewReturn value={replayValue(pick, "5d", "maxRunupPct")} /></strong>
+                  </div>
+                  <div>
+                    <span>10日最高</span>
+                    <strong><ReviewReturn value={replayValue(pick, "10d", "maxRunupPct")} /></strong>
+                  </div>
+                </div>
+
+                <div className="candidate-reasons">
+                  <strong>选中原因</strong>
+                  {reasons.length ? (
+                    <ul>
+                      {reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span className="muted">暂无结构化原因</span>
+                  )}
+                </div>
+
+                {risk && (
+                  <div className="candidate-risk-note">
+                    <AlertTriangle size={15} />
+                    <span>{risk}</span>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="empty">这个交易日没有候选标的</div>
+      )}
+    </section>
+  );
+}
+
 function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAestheticPick | StrategyStrongWatchPick }) {
-  const isAesthetic = isAestheticPick(pick);
-  const isStrong = isStrongWatchPick(pick);
+  const reasons = strategyPickReasons(pick);
   return (
     <article className="mobile-review-card strategy-mobile-card">
       <div className="mobile-card-head">
@@ -1760,8 +1958,8 @@ function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAes
           <p>{pick.instrument}</p>
         </div>
         <div className="mobile-card-badges">
-          <span className={`action-chip action-${pick.actionState}`}>{isStrong ? `强观察${pick.strongWatchTier}` : isAesthetic ? pick.bucketLabel : pick.signalLayer}</span>
-          <strong>{(isStrong ? pick.strongWatchScore : isAesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong>
+          <span className={`action-chip action-${pick.actionState}`}>{strategyPickTypeLabel(pick)}</span>
+          <strong>{strategyPickScore(pick).toFixed(1)}</strong>
         </div>
       </div>
       <div className="mobile-review-grid">
@@ -1783,7 +1981,7 @@ function MobileStrategyCard({ pick }: { pick: StrategyBacktestPick | StrategyAes
         </div>
       </div>
       <div className="mobile-card-foot">
-        <span>{isStrong ? pick.strongWatchReason : isAesthetic ? pick.watchReason : pick.setupState}</span>
+        <span>{reasons[0] ?? pick.setupState}</span>
         <span>{formatPct(pick.flowRatio5d)}</span>
       </div>
     </article>
@@ -1820,6 +2018,7 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
               <th>分位</th>
               <th>回撤</th>
               <th>30m</th>
+              <th>理由</th>
               <th>5日最高</th>
               <th>10日最高</th>
             </tr>
@@ -1828,20 +2027,22 @@ function StrategyPickTable({ title, subtitle, picks }: { title: string; subtitle
             {picks.map((pick) => {
               const aesthetic = isAestheticPick(pick);
               const strong = isStrongWatchPick(pick);
+              const reasons = strategyPickReasons(pick);
               return (
                 <tr key={`${pick.tradeDate}-${pick.instrument}-${strong ? "strong" : aesthetic ? pick.bucket : "main"}`}>
                   <td>{pick.rank}</td>
                   <td className="code">{pick.instrument}</td>
                   <td>{pick.name}</td>
-                  <td>{strong ? `强观察${pick.strongWatchTier}` : aesthetic ? pick.bucketLabel : pick.signalLayer === "main" ? "主策略" : "观察"}</td>
+                  <td>{strategyPickTypeLabel(pick)}</td>
                   <td>{pick.price.toFixed(2)}</td>
-                  <td><strong>{(strong ? pick.strongWatchScore : aesthetic ? pick.bucketScore : pick.strategyScore).toFixed(1)}</strong></td>
-                  <td><span className={`action-chip action-${pick.actionState}`}>{pick.actionState}</span></td>
+                  <td><strong>{strategyPickScore(pick).toFixed(1)}</strong></td>
+                  <td><span className={`action-chip action-${pick.actionState}`}>{strategyActionLabel(pick)}</span></td>
                   <td><span className={`setup-state ${setupStateClass(pick.setupState)}`}>{pick.setupState}</span></td>
                   <td><ReviewReturn value={pick.flowRatio5d} /></td>
                   <td>{pick.valuePosition.toFixed(1)}%</td>
                   <td>{pick.pullbackFromHigh.toFixed(1)}%</td>
                   <td>{pick.thirtyMinutePullbackScore ?? "-"} / {pick.thirtyMinuteShrinkRatio ?? "-"}</td>
+                  <td className="strategy-reason-cell">{reasons[0] ?? "-"}</td>
                   <td><ReviewReturn value={replayValue(pick, "5d", "maxRunupPct")} /></td>
                   <td><ReviewReturn value={replayValue(pick, "10d", "maxRunupPct")} /></td>
                 </tr>
@@ -2074,7 +2275,15 @@ function StrategyAttributionPanel({ report }: { report: StrategyBacktestReport }
   );
 }
 
-function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
+function StrategyArchiveTable({
+  archive,
+  selectedPath,
+  onSelect
+}: {
+  archive?: StrategyArchiveIndex;
+  selectedPath?: string;
+  onSelect: (item: StrategyArchiveItem) => void;
+}) {
   const items = archive?.items.slice(0, 12) ?? [];
   if (!items.length) return null;
 
@@ -2103,8 +2312,13 @@ function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
           </thead>
           <tbody>
             {items.map((item) => (
-              <tr key={item.tradeDate}>
-                <td>{item.tradeDate}</td>
+              <tr key={item.tradeDate} className={selectedPath === item.path ? "is-selected-row" : undefined}>
+                <td>
+                  <button className="archive-date-button" type="button" onClick={() => onSelect(item)} title={`查看 ${item.tradeDate} 策略归档`}>
+                    <History size={15} />
+                    <span>{item.tradeDate}</span>
+                  </button>
+                </td>
                 <td>{item.mainSignals}</td>
                 <td>{item.strongWatchSignals ?? 0}</td>
                 <td>{item.aestheticSignals}</td>
@@ -2122,7 +2336,111 @@ function StrategyArchiveTable({ archive }: { archive?: StrategyArchiveIndex }) {
   );
 }
 
+function StrategyArchiveDetail({
+  item,
+  report,
+  loading,
+  error
+}: {
+  item?: StrategyArchiveItem;
+  report?: StrategyBacktestReport;
+  loading: boolean;
+  error?: string;
+}) {
+  if (!item) return null;
+
+  if (loading) {
+    return (
+      <section className="list-panel strategy-wide-panel archive-detail-panel">
+        <div className="empty">正在读取 {item.tradeDate} 的策略归档...</div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="list-panel strategy-wide-panel archive-detail-panel">
+        <div className="empty">归档读取失败：{error}</div>
+      </section>
+    );
+  }
+
+  if (!report) return null;
+
+  const date = strategyDate(report);
+  const main = strategyPicksForDate(report.picks, date);
+  const strong = strategyPicksForDate(report.strongWatch?.picks ?? [], date);
+  const aesthetic = strategyPicksForDate(report.aestheticWatch?.picks ?? [], date);
+  const benchmark = report.benchmark ?? report;
+  const tenDay = benchmark.cooldownSummary["10d"] ?? benchmark.summary["10d"];
+  const strongTen = benchmark.strongWatch?.cooldownSummary["10d"] ?? benchmark.strongWatch?.summary["10d"];
+  const aestheticTen = benchmark.aestheticWatch?.cooldownSummary["10d"] ?? benchmark.aestheticWatch?.summary["10d"];
+
+  return (
+    <section className="strategy-archive-detail">
+      <div className="summary-grid review-summary">
+        <Metric icon={CalendarClock} label="归档交易日" value={date} tone="blue" />
+        <Metric icon={ListChecks} label="主策略" value={main.length} tone="green" />
+        <Metric icon={BadgeCheck} label="强观察" value={strong.length} tone="green" />
+        <Metric icon={Layers} label="审美池" value={aesthetic.length} tone="amber" />
+        <Metric icon={Target} label="主策略10日" value={formatRate(tenDay?.winRate)} tone="green" />
+        <Metric icon={Activity} label="强观察10日" value={formatRate(strongTen?.winRate)} tone="green" />
+        <Metric icon={Percent} label="审美池10日" value={formatRate(aestheticTen?.winRate)} tone="blue" />
+      </div>
+      <StrategyCandidateBoard
+        title="归档候选池"
+        subtitle="点击归档日期后按当日信号重建，包含 5/10 日后验表现"
+        date={date}
+        main={main}
+        strong={strong}
+        aesthetic={aesthetic}
+      />
+    </section>
+  );
+}
+
 function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; archive?: StrategyArchiveIndex }) {
+  const [selectedArchivePath, setSelectedArchivePath] = useState<string | undefined>();
+  const [archiveDetail, setArchiveDetail] = useState<StrategyBacktestReport | undefined>();
+  const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
+  const [archiveDetailError, setArchiveDetailError] = useState<string | undefined>();
+  const selectedArchiveItem = useMemo(() => {
+    if (!archive?.items.length) return undefined;
+    return archive.items.find((item) => item.path === selectedArchivePath) ?? archive.items[0];
+  }, [archive, selectedArchivePath]);
+
+  useEffect(() => {
+    let canceled = false;
+    if (!selectedArchiveItem?.path) {
+      setArchiveDetail(undefined);
+      setArchiveDetailError(undefined);
+      setArchiveDetailLoading(false);
+      return () => {
+        canceled = true;
+      };
+    }
+
+    setArchiveDetailLoading(true);
+    setArchiveDetailError(undefined);
+    loadStrategyArchiveReport(selectedArchiveItem.path)
+      .then((nextReport) => {
+        if (!canceled) setArchiveDetail(nextReport);
+      })
+      .catch((error) => {
+        if (!canceled) {
+          setArchiveDetail(undefined);
+          setArchiveDetailError(error instanceof Error ? error.message : String(error));
+        }
+      })
+      .finally(() => {
+        if (!canceled) setArchiveDetailLoading(false);
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [selectedArchiveItem?.path]);
+
   if (!report) {
     return (
       <section className="review-panel">
@@ -2162,6 +2480,15 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
         <span>目标 {benchmark.meta.targetPct}% / {benchmark.meta.strongTargetPct}% / {benchmark.meta.stretchTargetPct}% · 冷却 {benchmark.meta.cooldownDays} 日</span>
       </div>
 
+      <StrategyCandidateBoard
+        title="当日核心候选池"
+        subtitle="主策略优先，其次强观察，再补充审美观察；同一股票只展示最高优先级"
+        date={date}
+        main={latestMain}
+        strong={latestStrongWatch}
+        aesthetic={latestAesthetic}
+      />
+
       <div className="strategy-grid">
         <StrategyStatsTable
           title={hasBenchmark ? "主策略历史冷却统计" : "主策略冷却统计"}
@@ -2198,7 +2525,13 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
       </div>
 
       <StrategyStatsTable title={hasBenchmark ? "主策略历史原始统计" : "主策略原始统计"} rows={benchmark.summary} />
-      <StrategyArchiveTable archive={archive} />
+      <StrategyArchiveTable archive={archive} selectedPath={selectedArchiveItem?.path} onSelect={(item) => setSelectedArchivePath(item.path)} />
+      <StrategyArchiveDetail
+        item={selectedArchiveItem}
+        report={archiveDetail}
+        loading={archiveDetailLoading}
+        error={archiveDetailError}
+      />
     </section>
   );
 }
