@@ -1719,6 +1719,107 @@ a {
   overflow-wrap: anywhere;
 }
 
+.replay-review-panel {
+  display: grid;
+  gap: 0;
+}
+
+.replay-summary-grid,
+.replay-pool-grid,
+.replay-board-grid {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.replay-summary-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border-bottom: 1px solid #e2e9e5;
+}
+
+.replay-summary-grid div,
+.replay-pool-card {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+}
+
+.replay-summary-grid span,
+.replay-pool-card span,
+.replay-board-head span {
+  display: block;
+  color: #657168;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.replay-summary-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.replay-pool-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid #e2e9e5;
+}
+
+.replay-pool-card {
+  display: grid;
+  gap: 12px;
+}
+
+.replay-pool-card > div:first-child strong {
+  display: block;
+  font-size: 17px;
+}
+
+.replay-pool-card > div:first-child span {
+  margin-top: 4px;
+}
+
+.replay-board-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.replay-board-table {
+  min-width: 0;
+  border: 1px solid #e5ebe7;
+  border-radius: 8px;
+  background: #fbfcfa;
+  overflow: hidden;
+}
+
+.replay-board-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px;
+  border-bottom: 1px solid #e5ebe7;
+}
+
+.replay-board-head h3 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.replay-table-wrap {
+  max-height: 320px;
+}
+
+.replay-factor-table {
+  margin: 0 14px 14px;
+}
+
+.replay-empty {
+  padding: 24px;
+}
+
 .mobile-strategy-list {
   display: none;
   grid-template-columns: minmax(0, 1fr);
@@ -2855,6 +2956,17 @@ a {
   .tracking-grid {
     grid-template-columns: 1fr;
     padding: 10px;
+  }
+
+  .replay-summary-grid,
+  .replay-pool-grid,
+  .replay-board-grid {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .replay-factor-table {
+    margin: 0 10px 10px;
   }
 
   .tracking-kpis {

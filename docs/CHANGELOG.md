@@ -4,6 +4,49 @@ This file is the shared multi-agent update log. Every development milestone shou
 
 ## 2026-05-26
 
+### Strategy Replay Review Dashboard
+
+- `strategy:refresh-replay` now writes `reports/backtests/replay-review.json`.
+- The replay review report aggregates strategy archive candidates into:
+  - `+5%` / `+8%` / `+10%` hit leaderboards
+  - drawdown risk leaderboard
+  - still-tracking list
+  - near-target list
+  - pool-level performance for main, strong watch, and aesthetic watch
+  - factor buckets for `30m缩量比`, `回撤`, and `5日资金`
+- The strategy experiment tab now shows a “策略复盘榜单” panel using `replay-review.json`.
+- The panel stays useful before 5/10d completion by surfacing the tracking list, then fills hit/risk/factor boards as replay windows complete.
+- Mobile layout was verified with no horizontal overflow.
+
+Changed files:
+
+- `scripts/run-strategy-replay-refresh.ts`
+- `src/App.tsx`
+- `src/styles.css`
+- `README.md`
+- `docs/HANDOFF.md`
+- `docs/CHANGELOG.md`
+
+Validation:
+
+- `npm run build`
+- `npm run strategy:refresh-replay`
+- Browser check on `http://localhost:5174/` strategy tab:
+  - rendered “策略复盘榜单”
+  - rendered `+5% 命中榜`, `回撤风险榜`, `仍在追踪`, and `最近有效特征`
+  - mobile viewport `390x844` had no horizontal overflow
+
+Deployment:
+
+- Deployed source to `/opt/a-share-money-radar`.
+- Built on server with `/opt/node-v24`.
+- Ran `npm run strategy:refresh-replay` on production:
+  - refreshed `2026-05-22` and `2026-05-25`
+  - emitted `replay-review.json` with 2 history dates and 28 tracking candidates
+- Refreshed `system-health.json`.
+- Synced `dist/` to `http://112.126.57.131/` with `reports` excluded.
+- Verified production UI renders “策略复盘榜单”, `+5% 命中榜`, `回撤风险榜`, `仍在追踪`, and `最近有效特征` with no console errors.
+
 ### Strategy Replay Tracking Automation
 
 - Added `strategy:refresh-replay` to refresh archived strategy replay results from local daily K-line cache.

@@ -356,6 +356,74 @@ type StrategyReplayTracking = {
   aestheticWatch?: StrategyReplayTrackingHorizon;
 };
 
+type StrategyReplayReviewEntry = {
+  tradeDate: string;
+  pool: "main" | "strongWatch" | "aestheticWatch";
+  poolLabel: string;
+  rank: number;
+  instrument: string;
+  name: string;
+  price: number;
+  score?: number;
+  actionState?: StockActionState;
+  setupState?: StockPick["setupState"];
+  bucketLabel?: string;
+  flowRatio5d?: number;
+  valuePosition?: number;
+  pullbackFromHigh?: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
+  replay5d?: StrategyReplay;
+  replay10d?: StrategyReplay;
+  status: StrategyArchiveItem["replayStatus"];
+};
+
+type StrategyReplayReviewGroup = {
+  pool: string;
+  label: string;
+  samples: number;
+  completed5d: number;
+  completed10d: number;
+  hit5: number;
+  hit8: number;
+  hit10: number;
+  drawdownRisk: number;
+  tracking: number;
+  hit5Rate?: number;
+  hit8Rate?: number;
+  hit10Rate?: number;
+  drawdownRiskRate?: number;
+  avgMaxRunupPct?: number;
+  avgCloseReturnPct?: number;
+  avgMaxDrawdownPct?: number;
+};
+
+type StrategyReplayFactorRow = StrategyReplayReviewGroup & {
+  factor: string;
+  bucket: string;
+};
+
+type StrategyReplayReviewReport = {
+  meta: {
+    generatedAt: string;
+    source: "strategy-archive";
+    historyDates: number;
+    latestTradeDate?: string;
+    notes: string[];
+  };
+  summary: StrategyReplayReviewGroup;
+  byPool: StrategyReplayReviewGroup[];
+  leaderboards: {
+    hit5: StrategyReplayReviewEntry[];
+    hit8: StrategyReplayReviewEntry[];
+    hit10: StrategyReplayReviewEntry[];
+    drawdownRisk: StrategyReplayReviewEntry[];
+    tracking: StrategyReplayReviewEntry[];
+    nearTarget: StrategyReplayReviewEntry[];
+  };
+  factors: StrategyReplayFactorRow[];
+};
+
 type StrategyAttributionRow = {
   source: string;
   factor: string;
@@ -567,6 +635,13 @@ async function loadStrategyArchive() {
   const response = await fetch(`${base}reports/backtests/history/index.json?t=${Date.now()}`);
   if (!response.ok) return undefined;
   return (await response.json()) as StrategyArchiveIndex;
+}
+
+async function loadStrategyReplayReview() {
+  const base = import.meta.env.BASE_URL || "/";
+  const response = await fetch(`${base}reports/backtests/replay-review.json?t=${Date.now()}`);
+  if (!response.ok) return undefined;
+  return (await response.json()) as StrategyReplayReviewReport;
 }
 
 async function loadStrategyArchiveReport(path: string) {
@@ -2463,6 +2538,185 @@ function StrategyTrackingPanel({ archive }: { archive?: StrategyArchiveIndex }) 
   );
 }
 
+function StrategyReplayEntryTable({ title, rows }: { title: string; rows: StrategyReplayReviewEntry[] }) {
+  return (
+    <section className="replay-board-table">
+      <div className="replay-board-head">
+        <h3>{title}</h3>
+        <span>{rows.length} 条</span>
+      </div>
+      {rows.length ? (
+        <div className="table-wrap strategy-table replay-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>池子</th>
+                <th>代码</th>
+                <th>名称</th>
+                <th>价格</th>
+                <th>10日最高</th>
+                <th>10日收盘</th>
+                <th>最大回撤</th>
+                <th>30m</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((entry) => (
+                <tr key={`${title}-${entry.tradeDate}-${entry.pool}-${entry.instrument}`}>
+                  <td>{entry.tradeDate}</td>
+                  <td>{entry.poolLabel}</td>
+                  <td className="code">{entry.instrument}</td>
+                  <td>{entry.name}</td>
+                  <td>{entry.price.toFixed(2)}</td>
+                  <td><ReviewReturn value={entry.replay10d?.maxRunupPct ?? entry.replay5d?.maxRunupPct} /></td>
+                  <td><ReviewReturn value={entry.replay10d?.closeReturnPct ?? entry.replay5d?.closeReturnPct} /></td>
+                  <td><ReviewReturn value={entry.replay10d?.maxDrawdownPct ?? entry.replay5d?.maxDrawdownPct} /></td>
+                  <td>{entry.thirtyMinutePullbackScore ?? "-"} / {entry.thirtyMinuteShrinkRatio ?? "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="empty replay-empty">暂无完成样本</div>
+      )}
+    </section>
+  );
+}
+
+function StrategyReplayReviewPanel({ review }: { review?: StrategyReplayReviewReport }) {
+  if (!review) return null;
+  const boards = [
+    { title: "+5% 命中榜", rows: review.leaderboards.hit5 },
+    { title: "+8% 命中榜", rows: review.leaderboards.hit8 },
+    { title: "+10% 命中榜", rows: review.leaderboards.hit10 },
+    { title: "回撤风险榜", rows: review.leaderboards.drawdownRisk },
+    { title: "接近目标", rows: review.leaderboards.nearTarget },
+    { title: "仍在追踪", rows: review.leaderboards.tracking }
+  ];
+  const factorRows = review.factors.filter((row) => row.completed10d > 0).slice(0, 12);
+
+  return (
+    <section className="list-panel strategy-wide-panel replay-review-panel">
+      <div className="panel-toolbar">
+        <div>
+          <h2>策略复盘榜单</h2>
+          <span>基于归档后验，拆分命中、风险、追踪中和因子表现</span>
+        </div>
+        <div className="strategy-count-pill">
+          <TrendingUp size={16} />
+          <strong>{review.summary.samples}</strong>
+          <span>{review.meta.historyDates} 日</span>
+        </div>
+      </div>
+
+      <div className="replay-summary-grid">
+        <div>
+          <span>追踪中</span>
+          <strong>{review.summary.tracking}</strong>
+        </div>
+        <div>
+          <span>10日完成</span>
+          <strong>{review.summary.completed10d}/{review.summary.samples}</strong>
+        </div>
+        <div>
+          <span>+5%命中</span>
+          <strong>{formatRate(review.summary.hit5Rate)}</strong>
+        </div>
+        <div>
+          <span>+8%命中</span>
+          <strong>{formatRate(review.summary.hit8Rate)}</strong>
+        </div>
+        <div>
+          <span>+10%命中</span>
+          <strong>{formatRate(review.summary.hit10Rate)}</strong>
+        </div>
+        <div>
+          <span>回撤超5%</span>
+          <strong>{formatRate(review.summary.drawdownRiskRate)}</strong>
+        </div>
+      </div>
+
+      <div className="replay-pool-grid">
+        {review.byPool.map((pool) => (
+          <article key={pool.pool} className="replay-pool-card">
+            <div>
+              <strong>{pool.label}</strong>
+              <span>{pool.completed10d}/{pool.samples} 完成 · 追踪 {pool.tracking}</span>
+            </div>
+            <div className="tracking-kpis">
+              <div>
+                <span>+5%</span>
+                <strong>{formatRate(pool.hit5Rate)}</strong>
+              </div>
+              <div>
+                <span>+8%</span>
+                <strong>{formatRate(pool.hit8Rate)}</strong>
+              </div>
+              <div>
+                <span>+10%</span>
+                <strong>{formatRate(pool.hit10Rate)}</strong>
+              </div>
+              <div>
+                <span>平均最高</span>
+                <strong>{formatPct(pool.avgMaxRunupPct)}</strong>
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="replay-board-grid">
+        {boards.map((board) => (
+          <StrategyReplayEntryTable key={board.title} title={board.title} rows={board.rows} />
+        ))}
+      </div>
+
+      <section className="replay-board-table replay-factor-table">
+        <div className="replay-board-head">
+          <h3>最近有效特征</h3>
+          <span>10日完成样本</span>
+        </div>
+        {factorRows.length ? (
+          <div className="table-wrap strategy-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>因子</th>
+                  <th>区间</th>
+                  <th>样本</th>
+                  <th>+5%</th>
+                  <th>+8%</th>
+                  <th>+10%</th>
+                  <th>平均最高</th>
+                  <th>平均回撤</th>
+                </tr>
+              </thead>
+              <tbody>
+                {factorRows.map((row) => (
+                  <tr key={`${row.factor}-${row.bucket}`}>
+                    <td>{row.factor}</td>
+                    <td>{row.bucket}</td>
+                    <td>{row.completed10d}/{row.samples}</td>
+                    <td>{formatRate(row.hit5Rate)}</td>
+                    <td>{formatRate(row.hit8Rate)}</td>
+                    <td>{formatRate(row.hit10Rate)}</td>
+                    <td><ReviewReturn value={row.avgMaxRunupPct} /></td>
+                    <td><ReviewReturn value={row.avgMaxDrawdownPct} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty replay-empty">等待 10 日窗口完成后自动生成因子表现</div>
+        )}
+      </section>
+    </section>
+  );
+}
+
 function StrategyArchiveDetail({
   item,
   report,
@@ -2526,7 +2780,7 @@ function StrategyArchiveDetail({
   );
 }
 
-function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; archive?: StrategyArchiveIndex }) {
+function StrategyPanel({ report, archive, replayReview }: { report?: StrategyBacktestReport; archive?: StrategyArchiveIndex; replayReview?: StrategyReplayReviewReport }) {
   const [selectedArchivePath, setSelectedArchivePath] = useState<string | undefined>();
   const [archiveDetail, setArchiveDetail] = useState<StrategyBacktestReport | undefined>();
   const [archiveDetailLoading, setArchiveDetailLoading] = useState(false);
@@ -2617,6 +2871,8 @@ function StrategyPanel({ report, archive }: { report?: StrategyBacktestReport; a
       />
 
       <StrategyTrackingPanel archive={archive} />
+
+      <StrategyReplayReviewPanel review={replayReview} />
 
       <div className="strategy-grid">
         <StrategyStatsTable
@@ -3012,6 +3268,7 @@ export default function App() {
   const [review, setReview] = useState<ReviewReport | null>(null);
   const [strategy, setStrategy] = useState<StrategyBacktestReport | undefined>();
   const [strategyArchive, setStrategyArchive] = useState<StrategyArchiveIndex | undefined>();
+  const [strategyReplayReview, setStrategyReplayReview] = useState<StrategyReplayReviewReport | undefined>();
   const [health, setHealth] = useState<SystemHealthReport | undefined>();
   const [stockIndex, setStockIndex] = useState<StockDetailIndex | undefined>();
   const [stockDetail, setStockDetail] = useState<StockDetailReport | undefined>();
@@ -3042,16 +3299,18 @@ export default function App() {
       loadReview(),
       loadStrategyBacktest().catch(() => undefined),
       loadStrategyArchive().catch(() => undefined),
+      loadStrategyReplayReview().catch(() => undefined),
       loadSystemHealth().catch(() => undefined),
       loadStockIndex().catch(() => undefined)
     ])
-      .then(([liveReport, livePlan, liveReview, liveStrategy, liveStrategyArchive, liveHealth, liveStockIndex]) => {
+      .then(([liveReport, livePlan, liveReview, liveStrategy, liveStrategyArchive, liveStrategyReplayReview, liveHealth, liveStockIndex]) => {
         if (cancelled) return;
         setReport(liveReport);
         setPlan(livePlan);
         setReview(liveReview);
         setStrategy(liveStrategy);
         setStrategyArchive(liveStrategyArchive);
+        setStrategyReplayReview(liveStrategyReplayReview);
         setHealth(liveHealth);
         setStockIndex(liveStockIndex);
         setStatus(liveReport.meta.mode === "live" ? "live" : "sample");
@@ -3265,7 +3524,7 @@ export default function App() {
       ) : view === "plan" ? (
         <PlanPanel plan={plan} reviewRecords={review.records} />
       ) : view === "strategy" ? (
-        <StrategyPanel report={strategy} archive={strategyArchive} />
+        <StrategyPanel report={strategy} archive={strategyArchive} replayReview={strategyReplayReview} />
       ) : (
         <ReviewPanel review={review} />
       )}

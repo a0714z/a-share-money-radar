@@ -53,6 +53,17 @@ type StrategyPick = {
   instrument: string;
   name: string;
   price: number;
+  score?: number;
+  strategyScore?: number;
+  bucketScore?: number;
+  strongWatchScore?: number;
+  bucketLabel?: string;
+  strongWatchTier?: "A" | "B";
+  flowRatio5d?: number;
+  valuePosition?: number;
+  pullbackFromHigh?: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
   actionState?: StockActionState;
   state?: StockActionState;
   setupState?: SetupState;
@@ -162,6 +173,74 @@ type StrategyArchiveIndex = {
   generatedAt: string;
   latestTradeDate?: string;
   items: StrategyArchiveIndexItem[];
+};
+
+type ReplayReviewEntry = {
+  tradeDate: string;
+  pool: "main" | "strongWatch" | "aestheticWatch";
+  poolLabel: string;
+  rank: number;
+  instrument: string;
+  name: string;
+  price: number;
+  score?: number;
+  actionState?: StockActionState;
+  setupState?: SetupState;
+  bucketLabel?: string;
+  flowRatio5d?: number;
+  valuePosition?: number;
+  pullbackFromHigh?: number;
+  thirtyMinutePullbackScore?: number;
+  thirtyMinuteShrinkRatio?: number;
+  replay5d?: ReplayResult;
+  replay10d?: ReplayResult;
+  status: ArchiveReplayStatus;
+};
+
+type ReplayReviewGroup = {
+  pool: string;
+  label: string;
+  samples: number;
+  completed5d: number;
+  completed10d: number;
+  hit5: number;
+  hit8: number;
+  hit10: number;
+  drawdownRisk: number;
+  tracking: number;
+  hit5Rate?: number;
+  hit8Rate?: number;
+  hit10Rate?: number;
+  drawdownRiskRate?: number;
+  avgMaxRunupPct?: number;
+  avgCloseReturnPct?: number;
+  avgMaxDrawdownPct?: number;
+};
+
+type ReplayFactorRow = ReplayReviewGroup & {
+  factor: string;
+  bucket: string;
+};
+
+type ReplayReviewReport = {
+  meta: {
+    generatedAt: string;
+    source: "strategy-archive";
+    historyDates: number;
+    latestTradeDate?: string;
+    notes: string[];
+  };
+  summary: ReplayReviewGroup;
+  byPool: ReplayReviewGroup[];
+  leaderboards: {
+    hit5: ReplayReviewEntry[];
+    hit8: ReplayReviewEntry[];
+    hit10: ReplayReviewEntry[];
+    drawdownRisk: ReplayReviewEntry[];
+    tracking: ReplayReviewEntry[];
+    nearTarget: ReplayReviewEntry[];
+  };
+  factors: ReplayFactorRow[];
 };
 
 function argValue(name: string) {
@@ -470,6 +549,190 @@ function updateIndexItem(item: StrategyArchiveIndexItem, report: StrategyReport)
   };
 }
 
+function pickScore(pick: StrategyPick) {
+  return pick.strongWatchScore ?? pick.bucketScore ?? pick.strategyScore ?? pick.score;
+}
+
+function poolLabel(pool: ReplayReviewEntry["pool"]) {
+  if (pool === "main") return "主策略";
+  if (pool === "strongWatch") return "强观察";
+  return "审美观察";
+}
+
+function reviewStatus(pick: StrategyPick): ArchiveReplayStatus {
+  if (pick.replay?.["10d"]?.status === "complete") return "10d-complete";
+  if (pick.replay?.["5d"]?.status === "complete") return "5d-complete";
+  return "pending";
+}
+
+function toReviewEntry(pick: StrategyPick, pool: ReplayReviewEntry["pool"]): ReplayReviewEntry {
+  return {
+    tradeDate: pick.tradeDate,
+    pool,
+    poolLabel: poolLabel(pool),
+    rank: pick.rank,
+    instrument: pick.instrument,
+    name: pick.name,
+    price: pick.price,
+    score: pickScore(pick),
+    actionState: pick.actionState ?? pick.state,
+    setupState: pick.setupState ?? pick.setup,
+    bucketLabel: pick.bucketLabel,
+    flowRatio5d: pick.flowRatio5d,
+    valuePosition: pick.valuePosition,
+    pullbackFromHigh: pick.pullbackFromHigh,
+    thirtyMinutePullbackScore: pick.thirtyMinutePullbackScore,
+    thirtyMinuteShrinkRatio: pick.thirtyMinuteShrinkRatio,
+    replay5d: pick.replay?.["5d"],
+    replay10d: pick.replay?.["10d"],
+    status: reviewStatus(pick)
+  };
+}
+
+function uniqueReviewEntries(report: StrategyReport) {
+  const entries = [
+    ...(report.picks ?? []).map((pick) => toReviewEntry(pick, "main" as const)),
+    ...(report.strongWatch?.picks ?? []).map((pick) => toReviewEntry(pick, "strongWatch" as const)),
+    ...(report.aestheticWatch?.picks ?? []).map((pick) => toReviewEntry(pick, "aestheticWatch" as const))
+  ];
+  const priority: Record<ReplayReviewEntry["pool"], number> = { main: 0, strongWatch: 1, aestheticWatch: 2 };
+  const seen = new Set<string>();
+  return entries
+    .sort((a, b) => priority[a.pool] - priority[b.pool] || a.rank - b.rank)
+    .filter((entry) => {
+      const key = `${entry.tradeDate}-${entry.instrument}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function percent(count: number, total: number) {
+  return total > 0 ? round((count / total) * 100, 1) : undefined;
+}
+
+function avgDefined(values: Array<number | undefined>) {
+  const finite = values.filter((value): value is number => Number.isFinite(value));
+  return finite.length ? round(average(finite), 2) : undefined;
+}
+
+function reviewGroup(pool: string, label: string, entries: ReplayReviewEntry[]): ReplayReviewGroup {
+  const replay10 = entries.map((entry) => entry.replay10d).filter((replay): replay is ReplayResult => Boolean(replay));
+  const completed10 = replay10.filter((replay) => replay.status === "complete");
+  const completed5 = entries.map((entry) => entry.replay5d).filter((replay): replay is ReplayResult => Boolean(replay && replay.status === "complete"));
+  const hit5 = completed10.filter((replay) => replay.targetHit).length;
+  const hit8 = completed10.filter((replay) => replay.strongTargetHit).length;
+  const hit10 = completed10.filter((replay) => replay.stretchTargetHit).length;
+  const drawdownRisk = completed10.filter((replay) => (replay.maxDrawdownPct ?? 0) <= -5).length;
+
+  return {
+    pool,
+    label,
+    samples: entries.length,
+    completed5d: completed5.length,
+    completed10d: completed10.length,
+    hit5,
+    hit8,
+    hit10,
+    drawdownRisk,
+    tracking: entries.filter((entry) => entry.status !== "10d-complete").length,
+    hit5Rate: percent(hit5, completed10.length),
+    hit8Rate: percent(hit8, completed10.length),
+    hit10Rate: percent(hit10, completed10.length),
+    drawdownRiskRate: percent(drawdownRisk, completed10.length),
+    avgMaxRunupPct: avgDefined(completed10.map((replay) => replay.maxRunupPct)),
+    avgCloseReturnPct: avgDefined(completed10.map((replay) => replay.closeReturnPct)),
+    avgMaxDrawdownPct: avgDefined(completed10.map((replay) => replay.maxDrawdownPct))
+  };
+}
+
+function bucketLabel(value: number | undefined, buckets: Array<{ label: string; min: number; max: number }>) {
+  if (!Number.isFinite(value)) return "缺失";
+  return buckets.find((bucket) => value! >= bucket.min && value! < bucket.max)?.label ?? "其他";
+}
+
+function factorRows(entries: ReplayReviewEntry[]): ReplayFactorRow[] {
+  const factors = [
+    {
+      factor: "30m缩量比",
+      value: (entry: ReplayReviewEntry) => entry.thirtyMinuteShrinkRatio,
+      buckets: [
+        { label: "<=0.70", min: -Infinity, max: 0.7 },
+        { label: "0.70-0.95", min: 0.7, max: 0.95 },
+        { label: "0.95-1.10", min: 0.95, max: 1.1 },
+        { label: ">1.10", min: 1.1, max: Infinity }
+      ]
+    },
+    {
+      factor: "回撤",
+      value: (entry: ReplayReviewEntry) => entry.pullbackFromHigh,
+      buckets: [
+        { label: "<8%", min: -Infinity, max: 8 },
+        { label: "8%-12%", min: 8, max: 12 },
+        { label: "12%-18%", min: 12, max: 18 },
+        { label: "18%-24%", min: 18, max: 24 },
+        { label: ">24%", min: 24, max: Infinity }
+      ]
+    },
+    {
+      factor: "5日资金",
+      value: (entry: ReplayReviewEntry) => entry.flowRatio5d,
+      buckets: [
+        { label: "<1.5%", min: -Infinity, max: 1.5 },
+        { label: "1.5%-3%", min: 1.5, max: 3 },
+        { label: "3%-6%", min: 3, max: 6 },
+        { label: "6%-12%", min: 6, max: 12 },
+        { label: ">12%", min: 12, max: Infinity }
+      ]
+    }
+  ];
+
+  return factors.flatMap((factor) => {
+    const groups = new Map<string, ReplayReviewEntry[]>();
+    for (const entry of entries) {
+      const label = bucketLabel(factor.value(entry), factor.buckets);
+      groups.set(label, [...(groups.get(label) ?? []), entry]);
+    }
+    return [...groups.entries()]
+      .map(([bucket, grouped]) => ({ ...reviewGroup("factor", bucket, grouped), factor: factor.factor, bucket }))
+      .filter((row) => row.samples > 0);
+  });
+}
+
+function buildReviewReport(reports: StrategyReport[], items: StrategyArchiveIndexItem[]): ReplayReviewReport {
+  const allEntries = reports.flatMap(uniqueReviewEntries).sort((a, b) => b.tradeDate.localeCompare(a.tradeDate) || a.rank - b.rank);
+  const completed = allEntries.filter((entry) => entry.replay10d?.status === "complete");
+  const byPool = (["main", "strongWatch", "aestheticWatch"] as const).map((pool) =>
+    reviewGroup(pool, poolLabel(pool), allEntries.filter((entry) => entry.pool === pool))
+  );
+  const top = (entries: ReplayReviewEntry[], sorter: (a: ReplayReviewEntry, b: ReplayReviewEntry) => number) => [...entries].sort(sorter).slice(0, 12);
+
+  return {
+    meta: {
+      generatedAt: new Date().toISOString(),
+      source: "strategy-archive",
+      historyDates: reports.length,
+      latestTradeDate: items[0]?.tradeDate,
+      notes: [
+        "Replay review is generated from strategy archive reports after replay refresh.",
+        "Leaderboards use one highest-priority entry per stock per trade date: main, then strong watch, then aesthetic watch.",
+        "Hit leaderboards use the 10d replay window when complete; tracking list shows pending candidates first."
+      ]
+    },
+    summary: reviewGroup("all", "全部候选", allEntries),
+    byPool,
+    leaderboards: {
+      hit5: top(completed.filter((entry) => entry.replay10d?.targetHit), (a, b) => (b.replay10d?.maxRunupPct ?? -Infinity) - (a.replay10d?.maxRunupPct ?? -Infinity)),
+      hit8: top(completed.filter((entry) => entry.replay10d?.strongTargetHit), (a, b) => (b.replay10d?.maxRunupPct ?? -Infinity) - (a.replay10d?.maxRunupPct ?? -Infinity)),
+      hit10: top(completed.filter((entry) => entry.replay10d?.stretchTargetHit), (a, b) => (b.replay10d?.maxRunupPct ?? -Infinity) - (a.replay10d?.maxRunupPct ?? -Infinity)),
+      drawdownRisk: top(completed.filter((entry) => (entry.replay10d?.maxDrawdownPct ?? 0) <= -5), (a, b) => (a.replay10d?.maxDrawdownPct ?? 0) - (b.replay10d?.maxDrawdownPct ?? 0)),
+      tracking: top(allEntries.filter((entry) => entry.status !== "10d-complete"), (a, b) => b.tradeDate.localeCompare(a.tradeDate) || (b.score ?? 0) - (a.score ?? 0)),
+      nearTarget: top(allEntries.filter((entry) => (entry.replay10d?.maxRunupPct ?? entry.replay5d?.maxRunupPct ?? 0) >= 3), (a, b) => (b.replay10d?.maxRunupPct ?? b.replay5d?.maxRunupPct ?? 0) - (a.replay10d?.maxRunupPct ?? a.replay5d?.maxRunupPct ?? 0))
+    },
+    factors: factorRows(allEntries)
+  };
+}
+
 async function run() {
   const reportsDir = resolve(root, process.env.REPORT_DIR ?? "public/reports");
   const outputDir = resolve(root, process.env.STRATEGY_BACKTEST_DIR ?? resolve(reportsDir, "backtests"));
@@ -515,6 +778,14 @@ async function run() {
     latestTradeDate: items[0]?.tradeDate,
     items
   } satisfies StrategyArchiveIndex);
+
+  const reviewReports = await Promise.all(
+    (await readdir(historyDir))
+      .filter((file) => file.endsWith(".json") && file !== "index.json" && !file.startsWith("."))
+      .sort()
+      .map((file) => readJson<StrategyReport>(resolve(historyDir, file)))
+  );
+  await writeJson(resolve(outputDir, "replay-review.json"), buildReviewReport(reviewReports, items));
   console.log(`[strategy:refresh-replay] refreshed ${updated} archive reports`);
 }
 
