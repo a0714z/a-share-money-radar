@@ -121,7 +121,7 @@ npm run daily:close
 - `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json` 供前端“策略实验”页签使用；报告外层是当日选股，`benchmark` 字段附带同策略历史基准回测，并写入 `REPORT_DIR/backtests/history` 归档索引。若交易日不在日 K 缓存，会优先保留已有同日选股并补历史基准，否则退到不晚于报告日的最近缓存交易日。
 - `strategy:refresh-replay`：只读本地日 K 缓存，回填策略归档中候选票的 5/10 日后验表现和“追踪中/已验证”状态，并生成策略复盘榜单，不调用必盈 API。
 - `stock:details`：生成异动票详情 JSON 和搜索索引。
-- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
+- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步，并检查策略归档索引、最新归档后验追踪、`replay-review.json` 和 daily:close 产物链路日期。
 - `notify:dry`：预览邮件内容，不发送。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：只读本地缓存的策略回测实验脚本。

@@ -88,6 +88,32 @@ type SystemHealthReport = {
     benchmarkTo?: string;
     benchmarkDates?: number;
   };
+  strategyDataQuality?: {
+    tone: "ok" | "warn" | "risk";
+    archiveLatestDate?: string;
+    archiveItems: number;
+    archiveSynced: boolean;
+    replayReviewGeneratedAt?: string;
+    replayReviewLatestDate?: string;
+    replayReviewHistoryDates: number;
+    replayReviewSamples: number;
+    replayTracking: number;
+    latestReplayStatus?: "pending" | "5d-complete" | "10d-complete";
+    latestReplayAvailableDays: number;
+    latestReplayRemainingDays: number;
+    latestReplayUpdatedAt?: string;
+    latestArchiveHasTracking: boolean;
+    notes: string[];
+  };
+  dailyPipeline?: {
+    tone: "ok" | "warn" | "risk";
+    latestTradeDate?: string;
+    planTradeDate?: string;
+    strategyTradeDate?: string;
+    archiveLatestDate?: string;
+    replayReviewLatestDate?: string;
+    notes: string[];
+  };
   klineCache: {
     tone: "ok" | "warn" | "risk";
     generatedAt?: string;
@@ -1604,6 +1630,28 @@ function SystemStatusPanel({
                     ? ` · 基准至 ${health.strategyBacktest.benchmarkTo}`
                     : ""}
               </small>
+            </div>
+          )}
+          {health.strategyDataQuality && (
+            <div className={`system-health-card health-${health.strategyDataQuality.tone}`}>
+              <span>策略数据</span>
+              <strong>
+                {health.strategyDataQuality.replayTracking.toLocaleString("zh-CN")} 追踪 · {health.strategyDataQuality.archiveItems} 归档
+              </strong>
+              <small>
+                {health.strategyDataQuality.archiveLatestDate ?? "无归档"}
+                {health.strategyDataQuality.latestReplayStatus ? ` · ${strategyReplayStatusLabel(health.strategyDataQuality.latestReplayStatus)}` : ""}
+                {Number.isFinite(health.strategyDataQuality.latestReplayRemainingDays)
+                  ? ` · 还差 ${health.strategyDataQuality.latestReplayRemainingDays} 日`
+                  : ""}
+              </small>
+            </div>
+          )}
+          {health.dailyPipeline && (
+            <div className={`system-health-card health-${health.dailyPipeline.tone}`}>
+              <span>生产链路</span>
+              <strong>{health.dailyPipeline.latestTradeDate ?? "latest 缺失"}</strong>
+              <small>{health.dailyPipeline.notes[0] ?? "daily:close 产物日期已同步"}</small>
             </div>
           )}
           <div className={`system-health-card health-${health.status}`}>

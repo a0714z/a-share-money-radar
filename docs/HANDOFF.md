@@ -23,7 +23,7 @@
 
 不要把 root 密码、必盈 license、SMTP 授权码写入仓库或文档。服务器密钥在 `/etc/a-share-money-radar.env`。
 
-当前注意：生产 `latest.json` 和策略实验报告都已到 `2026-05-25`，`system-health.json` 为 `ok`。2026-05-25 当日策略结果是主策略 `0` 只、强观察 `1` 只（`002048.SZ 宁波华翔`）、审美池 `7` 只。服务器已按串行请求补足个股日 K 到最多 180 根，少数新股/短历史文件仍不足 120 根是正常现象。策略归档后验追踪和复盘榜单已启用：`2026-05-22` 归档已有 1 个后续交易日，距离 10 日验证还差 9 个交易日；`2026-05-25` 归档还差 10 个交易日；`replay-review.json` 当前汇总 2 个归档日、28 个候选，全部仍在追踪中。
+当前注意：生产 `latest.json` 和策略实验报告都已到 `2026-05-25`，`system-health.json` 为 `ok`。2026-05-25 当日策略结果是主策略 `0` 只、强观察 `1` 只（`002048.SZ 宁波华翔`）、审美池 `7` 只。服务器已按串行请求补足个股日 K 到最多 180 根，少数新股/短历史文件仍不足 120 根是正常现象。策略归档后验追踪和复盘榜单已启用：`2026-05-22` 归档已有 1 个后续交易日，距离 10 日验证还差 9 个交易日；`2026-05-25` 归档还差 10 个交易日；`replay-review.json` 当前汇总 2 个归档日、28 个候选，全部仍在追踪中。`system-health.json` 已新增策略数据质量和生产链路自检：会检查策略归档索引、最新归档 `replayTracking`、`replay-review.json`、策略日期与 latest 交易日是否同步，并在网页“系统状态”展示“策略数据/生产链路”卡片。
 
 ## 服务器事实
 
@@ -101,7 +101,7 @@ npm run daily:close
 - `strategy:latest`：读取 `REPORT_DIR/latest.json` 的交易日，生成 `REPORT_DIR/backtests/latest.json`，供前端“策略实验”页签使用；报告外层是当日选股，`benchmark` 字段附带同策略历史基准回测，并写入 `REPORT_DIR/backtests/history` 归档索引。如果该交易日不在本地日 K 缓存，会优先保留已有同日选股并补历史基准，否则退到不晚于报告日的最近缓存交易日并打印 warning。
 - `strategy:refresh-replay`：只读本地日 K 缓存，回填 `reports/backtests/history/YYYY-MM-DD.json` 内候选票的 5/10 日后验表现，更新归档索引里的“追踪中/5日已验证/10日已验证”状态，并生成 `reports/backtests/replay-review.json` 策略复盘榜单；不调用必盈 API。
 - `stock:details`：生成 `reports/stocks/index.json` 和 `reports/stocks/{instrument}.json`，覆盖候选池、预案池、近期复盘出现过的异动票。
-- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步。
+- `health`：生成 `system-health.json`，包含策略实验报告是否与 latest 交易日同步，并检查策略归档索引、最新归档后验追踪、`replay-review.json` 和 daily:close 产物链路日期。
 - `notify`：发送邮件，只读本地 JSON。
 - `backtest:strategy`：策略回测实验脚本，只读本地 K 线和资金流缓存，不调用必盈 API。
 - `cache:plan`：缓存覆盖/补数计划器，只扫描本地缓存和报告，不调用必盈 API。
@@ -139,6 +139,7 @@ flowchart TD
   H --> K["notify 邮件"]
   I --> J
   G --> L["health 系统健康"]
+  L --> M["策略数据质量 / 生产链路状态"]
 ```
 
 ## API 风控边界

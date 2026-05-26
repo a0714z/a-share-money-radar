@@ -4,6 +4,47 @@ This file is the shared multi-agent update log. Every development milestone shou
 
 ## 2026-05-26
 
+### Strategy Data Quality Health
+
+- `system-health.json` now checks strategy archive quality in addition to the latest strategy report:
+  - `backtests/history/index.json` exists and points at the latest strategy date
+  - latest archive has `meta.replayTracking`
+  - `replay-review.json` exists and is synced to the archive latest date
+  - strong-watch plus aesthetic-watch counts are not unexpectedly zero
+  - daily production outputs expose date mismatches across latest, plan, strategy, archive, and replay review
+- The homepage “系统状态” block now shows dedicated “策略数据” and “生产链路” cards, so daily chain failures are visible on the website.
+- The health script still only reads local JSON/cache files and does not call 必盈 API.
+
+Changed files:
+
+- `scripts/run-system-health.ts`
+- `src/App.tsx`
+- `src/styles.css`
+- `README.md`
+- `docs/HANDOFF.md`
+- `docs/CHANGELOG.md`
+
+Validation:
+
+- `npm run health`
+- `npm run build`
+- Browser check on `http://localhost:5174/`:
+  - rendered “策略数据” and “生产链路”
+  - no browser console errors
+
+Deployment:
+
+- Deployed source to `/opt/a-share-money-radar`.
+- Built on server with `/opt/node-v24`.
+- Ran `npm run health` on production:
+  - `status: ok`
+  - `strategyDataQuality.tone: ok`
+  - archive latest date `2026-05-25`
+  - replay review samples/tracking `28/28`
+  - production chain latest/plan/strategy/archive/replay dates all `2026-05-25`
+- Synced `dist/` to `http://112.126.57.131/` with `reports` excluded.
+- Verified production UI renders “策略数据” and “生产链路” with no browser console errors.
+
 ### Strategy Replay Review Dashboard
 
 - `strategy:refresh-replay` now writes `reports/backtests/replay-review.json`.
